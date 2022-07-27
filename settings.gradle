@@ -1,5 +1,8 @@
 pluginManagement {
 	repositories {
+		maven { name "Alibaba" ; url 'https://maven.aliyun.com/repository/public' } 
+		maven { name "Bstek" ; url 'https://nexus.bsdn.org/content/groups/public/' } 
+		maven { name "M2" ; url 'https://plugins.gradle.org/m2/' }
 		gradlePluginPortal()
 		maven { url "https://repo.spring.io/plugins-release" }
 	}
@@ -7,7 +10,7 @@ pluginManagement {
 
 plugins {
 	id "com.gradle.enterprise" version "3.6.1"
-	id "io.spring.ge.conventions" version "0.0.7"
+	// id "io.spring.ge.conventions" version "0.0.7"
 }
 
 include "spring-aop"
