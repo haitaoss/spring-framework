@@ -17,6 +17,7 @@ import java.io.InputStream;
  */
 @ComponentScan("cn.haitaoss")
 @HaitaoMapperScan("cn.haitaoss.mapper")
+// @MapperScan
 public class AppConfig {
     @Bean
     public SqlSessionFactory sqlSessionFactory() throws Exception {
