@@ -16,3 +16,8 @@
 ![image-20220727215837291](.README_imgs/image-20220727215837291.png)
 
 - 使用 idea 的 gradle 插件构建失败，可以使用命令行进行构建 `./gradlew build`
+
+
+## Spring 整合 Mybatis
+
+Mybatis 官网：https://mybatis.org/mybatis-3/getting-started.html
