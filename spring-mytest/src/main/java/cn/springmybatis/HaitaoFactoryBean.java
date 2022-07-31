@@ -1,12 +1,10 @@
-package cn.haitaoss.springmybatis;
+package cn.springmybatis;
 
 
-import cn.haitaoss.mapper.UserMapper;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 
 /**
  * @author haitao.chen
@@ -16,32 +14,30 @@ import org.springframework.stereotype.Component;
  *      - haitaoFactoryBean : 这个就是 createInstance 方法返回的对象
  *      - &haitaoFactoryBean ：这个就是 HaitaoFactoryBean 的实例
  */
-@Component
 public class HaitaoFactoryBean implements FactoryBean<Object> {
 
     private SqlSession sqlSession;
 
+    private Class<?> mapperClass;
+
+    public HaitaoFactoryBean(Class<?> mapperClass) {
+        this.mapperClass = mapperClass;
+    }
+
     @Autowired
     public void setSqlSession(SqlSessionFactory sqlSessionFactory) {
-        sqlSessionFactory.getConfiguration().addMapper(UserMapper.class);
+        sqlSessionFactory.getConfiguration()
+                .addMapper(mapperClass);
         this.sqlSession = sqlSessionFactory.openSession();
     }
 
     @Override
     public Object getObject() throws Exception {
-       /* return Proxy.newProxyInstance(HaitaoFactoryBean.class.getClassLoader(), new Class<?>[]{UserMapper.class}, new InvocationHandler() {
-            @Override
-            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-                System.out.println("method = " + method);
-                return null;
-            }
-        });*/
-        UserMapper mapper = sqlSession.getMapper(UserMapper.class);
-        return mapper;
+        return sqlSession.getMapper(mapperClass);
     }
 
     @Override
     public Class<?> getObjectType() {
-        return UserMapper.class;
+        return mapperClass;
     }
 }

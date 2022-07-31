@@ -1,5 +1,6 @@
 package cn.haitaoss.service;
 
+import cn.haitaoss.mapper.OrderMapper;
 import cn.haitaoss.mapper.UserMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -13,9 +14,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class UserService {
     @Autowired
-    private UserMapper userMapper; // Mybatis UserMapper代理对象 ---> bean
+    private UserMapper userMapper;
+
+    @Autowired
+    private OrderMapper orderMapper;
 
     public void printName() {
         System.out.println(userMapper.getUsername());
+        System.out.println(orderMapper.getOrderName());
     }
 }
