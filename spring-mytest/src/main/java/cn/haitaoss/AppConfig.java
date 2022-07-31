@@ -1,5 +1,6 @@
 package cn.haitaoss;
 
+import cn.springmybatis.HaitaoMapperScan;
 import org.apache.ibatis.io.Resources;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
@@ -15,6 +16,7 @@ import java.io.InputStream;
  *
  */
 @ComponentScan("cn.haitaoss")
+@HaitaoMapperScan("cn.haitaoss.mapper")
 public class AppConfig {
     @Bean
     public SqlSessionFactory sqlSessionFactory() throws Exception {
