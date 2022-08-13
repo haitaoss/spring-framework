@@ -11,7 +11,8 @@ repositories {
 
 dependencies {
     implementation project(":spring-context")
-    optional "org.aspectj:aspectjweaver"
+    implementation project(":spring-web")
+    implementation "org.aspectj:aspectjweaver"
     implementation project(":spring-jdbc")
     implementation 'mysql:mysql-connector-java:8.0.30'
     implementation 'org.mybatis:mybatis:3.5.8'

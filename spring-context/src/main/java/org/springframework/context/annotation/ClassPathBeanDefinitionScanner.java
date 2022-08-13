@@ -16,17 +16,10 @@
 
 package org.springframework.context.annotation;
 
-import java.util.LinkedHashSet;
-import java.util.Set;
-
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinitionHolder;
-import org.springframework.beans.factory.support.AbstractBeanDefinition;
-import org.springframework.beans.factory.support.BeanDefinitionDefaults;
-import org.springframework.beans.factory.support.BeanDefinitionReaderUtils;
-import org.springframework.beans.factory.support.BeanDefinitionRegistry;
-import org.springframework.beans.factory.support.BeanNameGenerator;
+import org.springframework.beans.factory.support.*;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.EnvironmentCapable;
 import org.springframework.core.env.StandardEnvironment;
@@ -34,6 +27,9 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.PatternMatchUtils;
+
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 /**
  * A bean definition scanner that detects bean candidates on the classpath,
@@ -273,7 +269,10 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
 		Assert.notEmpty(basePackages, "At least one base package must be specified");
 		Set<BeanDefinitionHolder> beanDefinitions = new LinkedHashSet<>();
 		for (String basePackage : basePackages) {
+
+			// 查找符合条件的 bean
 			Set<BeanDefinition> candidates = findCandidateComponents(basePackage);
+
 			for (BeanDefinition candidate : candidates) {
 				ScopeMetadata scopeMetadata = this.scopeMetadataResolver.resolveScopeMetadata(candidate);
 				candidate.setScope(scopeMetadata.getScopeName());
@@ -281,14 +280,20 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
 				if (candidate instanceof AbstractBeanDefinition) {
 					postProcessBeanDefinition((AbstractBeanDefinition) candidate, beanName);
 				}
+
 				if (candidate instanceof AnnotatedBeanDefinition) {
+					// 解析 @Lazy、@Primary、@DependsOn、@Role、@Description
 					AnnotationConfigUtils.processCommonDefinitionAnnotations((AnnotatedBeanDefinition) candidate);
 				}
+
+				// 检查 Spring 容器中是否已经存在该 beanName
 				if (checkCandidate(beanName, candidate)) {
 					BeanDefinitionHolder definitionHolder = new BeanDefinitionHolder(candidate, beanName);
 					definitionHolder =
 							AnnotationConfigUtils.applyScopedProxyMode(scopeMetadata, definitionHolder, this.registry);
 					beanDefinitions.add(definitionHolder);
+
+					// 注册
 					registerBeanDefinition(definitionHolder, this.registry);
 				}
 			}
@@ -341,6 +346,7 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
 		if (originatingDef != null) {
 			existingDef = originatingDef;
 		}
+		// 是否兼容，如果兼容返回false表示不会重新注册到Spring容器中，如果不兼容会抛异常
 		if (isCompatible(beanDefinition, existingDef)) {
 			return false;
 		}

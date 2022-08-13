@@ -16,30 +16,15 @@
 
 package org.springframework.context.annotation;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.aop.framework.autoproxy.AutoProxyUtils;
 import org.springframework.beans.PropertyValues;
 import org.springframework.beans.factory.BeanClassLoaderAware;
 import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
-import org.springframework.beans.factory.config.BeanDefinition;
-import org.springframework.beans.factory.config.BeanDefinitionHolder;
-import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
-import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
-import org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor;
-import org.springframework.beans.factory.config.SingletonBeanRegistry;
+import org.springframework.beans.factory.config.*;
 import org.springframework.beans.factory.parsing.FailFastProblemReporter;
 import org.springframework.beans.factory.parsing.PassThroughSourceExtractor;
 import org.springframework.beans.factory.parsing.ProblemReporter;
@@ -68,6 +53,8 @@ import org.springframework.core.type.classreading.MetadataReaderFactory;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
+
+import java.util.*;
 
 /**
  * {@link BeanFactoryPostProcessor} used for bootstrapping processing of
@@ -244,6 +231,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		}
 		this.registriesPostProcessed.add(registryId);
 
+		// 解析配置类
 		processConfigBeanDefinitions(registry);
 	}
 
@@ -284,6 +272,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 					logger.debug("Bean definition has already been processed as a configuration class: " + beanDef);
 				}
 			}
+			// 什么是配置类？
 			else if (ConfigurationClassUtils.checkConfigurationClassCandidate(beanDef, this.metadataReaderFactory)) {
 				configCandidates.add(new BeanDefinitionHolder(beanDef, beanName));
 			}
@@ -295,6 +284,7 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		}
 
 		// Sort by previously determined @Order value, if applicable
+		// 通过 Order可以排序，升序排序， order越小越靠前
 		configCandidates.sort((bd1, bd2) -> {
 			int i1 = ConfigurationClassUtils.getOrder(bd1.getBeanDefinition());
 			int i2 = ConfigurationClassUtils.getOrder(bd2.getBeanDefinition());
@@ -306,6 +296,8 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		if (registry instanceof SingletonBeanRegistry) {
 			sbr = (SingletonBeanRegistry) registry;
 			if (!this.localBeanNameGeneratorSet) {
+				// 可以预先往单例池中添加一个 CONFIGURATION_BEAN_NAME_ GENERATOR的 BeanNameGenerator类型的bean
+				// 可以用来作为扫描得到的Bean和 import导入进来的Bean的 beanName
 				BeanNameGenerator generator = (BeanNameGenerator) sbr.getSingleton(
 						AnnotationConfigUtils.CONFIGURATION_BEAN_NAME_GENERATOR);
 				if (generator != null) {
@@ -326,11 +318,19 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 
 		Set<BeanDefinitionHolder> candidates = new LinkedHashSet<>(configCandidates);
 		Set<ConfigurationClass> alreadyParsed = new HashSet<>(configCandidates.size());
+		// 递归解析配置类，有可能通过解析一个配置类，得到了其他的配置类，比如扫描和Import
 		do {
 			StartupStep processConfig = this.applicationStartup.start("spring.context.config-classes.parse");
-			parser.parse(candidates);
+
+			/*
+				解析配置类，会把每个 BeanDefinitionHolder首先封装为 ConfigurationClass
+				在这个过程中会进行扫描、导入等步骤，从而会找到其他的 ConfigurationClass
+				解析配置类的结果是什么？
+			 */
+			parser.parse(candidates); // AppConfig.class ---> BeanDefinition
 			parser.validate();
 
+			// configClasses 相当于就是解析之后的结果
 			Set<ConfigurationClass> configClasses = new LinkedHashSet<>(parser.getConfigurationClasses());
 			configClasses.removeAll(alreadyParsed);
 

@@ -1,0 +1,2 @@
+# Spring 扫描优化机制，如果配置了内容，那么spring只会扫描这里面定义的所有的key，根据value进行分组（注意：这里只是说了而已，真正的类里面需要标注上注解，否则也是扫描不上的）
+cn.haitaoss.service.UserService=org.springframework.stereotype.Component

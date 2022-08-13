@@ -16,30 +16,8 @@
 
 package org.springframework.context.annotation;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.lang.annotation.Annotation;
-import java.net.SocketException;
-import java.net.UnknownHostException;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.StringJoiner;
-import java.util.function.Predicate;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
@@ -60,11 +38,8 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.AnnotationAttributes;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.core.annotation.AnnotationUtils;
-import org.springframework.core.env.CompositePropertySource;
-import org.springframework.core.env.ConfigurableEnvironment;
-import org.springframework.core.env.Environment;
-import org.springframework.core.env.MutablePropertySources;
 import org.springframework.core.env.PropertySource;
+import org.springframework.core.env.*;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.core.io.support.DefaultPropertySourceFactory;
@@ -79,12 +54,15 @@ import org.springframework.core.type.classreading.MetadataReaderFactory;
 import org.springframework.core.type.filter.AssignableTypeFilter;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
-import org.springframework.util.Assert;
-import org.springframework.util.ClassUtils;
-import org.springframework.util.CollectionUtils;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.util.StringUtils;
+import org.springframework.util.*;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.lang.annotation.Annotation;
+import java.net.SocketException;
+import java.net.UnknownHostException;
+import java.util.*;
+import java.util.function.Predicate;
 
 /**
  * Parses a {@link Configuration} class definition, populating a collection of
@@ -286,12 +264,14 @@ class ConfigurationClassParser {
 		}
 
 		// Process any @ComponentScan annotations
+		// 会进行扫描，得到的 BeanDefinition会注册到 Spring容器中，并且会检查是不是配置类并进行解析
 		Set<AnnotationAttributes> componentScans = AnnotationConfigUtils.attributesForRepeatable(
 				sourceClass.getMetadata(), ComponentScans.class, ComponentScan.class);
 		if (!componentScans.isEmpty() &&
 				!this.conditionEvaluator.shouldSkip(sourceClass.getMetadata(), ConfigurationPhase.REGISTER_BEAN)) {
 			for (AnnotationAttributes componentScan : componentScans) {
 				// The config class is annotated with @ComponentScan -> perform the scan immediately
+				// 这里就会进行扫描，得到的 BeanDefinition会注册到 Spring容器中
 				Set<BeanDefinitionHolder> scannedBeanDefinitions =
 						this.componentScanParser.parse(componentScan, sourceClass.getMetadata().getClassName());
 				// Check the set of scanned definitions for any further config classes and parse recursively if needed
@@ -300,6 +280,7 @@ class ConfigurationClassParser {
 					if (bdCand == null) {
 						bdCand = holder.getBeanDefinition();
 					}
+					// 检查扫描出来的 BeanDefinition是不是配置类(full和lite)
 					if (ConfigurationClassUtils.checkConfigurationClassCandidate(bdCand, this.metadataReaderFactory)) {
 						parse(bdCand.getBeanClassName(), holder.getBeanName());
 					}

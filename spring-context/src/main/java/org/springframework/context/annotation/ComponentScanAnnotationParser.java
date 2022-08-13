@@ -16,14 +16,6 @@
 
 package org.springframework.context.annotation;
 
-import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.regex.Pattern;
-
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.config.BeanDefinitionHolder;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
@@ -32,15 +24,14 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.annotation.AnnotationAttributes;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.ResourceLoader;
-import org.springframework.core.type.filter.AbstractTypeHierarchyTraversingFilter;
-import org.springframework.core.type.filter.AnnotationTypeFilter;
-import org.springframework.core.type.filter.AspectJTypeFilter;
-import org.springframework.core.type.filter.AssignableTypeFilter;
-import org.springframework.core.type.filter.RegexPatternTypeFilter;
-import org.springframework.core.type.filter.TypeFilter;
+import org.springframework.core.type.filter.*;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
+
+import java.lang.annotation.Annotation;
+import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * Parser for the @{@link ComponentScan} annotation.
@@ -79,6 +70,7 @@ class ComponentScanAnnotationParser {
 
 		Class<? extends BeanNameGenerator> generatorClass = componentScan.getClass("nameGenerator");
 		boolean useInheritedGenerator = (BeanNameGenerator.class == generatorClass);
+		// 默认为 AnnotationBeanNameGenerator
 		scanner.setBeanNameGenerator(useInheritedGenerator ? this.beanNameGenerator :
 				BeanUtils.instantiateClass(generatorClass));
 

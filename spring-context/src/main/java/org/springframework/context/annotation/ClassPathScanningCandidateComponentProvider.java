@@ -16,17 +16,8 @@
 
 package org.springframework.context.annotation;
 
-import java.io.IOException;
-import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.annotation.Lookup;
@@ -52,13 +43,13 @@ import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.core.type.filter.AssignableTypeFilter;
 import org.springframework.core.type.filter.TypeFilter;
 import org.springframework.lang.Nullable;
-import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Controller;
-import org.springframework.stereotype.Indexed;
-import org.springframework.stereotype.Repository;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.*;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
+
+import java.io.IOException;
+import java.lang.annotation.Annotation;
+import java.util.*;
 
 /**
  * A component provider that provides candidate components from a base package. Can
@@ -339,7 +330,7 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	 * @see #extractStereotype(TypeFilter)
 	 */
 	private boolean indexSupportsIncludeFilter(TypeFilter filter) {
-		if (filter instanceof AnnotationTypeFilter) {
+ 		if (filter instanceof AnnotationTypeFilter) {
 			Class<? extends Annotation> annotation = ((AnnotationTypeFilter) filter).getAnnotationType();
 			return (AnnotationUtils.isAnnotationDeclaredLocally(Indexed.class, annotation) ||
 					annotation.getName().startsWith("javax."));
@@ -387,7 +378,7 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 				if (isCandidateComponent(metadataReader)) {
 					ScannedGenericBeanDefinition sbd = new ScannedGenericBeanDefinition(metadataReader);
 					sbd.setSource(metadataReader.getResource());
-					if (isCandidateComponent(sbd)) {
+					if ( isCandidateComponent(sbd)) {
 						if (debugEnabled) {
 							logger.debug("Using candidate component class from index: " + type);
 						}
@@ -415,6 +406,7 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	private Set<BeanDefinition> scanCandidateComponents(String basePackage) {
 		Set<BeanDefinition> candidates = new LinkedHashSet<>();
 		try {
+			// 获取 basePackage 下所有的文件资源
 			String packageSearchPath = ResourcePatternResolver.CLASSPATH_ALL_URL_PREFIX +
 					resolveBasePackage(basePackage) + '/' + this.resourcePattern;
 			Resource[] resources = getResourcePatternResolver().getResources(packageSearchPath);
@@ -427,7 +419,8 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 				if (resource.isReadable()) {
 					try {
 						MetadataReader metadataReader = getMetadataReaderFactory().getMetadataReader(resource);
-						if (isCandidateComponent(metadataReader)) {
+						// excludeFilters、includeFilters 判断
+						if (isCandidateComponent(metadataReader)) { // @Component --> includeFilters 判断
 							ScannedGenericBeanDefinition sbd = new ScannedGenericBeanDefinition(metadataReader);
 							sbd.setSource(resource);
 							if (isCandidateComponent(sbd)) {
@@ -486,11 +479,14 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	 * @return whether the class qualifies as a candidate component
 	 */
 	protected boolean isCandidateComponent(MetadataReader metadataReader) throws IOException {
+		// 不满足排除规则 且 匹配了包含规则，才能算是一个bean
 		for (TypeFilter tf : this.excludeFilters) {
 			if (tf.match(metadataReader, getMetadataReaderFactory())) {
 				return false;
 			}
 		}
+
+		// 符合 includeFilters的会进行条件匹配，通过了才是Bean,也就是先看有没有 @Component,再看是否符合 @Conditional
 		for (TypeFilter tf : this.includeFilters) {
 			if (tf.match(metadataReader, getMetadataReaderFactory())) {
 				return isConditionMatch(metadataReader);

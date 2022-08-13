@@ -16,21 +16,8 @@
 
 package org.springframework.context.support;
 
-import java.io.IOException;
-import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.beans.BeansException;
 import org.springframework.beans.CachedIntrospectionResults;
 import org.springframework.beans.factory.BeanFactory;
@@ -40,30 +27,8 @@ import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.support.ResourceEditorRegistrar;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.ApplicationContextAware;
-import org.springframework.context.ApplicationEvent;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.ApplicationEventPublisherAware;
-import org.springframework.context.ApplicationListener;
-import org.springframework.context.ApplicationStartupAware;
-import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.context.EmbeddedValueResolverAware;
-import org.springframework.context.EnvironmentAware;
-import org.springframework.context.HierarchicalMessageSource;
-import org.springframework.context.LifecycleProcessor;
-import org.springframework.context.MessageSource;
-import org.springframework.context.MessageSourceAware;
-import org.springframework.context.MessageSourceResolvable;
-import org.springframework.context.NoSuchMessageException;
-import org.springframework.context.PayloadApplicationEvent;
-import org.springframework.context.ResourceLoaderAware;
-import org.springframework.context.event.ApplicationEventMulticaster;
-import org.springframework.context.event.ContextClosedEvent;
-import org.springframework.context.event.ContextRefreshedEvent;
-import org.springframework.context.event.ContextStartedEvent;
-import org.springframework.context.event.ContextStoppedEvent;
-import org.springframework.context.event.SimpleApplicationEventMulticaster;
+import org.springframework.context.*;
+import org.springframework.context.event.*;
 import org.springframework.context.expression.StandardBeanExpressionResolver;
 import org.springframework.context.weaving.LoadTimeWeaverAware;
 import org.springframework.context.weaving.LoadTimeWeaverAwareProcessor;
@@ -87,6 +52,11 @@ import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.ReflectionUtils;
+
+import java.io.IOException;
+import java.lang.annotation.Annotation;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Abstract implementation of the {@link org.springframework.context.ApplicationContext}
@@ -550,33 +520,57 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 			prepareRefresh();
 
 			// Tell the subclass to refresh the internal bean factory.
+			// 这里会判断能否刷新，并且返回一个 BeanFactory,刷新不代表完全情况，主要是先执行Bean的销毁，然后重新生成一个 BeanFactory
 			ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
 
 			// Prepare the bean factory for use in this context.
+			/*
+				准备 BeanFactory
+				1. 设置 BeanFactory的类加载器、 SpringEL表达式解析器、类型转化注册器
+                2. 添加三个 BeanPostProcessor,注意是具体的 BeanPostProcessor实例对象
+                3. 记录 ignoreDependencyInterface
+                4. 记录 ResolvableDependency
+                5. 添加三个单例Bean
+			 */
 			prepareBeanFactory(beanFactory);
 
 			try {
 				// Allows post-processing of the bean factory in context subclasses.
+                // 子类来设置一下 BeanFactory
+
 				postProcessBeanFactory(beanFactory);
 
 				StartupStep beanPostProcess = this.applicationStartup.start("spring.context.beans.post-process");
 				// Invoke factory processors registered as beans in the context.
-				invokeBeanFactoryPostProcessors(beanFactory);
+                /*
+                    BeanFactory准备好了之后，执行 BeanFactoryPostProcessor,开始对 BeanFactory进行处理
+                    默认情况下：
+                        此时 beanFactory的 beanDefinitionMap中有6个 BeanDefinition,5个基础 BeanDefinition + AppConfig的 BeanDefinition
+                        而这6个中只有一个 BeanFactoryPostProcessor: ConfigurationClassPostProcessor
+                        这里会执行 ConfigurationClassPostProcessor进行 @Component的扫描，扫描得到 BeanDefinition,并注册到 beanFa???
+                        注意：扫描的过程中可能又会扫描出其他的 BeanFactoryPostProcessor,那么这些 BeanFactoryPostProcessor也得在这？？？
+                 */
+				invokeBeanFactoryPostProcessors(beanFactory); // scanner.scan()
 
 				// Register bean processors that intercept bean creation.
+                // 将扫描到的 BeanPostProcessors实例化并排序，并添加到 BeanFactory的 beanPostProcessors属性中去
 				registerBeanPostProcessors(beanFactory);
 				beanPostProcess.end();
 
 				// Initialize message source for this context.
+                // 设置 ApplicationContext的 MessageSource,要么是用户设置的，要么是 DelegatingMessageSource
 				initMessageSource();
 
 				// Initialize event multicaster for this context.
+                // 设置 ApplicationContext的 applicationEventMulticaster,么是用户设置的，要么是 SimpleApplicationEventM？？？？
 				initApplicationEventMulticaster();
 
 				// Initialize other special beans in specific context subclasses.
+                // 给子类的模板方法
 				onRefresh();
 
 				// Check for listener beans and register them.
+                // 把定义的 ApplicationListener的Bean对象，设置到 ApplicationContext中去，并执行在此之前所发布的事件
 				registerListeners();
 
 				// Instantiate all remaining (non-lazy-init) singletons.
