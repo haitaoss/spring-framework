@@ -1,6 +1,5 @@
 package cn.haitaoss.service;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -10,10 +9,14 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class UserService {
-    @Value("123")
+    // @Value("123")
     private Order order;
 
     public void say() {
         System.out.println(order);
+    }
+
+    public void test() {
+        System.out.println("test");
     }
 }
