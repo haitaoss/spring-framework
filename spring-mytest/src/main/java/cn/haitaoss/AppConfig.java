@@ -9,7 +9,9 @@ import org.springframework.aop.Pointcut;
 import org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator;
 import org.springframework.aop.support.DefaultPointcutAdvisor;
 import org.springframework.aop.support.NameMatchMethodPointcut;
+import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.*;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.lang.Nullable;
 
 import javax.annotation.Nonnull;
@@ -25,6 +27,12 @@ import java.lang.reflect.Method;
 @Configuration // 让AppConfig是代理对象
 @ImportResource("classpath:spring.xml")
 public class AppConfig {
+    @Bean
+    public MessageSource messageSource() {
+        ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
+        messageSource.setBasename("message"); // 国际化文件的，文件名省略后缀
+        return messageSource;
+    }
 
    /* @Bean // TODOHAITAO: 2022/8/14 1. 首先注册一个 BeanPostProcessor类型的bean 到容器中
     public DefaultAdvisorAutoProxyCreator defaultAdvisorAutoProxyCreator() {
@@ -55,7 +63,8 @@ public class AppConfig {
                 return new MethodMatcher() {
                     @Override
                     public boolean matches(Method method, Class<?> targetClass) {
-                        return !targetClass.getSuperclass().equals(AppConfig.class);
+                        return !targetClass.getSuperclass()
+                                .equals(AppConfig.class);
                     }
 
                     @Override
