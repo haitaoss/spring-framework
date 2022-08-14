@@ -1,7 +1,6 @@
 package cn.haitaoss;
 
 
-import cn.haitaoss.service.UserService;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 /**
@@ -11,47 +10,33 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
  */
 public class Test {
     public static void main(String[] args) throws Exception {
+
+        // 父子 ApplicationContext
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
-        UserService bean = context.getBean(UserService.class);
-        bean.test();
-        /*UserService userServiceProxy = (UserService) context.getBean("userServiceProxy");
-        userServiceProxy.test();*/
+        AnnotationConfigApplicationContext context1= new AnnotationConfigApplicationContext(AppConfig.class);
+        context1.setParent(context1);
+
+        /*// 验证 父子 BeanFactory
+        DefaultListableBeanFactory defaultListableBeanFactory = new DefaultListableBeanFactory();
+        AbstractBeanDefinition beanDefinition = BeanDefinitionBuilder.genericBeanDefinition()
+                .getBeanDefinition();
+        beanDefinition.setBeanClass(OrderService.class);
+        defaultListableBeanFactory.registerBeanDefinition("orderService", beanDefinition);
 
 
-        /*
-        // TODOHAITAO: 2022/8/14 通过 ProxyFactory 创建代理对象
-        UserService userService = new UserService();
-
-        ProxyFactory proxyFactory = new ProxyFactory();
-        proxyFactory.setTarget(userService);
-        proxyFactory.setProxyTargetClass(true); // true：cglib代理；false：jdk代理
-
-        proxyFactory.addAdvice(new MethodInterceptor() {
-            @Nullable
-            @Override
-            public Object invoke(@Nonnull MethodInvocation invocation) throws Throwable {
-                System.out.println("before...");
-                Object result = invocation.proceed();
-                System.out.println("after...");
-                return result;
-            }
-        });
-        UserService proxy = (UserService) proxyFactory.getProxy();
-
-        System.out.println(proxy);*/
+        DefaultListableBeanFactory defaultListableBeanFactory1 = new DefaultListableBeanFactory();
+        AbstractBeanDefinition beanDefinition1 = BeanDefinitionBuilder.genericBeanDefinition()
+                .getBeanDefinition();
+        beanDefinition1.setBeanClass(UserService.class);
+        defaultListableBeanFactory1.registerBeanDefinition("userService", beanDefinition1);
+        defaultListableBeanFactory1.setParentBeanFactory(defaultListableBeanFactory);
 
 
-        /*// 测试 TypeConverter
-        SimpleTypeConverter typeConverter = new SimpleTypeConverter();
+        System.out.println(defaultListableBeanFactory1.getBean("orderService"));*/
 
-        DefaultConversionService defaultConversionService = new DefaultConversionService();
-        defaultConversionService.addConverter(new String2OrderConverter2());
-        typeConverter.setConversionService(defaultConversionService); // Spring 的 ConversionService
-
-        typeConverter.registerCustomEditor(Order.class, new String2OrderPropertyEditor()); // jdk 的 PropertyEditor
-
-        Order order = typeConverter.convertIfNecessary("123", Order.class); // 会判断那个可以用就用那个（优先使用 ConversionService ）
-        System.out.println("order = " + order);*/
-
+        /*// 验证父子BeanDefinition
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+        System.out.println(context.getBean("orderService"));
+        System.out.println(context.getBean("orderService"));*/
     }
 }

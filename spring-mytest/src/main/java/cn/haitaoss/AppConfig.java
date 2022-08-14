@@ -9,10 +9,7 @@ import org.springframework.aop.Pointcut;
 import org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator;
 import org.springframework.aop.support.DefaultPointcutAdvisor;
 import org.springframework.aop.support.NameMatchMethodPointcut;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.*;
 import org.springframework.lang.Nullable;
 
 import javax.annotation.Nonnull;
@@ -26,6 +23,7 @@ import java.lang.reflect.Method;
 @ComponentScan("cn.haitaoss")
 @Import(DefaultAdvisorAutoProxyCreator.class)
 @Configuration // 让AppConfig是代理对象
+@ImportResource("classpath:spring.xml")
 public class AppConfig {
 
    /* @Bean // TODOHAITAO: 2022/8/14 1. 首先注册一个 BeanPostProcessor类型的bean 到容器中
