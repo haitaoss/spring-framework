@@ -1,18 +1,12 @@
 package cn.haitaoss;
 
 
-import cn.haitaoss.service.LazyService;
+import cn.haitaoss.converter.String2OrderConverter2;
+import cn.haitaoss.converter.String2OrderPropertyEditor;
+import cn.haitaoss.service.Order;
 import lombok.Data;
-import org.springframework.cglib.core.DebuggingClassWriter;
-import org.springframework.cglib.core.DefaultGeneratorStrategy;
-import org.springframework.cglib.proxy.Enhancer;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
+import org.springframework.beans.SimpleTypeConverter;
+import org.springframework.core.convert.support.DefaultConversionService;
 
 /**
  * @author haitao.chen
@@ -22,101 +16,22 @@ import java.lang.reflect.Proxy;
 @Data
 public class Test {
     public static void main(String[] args) throws Exception {
-        System.setProperty(DebuggingClassWriter.DEBUG_LOCATION_PROPERTY, "/Users/haitao/Desktop/xx");
-
-        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
-
-        LazyService bean = context.getBean(LazyService.class);
-        bean.test();
-        /*System.out.println("--->");
-        bean.test();
-        System.out.println("========");
-        System.out.println(context.getBean(OrderService.class));
-        System.out.println(context.getBean(OrderService.class));*/
-        /*System.out.println(context.getBean(LookupService.class)
-                .test());
-
-        context.getBean(LookupService.class)
-                .test1();
-        context.getBean(LookupService.class)
-                .test1();
-        context.getBean(LookupService.class)
-                .test2();
-        context.getBean(LookupService.class)
-                .test2();
-        UserService userService = (UserService) context.getBean("userService");
-        userService.test();
-
-        System.out.println(context.getBean(UserService.MemberService2.class));
-        context.getBean(UserService.MemberService1.class);*/
+        /*AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+        context.getBean(UserService.class)
+                .say();*/
 
 
-        //  ASM 工具的简单使用
-        /*FileInputStream fis = new FileInputStream("/Users/haitao/Desktop/spring-framework/spring-mytest/build/classes/java/main/cn/haitaoss/AppConfig.class");
-        ClassReader classReader = new ClassReader(fis);
-        System.out.println(classReader.getClassName());
-        System.out.println(classReader.getSuperName());*/
+        // 测试 TypeConverter
+        SimpleTypeConverter typeConverter = new SimpleTypeConverter();
 
-        // test();
-        // test2();
+        DefaultConversionService defaultConversionService = new DefaultConversionService();
+        defaultConversionService.addConverter(new String2OrderConverter2());
+        typeConverter.setConversionService(defaultConversionService); // Spring 的 ConversionService
 
-       /* D d = new D();
-        System.out.println(d);
+        typeConverter.registerCustomEditor(Order.class, new String2OrderPropertyEditor()); // jdk 的 PropertyEditor
 
-        d.test();*/
-    }
+        Order order = typeConverter.convertIfNecessary("123", Order.class); // 会判断那个可以用就用那个（优先使用 ConversionService ）
+        System.out.println("order = " + order);
 
-    public static void test() {
-        Proxy.newProxyInstance(ClassLoader.getSystemClassLoader(), new Class<?>[]{A.class}, new InvocationHandler() {
-            @Override
-            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-                return null;
-            }
-        });
-
-    }
-
-    public static void test2() {
-        Enhancer enhancer = new Enhancer();
-        enhancer.setSuperclass(C.class);
-
-        C c = new C();
-        enhancer.setCallback(new org.springframework.cglib.proxy.InvocationHandler() {
-            @Override
-            public Object invoke(Object o, Method method, Object[] objects) throws Throwable {
-                System.out.println("代理");
-                return method.invoke(c, objects);
-            }
-        });
-        C o = (C) enhancer.create();
-        o.x();
-
-        try {
-            DefaultGeneratorStrategy instance = DefaultGeneratorStrategy.INSTANCE;
-            byte[] classBin = instance.generate(enhancer);
-            new FileOutputStream(new File("/Users/haitao/Desktop/C.class")).write(classBin);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-}
-
-interface A {
-
-}
-
-class B implements A {}
-
-class C {
-    public void x() {
-        System.out.println(this);
-        System.out.println("执行了");
-    }
-}
-
-class D extends C {
-    public void test() {
-        super.x();
     }
 }
