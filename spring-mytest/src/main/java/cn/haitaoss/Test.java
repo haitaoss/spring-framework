@@ -2,7 +2,7 @@ package cn.haitaoss;
 
 
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.core.io.Resource;
+import org.springframework.core.env.ConfigurableEnvironment;
 
 /**
  * @author haitao.chen
@@ -13,20 +13,16 @@ public class Test {
     public static void main(String[] args) throws Exception {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
 
-        // Spring 提供便利的资源加载方式（本地文件资源、网络资源）
-        Resource resource = context.getResource("/Users/haitao/Desktop/spring-framework/spring-mytest/src/main/java/cn/haitaoss/AppConfig.java");
-        System.out.println(resource.contentLength());
+        ConfigurableEnvironment environment = context.getEnvironment();
 
-        Resource resource1 = context.getResource("https://www.baidu.com");
-        System.out.println(resource1.contentLength());
-        System.out.println(resource1.getURL());
+        System.out.println(environment.getSystemProperties()); // 系统环境变量
+
+        System.out.println(environment.getSystemEnvironment());// jvm 环境变量
+
+        System.out.println(environment.getPropertySources());// 属性文件
 
 
-        Resource resource2 = context.getResource("classpath:spring.xml");
-        System.out.println(resource2.contentLength());
-        System.out.println(resource2.getURL());
-        /*// 或者通过 MessageSourceAware 接口把 MessageSource 注入到bean中
-        System.out.println(context.getMessage("name", null, new Locale("en")));*/
-
+        //  不需要关系，变量属于 操作系统、JVM、属性文件，直接可以通过下面的方式获取
+        System.out.println(environment.getProperty("test"));
     }
 }
