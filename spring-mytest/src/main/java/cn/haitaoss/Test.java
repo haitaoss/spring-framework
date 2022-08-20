@@ -12,6 +12,5 @@ public class Test {
 
     public static void main(String[] args) throws Exception {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
-        context.publishEvent("haitao");
     }
 }
