@@ -40,7 +40,7 @@ public class AppConfig {
         return new DefaultAdvisorAutoProxyCreator();
     }*/
 
-    @Bean // TODOHAITAO: 2022/8/14 2. 设置增强器（切入点和增强内容）
+    // @Bean // TODOHAITAO: 2022/8/14 2. 设置增强器（切入点和增强内容）
     public DefaultPointcutAdvisor defaultPointcutAdvisor() {
         NameMatchMethodPointcut nameMatchMethodPointcut = new NameMatchMethodPointcut();
         nameMatchMethodPointcut.addMethodName("test");
