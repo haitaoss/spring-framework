@@ -16,7 +16,8 @@
                 http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
                 http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.0.xsd
                  http://mybatis.org/schema/mybatis-spring http://mybatis.org/schema/mybatis-spring-1.2.xsd">
-    <!-- 父子 beanDefinition 属性是可以继承的-->
-    <bean id="userServiceX" class="cn.haitaoss.service.UserService" scope="prototype"/>
-    <bean id="orderService" class="cn.haitaoss.service.OrderService" parent="userServiceX"/>
+    <!--    <context:component-scan base-package="cn.haitaoss.xml"/>-->
+    <bean id="parentComponent" class="cn.haitaoss.xml.TestXml" abstract="true"/>
+    <bean id="songComponent" class="cn.haitaoss.xml.TestXml" parent="parentComponent"/>
+    <bean id="testInit" class="cn.haitaoss.xml.TestXml" init-method="myInit"/>
 </beans>

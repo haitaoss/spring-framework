@@ -95,3 +95,23 @@ class Demo {
 
 }
 ```
+
+## 后置处理器
+## BeanFactory 的后置处理器(只会在IOC 生命周期中 执行一次)
+
+- // TODOHAITAO BeanDefinitionRegistryPostProcessor#postProcessBeanDefinitionRegistry。可用来修改和注册 BeanDefinition（JavaConfig 就是通过 ConfigurationClassPostProcessor ）
+- // TODOHAITAO BeanFactoryPostProcessor#postProcessBeanFactory 此时 beanDefinition 都加载完了,可以在这里创建bean 来实现提前创建的目的
+
+## bean 九个后置处理器（每个bean 都会执行）
+
+
+InstantiationAwareBeanPostProcessors后置处器 postProcessAfterInitialization
+InstantiationAwareBeanPostProcessors后置处器 postProcessAfterInitialization
+SmartInstantiationAwareBeanPostProcessor#determineCandidateConstructors
+MergedBeanDefinitionPostProcessor#postProcessMergedBeanDefinition
+SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference
+
+
+
+
+
