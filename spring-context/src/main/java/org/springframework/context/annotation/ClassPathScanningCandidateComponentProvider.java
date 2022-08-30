@@ -499,6 +499,7 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
         // 符合 includeFilters的会进行条件匹配，通过了才是Bean,也就是先看有没有 @Component,再看是否符合 @Conditional
         for (TypeFilter tf : this.includeFilters) {
             if (tf.match(metadataReader, getMetadataReaderFactory())) {
+                // TODOHAITAO: 2022/8/29 @Conditional 注解的判断
                 return isConditionMatch(metadataReader);
             }
         }

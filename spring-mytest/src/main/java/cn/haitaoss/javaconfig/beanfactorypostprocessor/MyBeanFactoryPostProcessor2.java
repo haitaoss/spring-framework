@@ -17,16 +17,9 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class MyBeanFactoryPostProcessor2 implements BeanDefinitionRegistryPostProcessor {
-    /**
-     * 通过这个可以实现 bean创建的优先级
-     *
-     * @throws BeansException
-     */
+
     @Override
     public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
-        System.out.println("MyBeanFactoryPostProcessor2.postProcessBeanFactory...");
-        System.out.println("可以通过这种方式 提前创建bean");
-        beanFactory.getBean("testPreCreate");
     }
 
     /**

@@ -1,5 +1,5 @@
-
 ## 本地编译配置
+
 1. 删掉代码检查规范
 2. 添加仓库
 3. 注释掉插件
@@ -7,6 +7,7 @@
 5. 编译代码：`./gradlew build`
 
 ## 编写测试类测试
+
 - 需要在idea中配置 gradle 的编译信息
 
 ![img.png](.README_imgs/img.png)
@@ -17,37 +18,38 @@
 
 - 使用 idea 的 gradle 插件构建失败，可以使用命令行进行构建 `./gradlew build`
 
-
 ## Spring 整合 Mybatis
 
 Mybatis 官网：https://mybatis.org/mybatis-3/getting-started.html
 
+## Spring 扫描源码
 
-## Spring 扫描源码 
 ### 源码分析
 
 关键的几个方法：
-- org.springframework.context.annotation.ConfigurationClassPostProcessor 
-  - org.springframework.context.annotation.ConfigurationClassPostProcessor.postProcessBeanDefinitionRegistry 
-    - org.springframework.context.annotation.ConfigurationClassParser.doProcessConfigurationClass 
-      - org.springframework.context.annotation.ClassPathBeanDefinitionScanner.doScan
+
+- org.springframework.context.annotation.ConfigurationClassPostProcessor
+    - org.springframework.context.annotation.ConfigurationClassPostProcessor.postProcessBeanDefinitionRegistry
+        - org.springframework.context.annotation.ConfigurationClassParser.doProcessConfigurationClass
+            - org.springframework.context.annotation.ClassPathBeanDefinitionScanner.doScan
 
 核心步骤：
+
 1. @ComponentScan 注解
 2. 构造扫描器 ClassPathBeanDefinitionScanner
 3. 根据 @ComponentScan 注解的属性配置扫描器
 4. 扫描: 两种扫描方式
-   - 扫描指定的类：工具目录配置了 `resources/META-INF/spring.components` 内容，就只会扫描里面定义的类。这是Spring扫描的优化机制
-   - 扫描指定包下的所有类：获得扫描路径下所有的class文件（Resource对象）
+    - 扫描指定的类：工具目录配置了 `resources/META-INF/spring.components` 内容，就只会扫描里面定义的类。这是Spring扫描的优化机制
+    - 扫描指定包下的所有类：获得扫描路径下所有的class文件（Resource对象）
 5. 利用 ASM 技术读取class文件信息
 6. 进行filter+条件注解的判断
 7. 进行独立类、接口、抽样类 @Lookup的判断
 8. 判断生成的BeanDefinition是否重复
 9. 添加到Spring容器中
 
-
 ### [ASM 技术](https://asm.ow2.io/)
->  简单来说，ASM是一个操作Java字节码的类库。
+
+> 简单来说，ASM是一个操作Java字节码的类库。
 > #### 第一个问题，ASM的操作对象是什么呢？
 > ASM所操作的对象是字节码（ByteCode）数据
 > #### 第二个问题，ASM是如何处理字节码（ByteCode）数据的？
@@ -56,11 +58,12 @@ Mybatis 官网：https://mybatis.org/mybatis-3/getting-started.html
 > - 说白了就是文件解析，并不会把这个 .class 文件加载到 JVM 中，就是文件的解析工具
 
 为什么要使用 ASM ?
-- 扫描到所有的 class 资源后，要判断该 class 是否作为一个 bean对象（比如标注了@Component 注解），
-如果我们通过反射来判断，那么在 Spring 启动阶段就会加载很多的bean，这势必会浪费系统资源和耗时（因为可能很多的工具类，是不需要Spring进行管理的）。
 
+- 扫描到所有的 class 资源后，要判断该 class 是否作为一个 bean对象（比如标注了@Component 注解），
+  如果我们通过反射来判断，那么在 Spring 启动阶段就会加载很多的bean，这势必会浪费系统资源和耗时（因为可能很多的工具类，是不需要Spring进行管理的）。
 
 ### Lookup 注解
+
 这个注解标注在方法上，如果一个bean对象中的方法标注了 Lookup注解，那么会生成代理对象放入 bean容器中，
 当标注了 Lookup 注解的方法时，会直接返回 Lookup 需要查找的bean，并不会执行方法，
 所以说 Lookup 的value值要指定，否则没有意义。
@@ -68,7 +71,9 @@ Mybatis 官网：https://mybatis.org/mybatis-3/getting-started.html
 使用说明：如果Lookup注解的value没有指定，那么会根据方法的返回值类型查找bean，如果指定了value 那就根据name查找bean
 
 使用场景：A 依赖多例bean B，可以使用Lookup 注解在A中定义一个方法，该方法每次都会从容器中获取一个bean，因为B 是多例的，所以每次都是返回新的对象
+
 ```java
+
 @Component
 public class LookupService {
     @Autowired
@@ -97,13 +102,14 @@ class Demo {
 ```
 
 ## 后置处理器
+
 ## BeanFactory 的后置处理器(只会在IOC 生命周期中 执行一次)
 
-- // TODOHAITAO BeanDefinitionRegistryPostProcessor#postProcessBeanDefinitionRegistry。可用来修改和注册 BeanDefinition（JavaConfig 就是通过 ConfigurationClassPostProcessor ）
+- // TODOHAITAO BeanDefinitionRegistryPostProcessor#postProcessBeanDefinitionRegistry。可用来修改和注册 BeanDefinition（JavaConfig
+  就是通过 ConfigurationClassPostProcessor ）
 - // TODOHAITAO BeanFactoryPostProcessor#postProcessBeanFactory 此时 beanDefinition 都加载完了,可以在这里创建bean 来实现提前创建的目的
 
 ## bean 九个后置处理器（每个bean 都会执行）
-
 
 InstantiationAwareBeanPostProcessors后置处器 postProcessAfterInitialization
 InstantiationAwareBeanPostProcessors后置处器 postProcessAfterInitialization
@@ -111,7 +117,124 @@ SmartInstantiationAwareBeanPostProcessor#determineCandidateConstructors
 MergedBeanDefinitionPostProcessor#postProcessMergedBeanDefinition
 SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference
 
+## Conditional 注解的作用
 
+```java
+@ComponentScan(value = "cn.haitaoss.javaconfig.beanfactorypostprocessor", excludeFilters = {}, includeFilters = {})
+```
 
+执行完 excludeFilters 、includeFilters 会进行 @Conditional 条件的判断
+org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider.isCandidateComponent(
+org.springframework.core.type.classreading.MetadataReader)
 
+```java
 
+@FunctionalInterface
+public interface Condition {
+    /**
+     *
+     * @param context 这里面可以拿到，beanFactory 已经注册的beanDefinition 和 单例bean。所以Condition的判断只能是判断当前环境的
+     * @param metadata
+     * @return
+     */
+    boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata);
+}
+```
+
+## 类型转换
+
+### bean的生命周期中时候会使用 TypeConverter?
+
+```java
+/**
+ * 创建bean -> 填充bean -> AutowiredAnnotationBeanPostProcessor#postProcessProperties -> resolveFieldValue -> getTypeConverter
+ * @see AbstractAutowireCapableBeanFactory#doCreateBean(String, RootBeanDefinition, Object[])
+ * @see AbstractAutowireCapableBeanFactory#populateBean(String, RootBeanDefinition, BeanWrapper)
+ * @see AutowiredAnnotationBeanPostProcessor#postProcessProperties(PropertyValues, Object, String)
+ * @see AutowiredAnnotationBeanPostProcessor.AutowiredFieldElement#resolveFieldValue(Field, Object, String)
+ * @see AbstractBeanFactory#getTypeConverter()
+ * 注：类型转换的功能是通过 ConversionService 实现的
+ * */
+```
+
+### 什么时候往 TypeConverter 中设置 conversionService? IOC 容器refresh环节
+
+```java
+/**
+ * 会在这里从容器中获取一个name 是 conversionService 的bean 进行注入
+ * @see org.springframework.context.support.AbstractApplicationContext#finishBeanFactoryInitialization(ConfigurableListableBeanFactory)
+ */
+```
+
+### 有哪些 ConversionService ？
+
+其中 DefaultFormattingConversionService 功能强大： 类型转换 + 格式化
+![img.png](img.png)
+
+```java
+
+@Component
+public class TestConversionService {
+    @Value("2022-08-11")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    private Date date = new Date();
+
+    @Value("101.11")
+    @NumberFormat(pattern = "#")
+    private Integer money;
+
+    @Value("code,play")
+    private String[] jobs;
+
+    @Override
+    public String toString() {
+        return "TestConversionService{" + "date=" + date + ", money=" + money + ", jobs=" + Arrays.toString(jobs) + '}';
+    }
+}
+```
+
+### 如何自定义类型装换？
+
+```java
+
+@Component
+public class TestConversionService {
+    @Value("haitaoss")
+    private Person person;
+}
+```
+
+```java
+public class AppConfig {
+    public AppConfig() {
+        System.out.println("AppConfig 构造器");
+    }
+
+    @Bean
+    public FormattingConversionService conversionService() {
+        DefaultFormattingConversionService conversionService = new DefaultFormattingConversionService();
+        conversionService.addConverter(new String2PersonConverter());
+        return conversionService;
+    }
+}
+
+class String2PersonConverter implements ConditionalGenericConverter {
+    @Override
+    public boolean matches(TypeDescriptor sourceType, TypeDescriptor targetType) {
+        return String.class.isAssignableFrom(sourceType.getType())
+               && Person.class.isAssignableFrom(targetType.getType());
+    }
+
+    @Override
+    public Set<ConvertiblePair> getConvertibleTypes() {
+        return Collections.singleton(new ConvertiblePair(String.class, Person.class));
+    }
+
+    @Override
+    public Object convert(Object source, TypeDescriptor sourceType, TypeDescriptor targetType) {
+        Person person = new Person();
+        person.setName(source + "--->");
+        return person;
+    }
+}
+```

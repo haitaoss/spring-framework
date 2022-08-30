@@ -932,12 +932,17 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 
     @Override
     public TypeConverter getTypeConverter() {
+        // TODOHAITAO 执行属性注入的时候 会使用 TypeConverter 来解析
         TypeConverter customConverter = getCustomTypeConverter();
         if (customConverter != null) {
             return customConverter;
         } else {
             // Build default TypeConverter, registering custom editors.
             SimpleTypeConverter typeConverter = new SimpleTypeConverter();
+            /**
+             * 会在这里从容器中获取一个name 是 conversionService 的bean 进行注入
+             * @see org.springframework.context.support.AbstractApplicationContext#finishBeanFactoryInitialization(ConfigurableListableBeanFactory)
+             */
             typeConverter.setConversionService(getConversionService());
             registerCustomEditors(typeConverter);
             return typeConverter;
