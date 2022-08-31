@@ -384,7 +384,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
         for (BeanPostProcessor processor : getBeanPostProcessors()) {
             /**
              * TODOHAITAO 后置处理器的【第八次】BeanPostProcessor#postProcessBeforeInitialization
-             * 调用我们的bean的后置处理器的 BeanPostProcessor#postProcessBeforeInitialization @PostCust注解的方法
+             * 调用我们的bean的后置处理器的 BeanPostProcessor#postProcessBeforeInitialization @PostConstruct 注解的方法
              * @see cn.haitaoss.javaconfig.beanpostprocessor.MyInstantiationAwareBeanPostProcessor#postProcessBeforeInitialization(Object, String)
              * */
             Object current = processor.postProcessBeforeInitialization(result, beanName);
@@ -575,7 +575,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
             if (!mbd.postProcessed) {
                 try {
                     /**
-                     * TODOHAITAO 后置处理器的【第三次】MergedBeanDefinitionPostProcessor#postProcessMergedBeanDefinition
+                     * TODOHAITAO 后置处理器的【第四次】MergedBeanDefinitionPostProcessor#postProcessMergedBeanDefinition
                      * 进行后置处理 @Autowired @Value的注解的预解析
                      */
                     applyMergedBeanDefinitionPostProcessors(mbd, beanType, beanName);
@@ -986,7 +986,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
         if (!mbd.isSynthetic() && hasInstantiationAwareBeanPostProcessors()) {
             for (SmartInstantiationAwareBeanPostProcessor bp : getBeanPostProcessorCache().smartInstantiationAware) {
                 /**
-                 * TODOHAITAO 后置处理器的【第四次】 SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference
+                 * TODOHAITAO 后置处理器的【第一次】 SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference
                  */
                 exposedObject = bp.getEarlyBeanReference(exposedObject, beanName);
             }
@@ -1136,7 +1136,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
                 if (targetType != null) {
                     /**
                      *
-                     * TODOHAITAO 后置处理器的【第一次】调用总共有九处调用事务在这里不会被调用，aop的才会被调用
+                     * TODOHAITAO 后置处理器的【第二次】调用总共有九处调用事务在这里不会被调用，aop的才会被调用
                      * 为啥aop在这里调用了，因为在此处需要解析出对应的切面保存到缓存中
                      * */
                     bean = applyBeanPostProcessorsBeforeInstantiation(targetType, beanName);
@@ -1359,7 +1359,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
         // beanClass对象不为空且ioc容器中有 InstantiationAwareBeanPostProcessors 的后置处理器
         if (beanClass != null && hasInstantiationAwareBeanPostProcessors()) {
             /**
-             * TODOHAITAO 后置处理器的【第二次】遍历 SmartInstantiationAwareBeanPostProcessor#determineCandidateConstructors
+             * TODOHAITAO 后置处理器的【第三次】遍历 SmartInstantiationAwareBeanPostProcessor#determineCandidateConstructors
              * @see  cn.haitaoss.javaconfig.beanpostprocessor.MySmartInstantiationAwareBeanPostProcessor
              */
             for (SmartInstantiationAwareBeanPostProcessor bp : getBeanPostProcessorCache().smartInstantiationAware) {
@@ -1536,7 +1536,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
                     /**
                      * TODOHAITAO 后置处理器的【第七次】cn.haitaoss.javaconfig.beanpostprocessor.MyInstantiationAwareBeanPostProcessor#postProcessPropertyValues(org.springframework.beans.PropertyValues, java.beans.PropertyDescriptor[], java.lang.Object, java.lang.String)
                      * 过时方法了，不建议使用
-                     * @see cn.haitaoss.javaconfig.beanpostprocessor.MyInstantiationAwareBeanPostProcessor#postProcessProperties(PropertyValues, Object, String)
+                     * @see cn.haitaoss.javaconfig.beanpostprocessor.MyInstantiationAwareBeanPostProcessor#postProcessPropertyValues(PropertyValues, Object, String)
                      */
                     pvsToUse = bp.postProcessPropertyValues(pvs, filteredPds, bw.getWrappedInstance(), beanName);
                     if (pvsToUse == null) {

@@ -573,12 +573,13 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
         /**
          * @see cn.haitaoss.javaconfig.dependson.A1
          * A 依赖 C
-         * beanName ： A
-         * dependentBeanName ：C
+         * beanName(依赖) ： A
+         * dependentBeanName(被依赖) ：C
          *
          * dependentBeanMap：
          *  key: C
          *  value: {A...}
+         *
          */
         String canonicalName = canonicalName(beanName);
         Set<String> dependentBeans = this.dependentBeanMap.get(canonicalName);

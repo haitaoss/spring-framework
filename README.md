@@ -238,3 +238,122 @@ class String2PersonConverter implements ConditionalGenericConverter {
     }
 }
 ```
+
+## bean 创建的生命周期
+
+1. 所有的bean 都是通过 `getBean()` 来创建的
+```java
+/** 
+ * 
+ * @see AbstractApplicationContext#refresh()
+ * @see AbstractApplicationContext#finishBeanFactoryInitialization(ConfigurableListableBeanFactory)
+ * @see DefaultListableBeanFactory#preInstantiateSingletons()
+ *  - 遍历 beanNames 
+ *  - 不是抽象的 && 是单例的 && 不是懒加载的
+ *  - 是不是 FactoryBean :
+ *      - 是：
+ *          - 创建 FactoryBean 实例
+ *          - 判断 是否立即初始化 FactoryBean#getObject 返回的bean
+ *      - 不是： 
+ *          @see org.springframework.beans.factory.support.AbstractBeanFactory#getBean(java.lang.String)
+ *      注：创建bean 都是执行 getBean
+ * */
+```
+
+2. `getBean()` 流程
+```java
+/**
+ * @see AbstractBeanFactory#doGetBean(String, Class, Object[], boolean)
+ * 根据beanName 从单例池获取bean
+ *  是否存在
+ *      存在：
+ *          - beanName 是 &开头的 直接返回
+ *          - 不是 &开头，获取的 bean 是 FactoryBean 的实例 直接返回
+ *          - 不是 &开头，获取的 bean 是 FactoryBean 的实例，那就是要返回 FactoryBean#getObject 返回的bean
+ *              1. 从 factoryBeanObjectCache 中获取
+ *              2. 缓存中不存在，执行 `FactoryBean#getObject` 存储缓存，然后返回
+ *      不存在：
+ *          - 当前beanFactory 中不存在 该beanName 的 definition，判断父 beanFactory 是否存在，存在就执行  org.springframework.beans.factory.BeanFactory#getBean(java.lang.String)
+ *          - 获取该bean 所有的 dependsOn 的值，遍历执行 org.springframework.beans.factory.support.AbstractBeanFactory#getBean(java.lang.String)
+ *          - 是单例bean
+ *              @see org.springframework.beans.factory.support.DefaultSingletonBeanRegistry#getSingleton(java.lang.String, org.springframework.beans.factory.ObjectFactory)
+ *          - 是多例bean
+ *              @see org.springframework.beans.factory.support.AbstractBeanFactory#createBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])
+ *          - 其他bean（web应用的：request域、session域、application域）
+ *              @see org.springframework.beans.factory.config.Scope#get(java.lang.String, org.springframework.beans.factory.ObjectFactory)
+ * */
+```
+
+3. `DefaultSingletonBeanRegistry#getSingleton` 流程
+```java
+/**
+ * DefaultSingletonBeanRegistry#getSingleton
+ * 1. 从单例缓存池中获取不到 bean `this.singletonObjects.get(beanName);`
+ *  - 单例池获取 -> 二级缓存获取 -> 三级缓存获取，执行缓存里的ObjectFactory 进行提前AOP
+ *  - 提前AOP，【第一次】执行beanPostProcessor
+ * @see org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference(java.lang.Object, java.lang.String)
+ * 2. 标记当前bean 正在创建（用来解决循环依赖）`this.singletonsCurrentlyInCreation.add(beanName)`
+ * 3. 创建bean 
+ *  @see AbstractAutowireCapableBeanFactory#createBean(String, RootBeanDefinition, Object[])
+ * 4. 删除标记 `this.singletonsCurrentlyInCreation.remove(beanName)`
+ * 5. 将bean 放入单例池
+ *  @see DefaultSingletonBeanRegistry#addSingleton(String, Object)
+ *  1. 加入到单例缓存池中
+ *  2. 从三级缓存中移除
+ *  3. 从二级缓存中移除
+ * */
+```
+
+4. `AbstractAutowireCapableBeanFactory#createBean` 可以通过后置处理器，快速返回，不要执行bean创建的生命周期
+```java
+/**
+ * @see AbstractAutowireCapableBeanFactory#createBean(String, RootBeanDefinition, Object[])
+ * 1. 【第二次】执行beanPostProcessor 返回值不为null 直接返回bean，不执行后面 bean的生命周期流程（简而言之可以拦截bean的创建过程）
+ * @see org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessBeforeInstantiation(java.lang.Class, java.lang.String)
+ * 2. 真正开始创建bean了，返回创建结果(这里才是bean的核心生命周期流程) 
+ * @see org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#doCreateBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])
+ * */
+```
+
+5. `AbstractAutowireCapableBeanFactory#doCreateBean` bean创建的生命周期
+```java
+/**
+ * 1. 构造器初始化
+ *  @see AbstractAutowireCapableBeanFactory#createBeanInstance(String, RootBeanDefinition, Object[])
+ *  【第三次】执行beanPostProcessor，返回构造器
+ *      @see SmartInstantiationAwareBeanPostProcessor#determineCandidateConstructors(Class, String)
+ * 2. 【第四次】执行beanPostProcessor, 对 @Autowired @Value的注解的预解析
+ *  @see MergedBeanDefinitionPostProcessor#postProcessMergedBeanDefinition(RootBeanDefinition, Class, String)
+ *  3. 满足（是单例bean && 允许循环引用 && 当前bean在真正创建bean集合中）往三级缓存中，记录 当前实例化的bean 的 提前AOP 操作
+ * @see DefaultSingletonBeanRegistry#addSingletonFactory(String, ObjectFactory)
+ *      - 参数 ObjectFactory
+ *          @see AbstractAutowireCapableBeanFactory#getEarlyBeanReference(String, RootBeanDefinition, Object)
+ *          - `getEarlyBeanReference` 里面其实是提前AOP的操作，说白了就是执行beanPostProcessor
+ *              @see SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference(Object, String)
+ *  4. 属性注入
+ * @see AbstractAutowireCapableBeanFactory#populateBean(String, RootBeanDefinition, BeanWrapper)
+ *      1. 【第五次】执行beanPostProcessor, 停止属性注入
+ *          @see InstantiationAwareBeanPostProcessor#postProcessAfterInstantiation(Object, String)
+ *      2. 对属性的值进行解析(会使用 TypeConverter )，存到 `PropertyValues`（注意这里还没有把值设置到bean对象中，只是存到 `PropertyValues`）
+ *          @see AutowireCapableBeanFactory#resolveDependency(DependencyDescriptor, String, Set, TypeConverter)
+ *      3. 【第六次】执行beanPostProcessor, 也是解析配置的属性值 记录在 `PropertyValues`
+ *          @see InstantiationAwareBeanPostProcessor#postProcessProperties(PropertyValues, Object, String)
+ *      4. 【第七次】执行beanPostProcessor，也是解析配置的属性值 记录在 `PropertyValues`
+ *          @see InstantiationAwareBeanPostProcessor#postProcessPropertyValues(PropertyValues, PropertyDescriptor[], Object, String)
+ *      5. 如果上面解析的 PropertyValues 不为null，就把 `PropertyValues` 注入到 bean实例中，完成属性注入
+ *          @see AbstractAutowireCapableBeanFactory#applyPropertyValues(String, BeanDefinition, BeanWrapper, PropertyValues)
+ *  5. 初始化操作
+ * @see AbstractAutowireCapableBeanFactory#initializeBean(String, Object, RootBeanDefinition)
+ *      1. 完成对 XxxAware 接口的方法回调
+ *          @see AbstractAutowireCapableBeanFactory#invokeAwareMethods(String, Object)
+ *      2. 【第八次】执行beanPostProcessor, 比如 执行 @PostConstruct 标注的方法
+ *          @see BeanPostProcessor#postProcessBeforeInitialization(Object, String)
+ *      3. 执行初始化方法, 执行 org.springframework.beans.factory.InitializingBean#afterPropertiesSet()
+ *          @see AbstractAutowireCapableBeanFactory#invokeInitMethods(String, Object, RootBeanDefinition)
+ *      4. 【第九次】执行beanPostProcessor, @EnableAspectJAutoProxy 、@EnableTransactionManagement 都是在这里完成代理对象的创建的
+ *          @see BeanPostProcessor#postProcessAfterInitialization(Object, String)
+ *  6. 销毁bean
+ *      【第十次】执行beanPostProcessor
+ *          @see org.springframework.beans.factory.config.DestructionAwareBeanPostProcessor.requiresDestruction
+ * */
+```
