@@ -308,7 +308,11 @@ class String2PersonConverter implements ConditionalGenericConverter {
 ```java
 /**
  * @see AbstractAutowireCapableBeanFactory#createBean(String, RootBeanDefinition, Object[])
- * 1. 【第二次】执行beanPostProcessor 返回值不为null 直接返回bean，不执行后面 bean的生命周期流程（简而言之可以拦截bean的创建过程）
+ * 1. 【第二次】执行beanPostProcessor 可以实现 不执行后面 bean的构造器、属性注入、初始化流程（简而言之可以拦截bean的创建过程）
+ *  - 返回值是否为null:
+ *      为null：继续走 bean 的生命周期流程
+ *      不为null：执行beanPostProcessor，执行bean的初始化后动作（AOP和注解事务是在 `postProcessAfterInitialization` 实现的）
+ *          @see org.springframework.beans.factory.config.BeanPostProcessor#postProcessAfterInitialization(java.lang.Object, java.lang.String)
  * @see org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessBeforeInstantiation(java.lang.Class, java.lang.String)
  * 2. 真正开始创建bean了，返回创建结果(这里才是bean的核心生命周期流程) 
  * @see org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#doCreateBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])
