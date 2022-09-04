@@ -375,3 +375,16 @@ class String2PersonConverter implements ConditionalGenericConverter {
  *          @see org.springframework.beans.factory.config.DestructionAwareBeanPostProcessor.requiresDestruction
  * */
 ```
+
+## 如何实现bean创建的优先级
+```java
+/**
+ * 如何实现bean创建的优先级：
+ * 1. 实现 BeanFactoryPostProcessor（缺点：破坏了bean的生命周期）
+ * 2. 重写 cn.haitaoss.javaconfig.ordercreatebean.MySmartInstantiationAwareBeanPostProcessor#postProcessBeforeInstantiation(java.lang.Class, java.lang.String)
+ *  这个是 BeanPostProcessor 中最先执行的回调方法，其他的BeanPostProcessor 也可以
+ * 3. 重写 onRefresh 方法，通过发布并消费早期事件
+ *      cn.haitaoss.javaconfig.applicationlistener.MyAnnotationConfigApplicationContext#onRefresh()
+ * 4. 使用 @DependsOn("b")
+ */
+```
