@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
  * date 2022-08-28 19:19
  *
  */
-@Component
+// @Component
 @Scope("prototype")
 public class A {
     @Autowired
@@ -21,7 +21,7 @@ public class A {
     }
 }
 
-@Component
+// @Component
 @Scope("prototype")
 class B {
     @Autowired

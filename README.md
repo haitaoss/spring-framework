@@ -388,3 +388,20 @@ class String2PersonConverter implements ConditionalGenericConverter {
  * 4. 使用 @DependsOn("b")
  */
 ```
+
+## 单例bean循环依赖导致的错误
+```java
+/**
+ * spring 为了解决单例bean循环依赖问题，是才用 提请 AOP 的方式 来解决的，
+ * 提前AOP是执行
+ *      @see org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference(java.lang.Object, java.lang.String)
+ * 然后在bean的生命周期的最后阶段会执行 org.springframework.beans.factory.config.BeanPostProcessor#postProcessAfterInitialization(java.lang.Object, java.lang.String)
+ * 也可能会返回代理对象。所以就可能出现 postProcessAfterInitialization 创建的代理对象和一开始提前AOP注入给其他bean的不一样
+ * 所以只能报错了。
+ *
+ * 解决方式：
+ * 1. 将 postProcessAfterInitialization 的代理逻辑放到 SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference 实现
+ * 2. 使用 @Lazy 注解，不要在初始化的时间就从容器中获取bean，而是直接返回一个代理对象
+ * 3. 使用 @Lookup
+ */
+```
