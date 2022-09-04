@@ -1,7 +1,6 @@
 package cn.haitaoss;
 
 
-import cn.haitaoss.javaconfig.service.TestConversionService;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 /**
@@ -14,7 +13,11 @@ public class Test {
     public static void main(String[] args) throws Exception {
         // ClassPathXmlApplicationContext classPathXmlApplicationContext = new ClassPathXmlApplicationContext("spring.xml");
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+
+        /*
+        测试 格式化和类型转换
         System.out.println(context.getBean(TestConversionService.class));
+        */
 
         /*
         测试构造器注入 异常

@@ -241,6 +241,20 @@ class String2PersonConverter implements ConditionalGenericConverter {
 
 ## bean 创建的生命周期
 
+```java
+/**
+ * org.springframework.beans.factory.support.AbstractBeanFactory#getBean(java.lang.String, java.lang.Class, java.lang.Object...)
+ * org.springframework.beans.factory.support.AbstractBeanFactory#doGetBean(java.lang.String, java.lang.Class, java.lang.Object[], boolean)
+ *   循环依赖核心代码：如果bean正在创建 -> 二级缓存获取 -> 三级缓存 对正在创建的bean 进行提前AOP 然后返回
+ *      org.springframework.beans.factory.support.DefaultSingletonBeanRegistry#getSingleton(java.lang.String)
+ * org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#createBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])
+ * org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#doCreateBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])
+ *  org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#createBeanInstance(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])
+ *  org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#populateBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, org.springframework.beans.BeanWrapper)
+ *  org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#initializeBean(java.lang.String, java.lang.Object, org.springframework.beans.factory.support.RootBeanDefinition)
+ * */
+```
+
 1. 所有的bean 都是通过 `getBean()` 来创建的
 ```java
 /** 
@@ -268,7 +282,7 @@ class String2PersonConverter implements ConditionalGenericConverter {
  *  是否存在
  *      存在：
  *          - beanName 是 &开头的 直接返回
- *          - 不是 &开头，获取的 bean 是 FactoryBean 的实例 直接返回
+ *          - 不是 &开头，获取的 bean 不是 FactoryBean 的实例 直接返回
  *          - 不是 &开头，获取的 bean 是 FactoryBean 的实例，那就是要返回 FactoryBean#getObject 返回的bean
  *              1. 从 factoryBeanObjectCache 中获取
  *              2. 缓存中不存在，执行 `FactoryBean#getObject` 存储缓存，然后返回
