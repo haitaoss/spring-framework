@@ -100,23 +100,6 @@ class Demo {
 
 }
 ```
-
-## 后置处理器
-
-## BeanFactory 的后置处理器(只会在IOC 生命周期中 执行一次)
-
-- // TODOHAITAO BeanDefinitionRegistryPostProcessor#postProcessBeanDefinitionRegistry。可用来修改和注册 BeanDefinition（JavaConfig
-  就是通过 ConfigurationClassPostProcessor ）
-- // TODOHAITAO BeanFactoryPostProcessor#postProcessBeanFactory 此时 beanDefinition 都加载完了,可以在这里创建bean 来实现提前创建的目的
-
-## bean 九个后置处理器（每个bean 都会执行）
-
-InstantiationAwareBeanPostProcessors后置处器 postProcessAfterInitialization
-InstantiationAwareBeanPostProcessors后置处器 postProcessAfterInitialization
-SmartInstantiationAwareBeanPostProcessor#determineCandidateConstructors
-MergedBeanDefinitionPostProcessor#postProcessMergedBeanDefinition
-SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference
-
 ## Conditional 注解的作用
 
 ```java
@@ -404,4 +387,68 @@ class String2PersonConverter implements ConditionalGenericConverter {
  * 2. 使用 @Lazy 注解，不要在初始化的时间就从容器中获取bean，而是直接返回一个代理对象
  * 3. 使用 @Lookup
  */
+```
+
+## BeanFactoryPostProcessor
+特点：只会在 IOC 生命周期中 执行一次。就是一个bean工厂执行一次
+
+有两个接口可用：
+- BeanDefinitionRegistryPostProcessor#postProcessBeanDefinitionRegistry(org.springframework.beans.factory.support.BeanDefinitionRegistry)
+  - 可用来修改和注册 BeanDefinition（JavaConfig
+    就是通过 ConfigurationClassPostProcessor 来注册beanDefinition的）
+- BeanFactoryPostProcessor#postProcessBeanFactory(org.springframework.beans.factory.config.ConfigurableListableBeanFactory) 
+  - 此时 beanDefinition 都加载完了,可以在这里创建bean 来实现提前创建的目的(但是会破坏bean的生命周期)
+  - 此时的参数就是beanFactory，可以往里面注册默认的单例bean等操作
+
+## BeanPostProcessor
+特点：每个bean的生命周期中都会执行一次。实例化前、构造器初始化、实例化后、属性填充前、初始化前、初始化后
+
+```java
+/** 
+ * 核心的接口类型：
+ *  1. SmartInstantiationAwareBeanPostProcessor
+ *  2. MergedBeanDefinitionPostProcessor
+ *  3. InstantiationAwareBeanPostProcessor
+ *  4. BeanPostProcessor
+ *  5. DestructionAwareBeanPostProcessor
+ *  
+ * 四处地方可以将对象加工厂代理对象：
+ *  1. SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference
+ *      - 在这里代理不会出现循环依赖问题
+ *  2. InstantiationAwareBeanPostProcessor#postProcessBeforeInstantiation
+ *      - 在这里代理不会出现循环依赖问题
+ *  3. BeanPostProcessor#postProcessBeforeInitialization
+ *  4. BeanPostProcessor#postProcessAfterInitialization
+ *  
+ *  每个 BeanPostProcessor 回调方法的作用：
+ *     提前AOP
+ *     org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference(java.lang.Object, java.lang.String)
+ *     
+ *     实例化前。如果该方法返回值不为null，先执行初始化后，然后直接返回该对象。不在执行bean生命周期的构造器初始化、属性填充、初始化操作）
+ *     org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference(java.lang.Object, java.lang.String)
+ *     
+ *     构造器初始化。如果返回值不为null，就会使用返回的构造器进行实例化
+ *     org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostProcessor#determineCandidateConstructors(java.lang.Class, java.lang.String)
+ *     
+ *     合并beanDefinition。这里可以拿到BeanDefinition
+ *     org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor#postProcessMergedBeanDefinition(org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Class, java.lang.String)
+ *     
+ *     实例化后。可以拿到构造器初始化后的对象
+ *     org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessAfterInstantiation(java.lang.Object, java.lang.String)
+ *     
+ *     属性注入前。可以拿到解析注解或者xml中设置的属性值
+ *     org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessProperties(org.springframework.beans.PropertyValues, java.lang.Object, java.lang.String)
+ *     
+ *     属性注入前。可以拿到解析注解或者xml中设置的属性值（过时方法）
+ *     org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessPropertyValues(org.springframework.beans.PropertyValues, java.beans.PropertyDescriptor[], java.lang.Object, java.lang.String)
+ *     
+ *     初始化前。此时的bean已经完成了属性注入、Wrapper注入，还未执行初始化方法(org.springframework.beans.factory.InitializingBean#afterPropertiesSet())
+ *     org.springframework.beans.factory.config.BeanPostProcessor#postProcessBeforeInitialization(java.lang.Object, java.lang.String)
+ *     
+ *     初始化后。这是bean生命周期的最后一个环节了
+ *     org.springframework.beans.factory.config.BeanPostProcessor#postProcessAfterInitialization(java.lang.Object, java.lang.String)
+ * 
+ *     销毁bean的回调
+ *     org.springframework.beans.factory.config.DestructionAwareBeanPostProcessor#requiresDestruction(java.lang.Object)
+ * */
 ```
