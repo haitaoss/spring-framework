@@ -292,6 +292,9 @@ class ConfigurationClassParser {
             }
         }
 
+        /**
+         * TODOHAITAO 【@Bean 第一步】处理附加的 @Bean 方法，在这里会把@Bean 标记的方法，先存起来
+         * */
         // Process individual @Bean methods
         Set<MethodMetadata> beanMethods = retrieveBeanMethodMetadata(sourceClass);
         for (MethodMetadata methodMetadata : beanMethods) {
@@ -301,6 +304,10 @@ class ConfigurationClassParser {
         // Process default methods on interfaces
         processInterfaces(configClass, sourceClass);
 
+        /**
+         * TODOHAITAO 【@Bean 第二步】针对父类里面有@Bean的方法，会把已经处理过的父类 存到 knownSuperclasses 这个Map中，避免重复处理
+         *  所以但我们使用SpringBoot+SpringMVC的时，注册多个 WebMvcConfigurationSupport 子类时候 发现只有一个子类会生效。就是因为这个机制保证了父类里面的@Bean方法只会被注册一次
+         * */
         // Process superclass, if any
         if (sourceClass.getMetadata()
                 .hasSuperClass()) {

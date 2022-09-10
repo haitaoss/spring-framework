@@ -100,6 +100,30 @@ class Demo {
 
 }
 ```
+
+### @Bean 如何解析的
+```java
+/**
+ * 1. IOC 容器初始化
+ * @see org.springframework.context.support.AbstractApplicationContext#refresh()
+ * 2. 执行 BeanFactory 的后置处理器
+ * @see org.springframework.context.support.AbstractApplicationContext#invokeBeanFactoryPostProcessors(org.springframework.beans.factory.config.ConfigurableListableBeanFactory)
+ * 3. invokeBeanDefinitionRegistryPostProcessors 动态注册BeanDefinition。
+ * @see org.springframework.context.support.PostProcessorRegistrationDelegate#invokeBeanDefinitionRegistryPostProcessors(java.util.Collection, org.springframework.beans.factory.support.BeanDefinitionRegistry, org.springframework.core.metrics.ApplicationStartup)
+ * 4. javaConfig 就是通过 ConfigurationClassPostProcessor 来注册beanDefinition的
+ * @see org.springframework.context.annotation.ConfigurationClassPostProcessor#processConfigBeanDefinitions(org.springframework.beans.factory.support.BeanDefinitionRegistry)
+ * 5. 解析。解析配置类里面的：配置类、@Bean、@ImportResource、@Import
+ * @see org.springframework.context.annotation.ConfigurationClassParser#parse(java.util.Set)
+ *  5.1 将@Bean标注的方法添加到configClass中。针对父类里面有@Bean的方法，会把已经处理过的父类 存到 knownSuperclasses 这个Map中，避免重复处理
+ *      @see org.springframework.context.annotation.ConfigurationClassParser#doProcessConfigurationClass(org.springframework.context.annotation.ConfigurationClass, org.springframework.context.annotation.ConfigurationClassParser.SourceClass, java.util.function.Predicate)
+ *      @see configClass.addBeanMethod(new BeanMethod(methodMetadata, configClass));
+ * 6. 从解析完的 configClass 中加载BeanDefinition
+ * @see org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsForConfigurationClass(org.springframework.context.annotation.ConfigurationClass, org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader.TrackedConditionEvaluator)
+ * 7. 将 BeanMethod 解析完，然后添加到beanDefinitionMap中
+ * @see org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsForBeanMethod(org.springframework.context.annotation.BeanMethod)
+ * */
+```
+
 ## Conditional 注解的作用
 
 ```java

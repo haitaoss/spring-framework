@@ -1,5 +1,9 @@
 package cn.haitaoss;
 
+import cn.haitaoss.javaconfig.service.Person;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+
 /**
  * @author haitao.chen
  * email haitaoss@aliyun.com
@@ -14,9 +18,15 @@ package cn.haitaoss;
 // @DependsOn({"user"})
 // @Import({MyImportSelector.class, MyImportBeanDefinitionRegistrar.class})
 // @ComponentScan("cn.haitaoss.javaconfig.circular")
+@ComponentScan("cn.haitaoss.javaconfig.configclass")
 public class AppConfig {
     public AppConfig() {
         System.out.println("AppConfig 构造器");
+    }
+
+    @Bean
+    public Person person() {
+        return new Person();
     }
 
 }

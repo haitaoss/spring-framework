@@ -322,10 +322,14 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 		do {
 			StartupStep processConfig = this.applicationStartup.start("spring.context.config-classes.parse");
 
-			/*
-				解析配置类，会把每个 BeanDefinitionHolder首先封装为 ConfigurationClass
-				在这个过程中会进行扫描、导入等步骤，从而会找到其他的 ConfigurationClass
-				解析配置类的结果是什么？
+			/**
+			 * 解析配置类，会把每个 BeanDefinitionHolder首先封装为 ConfigurationClass
+			 * 在这个过程中会进行扫描、导入等步骤，从而会找到其他的 ConfigurationClass
+			 *
+			 * 解析完 configClasses 中记录的信息：
+			 * 	1. @Bean 标注的方法
+			 * 	2. @ImportResource
+			 * 	3. @Import
 			 */
 			parser.parse(candidates); // AppConfig.class ---> BeanDefinition
 			parser.validate();
@@ -340,6 +344,10 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 						registry, this.sourceExtractor, this.resourceLoader, this.environment,
 						this.importBeanNameGenerator, parser.getImportRegistry());
 			}
+			/**
+			 * TODOHAITAO 【@Bean 第三步】因为解析完的 configClasses 里面会记录 @Bean标注的方法，这个方法被称为 factoryMethod
+			 * 	会在下面的方法注册成 beanDefinition
+			 */
 			this.reader.loadBeanDefinitions(configClasses);
 			alreadyParsed.addAll(configClasses);
 			processConfig.tag("classCount", () -> String.valueOf(configClasses.size())).end();

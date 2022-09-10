@@ -1,6 +1,8 @@
 package cn.haitaoss;
 
 
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
 /**
  * @author haitao.chen
  * email haitaoss@aliyun.com
@@ -9,7 +11,9 @@ package cn.haitaoss;
 public class Test {
 
     public static void main(String[] args) throws Exception {
-        // AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+        context.getBean(cn.haitaoss.javaconfig.configclass.Test.class)
+                .say();
     }
 
 }
