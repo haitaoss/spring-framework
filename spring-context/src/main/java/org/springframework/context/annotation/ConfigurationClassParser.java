@@ -143,6 +143,15 @@ class ConfigurationClassParser {
 
     public void parse(Set<BeanDefinitionHolder> configCandidates) {
         for (BeanDefinitionHolder holder : configCandidates) {
+            /**
+             * 加载完所有的配置类里面的信息。
+             * 先解析的内容有：
+             * 1. @Bean
+             * 2. @ImportResource
+             * 3. @Import(非实现DeferredImportSelector的类)
+             * 4. 等等
+             * @see org.springframework.context.annotation.ConfigurationClassParser#doProcessConfigurationClass(org.springframework.context.annotation.ConfigurationClass, org.springframework.context.annotation.ConfigurationClassParser.SourceClass, java.util.function.Predicate)
+             * */
             BeanDefinition bd = holder.getBeanDefinition();
             try {
                 if (bd instanceof AnnotatedBeanDefinition) {
@@ -159,7 +168,11 @@ class ConfigurationClassParser {
                         "Failed to parse configuration class [" + bd.getBeanClassName() + "]", ex);
             }
         }
-
+        /**
+         * 开始解析 @Import(DeferredImportSelector 的实现类)
+         * SpringBoot 的自动装配就是通过实现这个接口实现的，目的就是延时加载。因为很多 AutoConfigurationClass 会使用 @ConditionOnMissXx 来判断是否注入bean
+         * 所以需要延时加载，才能正确的判断
+         * */
         this.deferredImportSelectorHandler.process();
     }
 

@@ -10,6 +10,7 @@ repositories {
 }
 
 dependencies {
+    optional("org.apache.tomcat.embed:tomcat-embed-core")
     implementation project(":spring-context")
     implementation project(":spring-web")
     implementation "org.aspectj:aspectjweaver"

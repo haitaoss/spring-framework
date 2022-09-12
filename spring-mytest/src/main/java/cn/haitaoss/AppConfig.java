@@ -1,7 +1,5 @@
 package cn.haitaoss;
 
-import cn.haitaoss.javaconfig.service.Person;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 
 /**
@@ -20,13 +18,9 @@ import org.springframework.context.annotation.ComponentScan;
 // @ComponentScan("cn.haitaoss.javaconfig.circular")
 @ComponentScan("cn.haitaoss.javaconfig.configclass")
 public class AppConfig {
-    public AppConfig() {
-        System.out.println("AppConfig 构造器");
-    }
 
-    @Bean
-    public Person person() {
-        return new Person();
+    public AppConfig() {
+        System.out.println("构造器--->AppConfig");
     }
 
 }

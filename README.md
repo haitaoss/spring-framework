@@ -102,6 +102,7 @@ class Demo {
 ```
 
 ### @Bean 如何解析的
+
 ```java
 /**
  * 1. IOC 容器初始化
@@ -263,9 +264,10 @@ class String2PersonConverter implements ConditionalGenericConverter {
 ```
 
 1. 所有的bean 都是通过 `getBean()` 来创建的
+
 ```java
-/** 
- * 
+/**
+ *
  * @see AbstractApplicationContext#refresh()
  * @see AbstractApplicationContext#finishBeanFactoryInitialization(ConfigurableListableBeanFactory)
  * @see DefaultListableBeanFactory#preInstantiateSingletons()
@@ -282,6 +284,7 @@ class String2PersonConverter implements ConditionalGenericConverter {
 ```
 
 2. `getBean()` 流程
+
 ```java
 /**
  * @see AbstractBeanFactory#doGetBean(String, Class, Object[], boolean)
@@ -306,6 +309,7 @@ class String2PersonConverter implements ConditionalGenericConverter {
 ```
 
 3. `DefaultSingletonBeanRegistry#getSingleton` 流程
+
 ```java
 /**
  * DefaultSingletonBeanRegistry#getSingleton
@@ -326,6 +330,7 @@ class String2PersonConverter implements ConditionalGenericConverter {
 ```
 
 4. `AbstractAutowireCapableBeanFactory#createBean` 可以通过后置处理器，快速返回，不要执行bean创建的生命周期
+
 ```java
 /**
  * @see AbstractAutowireCapableBeanFactory#createBean(String, RootBeanDefinition, Object[])
@@ -341,6 +346,7 @@ class String2PersonConverter implements ConditionalGenericConverter {
 ```
 
 5. `AbstractAutowireCapableBeanFactory#doCreateBean` bean创建的生命周期
+
 ```java
 /**
  * 1. 构造器初始化
@@ -384,6 +390,7 @@ class String2PersonConverter implements ConditionalGenericConverter {
 ```
 
 ## 如何实现bean创建的优先级
+
 ```java
 /**
  * 如何实现bean创建的优先级：
@@ -397,6 +404,7 @@ class String2PersonConverter implements ConditionalGenericConverter {
 ```
 
 ## 单例bean循环依赖导致的错误
+
 ```java
 /**
  * spring 为了解决单例bean循环依赖问题，是才用 提请 AOP 的方式 来解决的，
@@ -414,28 +422,34 @@ class String2PersonConverter implements ConditionalGenericConverter {
 ```
 
 ## BeanFactoryPostProcessor
+
 特点：只会在 IOC 生命周期中 执行一次。就是一个bean工厂执行一次
 
 有两个接口可用：
-- BeanDefinitionRegistryPostProcessor#postProcessBeanDefinitionRegistry(org.springframework.beans.factory.support.BeanDefinitionRegistry)
-  - 可用来修改和注册 BeanDefinition（JavaConfig
-    就是通过 ConfigurationClassPostProcessor 来注册beanDefinition的）
-- BeanFactoryPostProcessor#postProcessBeanFactory(org.springframework.beans.factory.config.ConfigurableListableBeanFactory) 
-  - 此时 beanDefinition 都加载完了,可以在这里创建bean 来实现提前创建的目的(但是会破坏bean的生命周期)
-  - 此时的参数就是beanFactory，可以往里面注册默认的单例bean等操作
+
+- BeanDefinitionRegistryPostProcessor#postProcessBeanDefinitionRegistry(
+  org.springframework.beans.factory.support.BeanDefinitionRegistry)
+    - 可用来修改和注册 BeanDefinition（JavaConfig 就是通过 ConfigurationClassPostProcessor 来解析配置类注册beanDefinition的）
+    - 可以在这里面套娃注册 BeanDefinitionRegistryPostProcessor，也可以注册 BeanFactoryPostProcessor。因为底层是使用 while 循环来处理
+- BeanFactoryPostProcessor#postProcessBeanFactory(
+  org.springframework.beans.factory.config.ConfigurableListableBeanFactory)
+    - 此时的参数就是beanFactory，可以注册BeanDefinition、创建Bean
+    - 可以在这里创建bean 来实现提前创建的目的，但是会破坏bean的生命周期，因为此时容器中还没有创建出BeanPostProcessor
+    - 在这里注册 BeanDefinitionRegistryPostProcessor、BeanFactoryPostProcessor 是没有用的，不会作为BeanFactory 来执行回调方法
 
 ## BeanPostProcessor
+
 特点：每个bean的生命周期中都会执行一次。实例化前、构造器初始化、实例化后、属性填充前、初始化前、初始化后
 
 ```java
-/** 
+/**
  * 核心的接口类型：
  *  1. SmartInstantiationAwareBeanPostProcessor
  *  2. MergedBeanDefinitionPostProcessor
  *  3. InstantiationAwareBeanPostProcessor
  *  4. BeanPostProcessor
  *  5. DestructionAwareBeanPostProcessor
- *  
+ *
  * 四处地方可以将对象加工厂代理对象：
  *  1. SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference
  *      - 在这里代理不会出现循环依赖问题
@@ -443,36 +457,94 @@ class String2PersonConverter implements ConditionalGenericConverter {
  *      - 在这里代理不会出现循环依赖问题
  *  3. BeanPostProcessor#postProcessBeforeInitialization
  *  4. BeanPostProcessor#postProcessAfterInitialization
- *  
+ *
  *  每个 BeanPostProcessor 回调方法的作用：
  *     提前AOP
  *     org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference(java.lang.Object, java.lang.String)
- *     
+ *
  *     实例化前。如果该方法返回值不为null，先执行初始化后，然后直接返回该对象。不在执行bean生命周期的构造器初始化、属性填充、初始化操作）
  *     org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessBeforeInstantiation(java.lang.Class, java.lang.String)
- *     
+ *
  *     构造器初始化。如果返回值不为null，就会使用返回的构造器进行实例化
  *     org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostProcessor#determineCandidateConstructors(java.lang.Class, java.lang.String)
- *     
+ *
  *     合并beanDefinition。这里可以拿到BeanDefinition
  *     org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor#postProcessMergedBeanDefinition(org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Class, java.lang.String)
- *     
+ *
  *     实例化后。可以拿到构造器初始化后的对象
  *     org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessAfterInstantiation(java.lang.Object, java.lang.String)
- *     
+ *
  *     属性注入前。可以拿到解析注解或者xml中设置的属性值
  *     org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessProperties(org.springframework.beans.PropertyValues, java.lang.Object, java.lang.String)
- *     
+ *
  *     属性注入前。可以拿到解析注解或者xml中设置的属性值（过时方法）
  *     org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessPropertyValues(org.springframework.beans.PropertyValues, java.beans.PropertyDescriptor[], java.lang.Object, java.lang.String)
- *     
+ *
  *     初始化前。此时的bean已经完成了属性注入、Wrapper注入，还未执行初始化方法(org.springframework.beans.factory.InitializingBean#afterPropertiesSet())
  *     org.springframework.beans.factory.config.BeanPostProcessor#postProcessBeforeInitialization(java.lang.Object, java.lang.String)
- *     
+ *
  *     初始化后。这是bean生命周期的最后一个环节了
  *     org.springframework.beans.factory.config.BeanPostProcessor#postProcessAfterInitialization(java.lang.Object, java.lang.String)
- * 
+ *
  *     销毁bean的回调
  *     org.springframework.beans.factory.config.DestructionAwareBeanPostProcessor#requiresDestruction(java.lang.Object)
+ * */
+```
+
+### 配置类解析流程
+```java
+/**
+ * 1. BeanDefinitionRegistryPostProcessor 回调
+ * {@link org.springframework.context.annotation.ConfigurationClassPostProcessor#postProcessBeanDefinitionRegistry(BeanDefinitionRegistry)}
+ *
+ * 2. 处理方法
+ * {@link org.springframework.context.annotation.ConfigurationClassPostProcessor#processConfigBeanDefinitions(BeanDefinitionRegistry)}
+ *
+ * 3. 校验 ApplicationContext 入参传入的Class 是否是配置类
+ *       什么才是配置类？{@link org.springframework.context.annotation.ConfigurationClassUtils#checkConfigurationClassCandidate(BeanDefinition, MetadataReaderFactory)}
+ *       有 @Configuration(proxyBeanMethods=true) full配置类
+ *       有 @Configuration(proxyBeanMethods=false) lite配置类
+ *       无 @Configuration 但是有  (@Component || @ComponentScan || @Import || @ImportResource || @Bean ) lite配置类
+ *       都不满足就不是配置类
+ *
+ *       将配置类添加到集合中 --> configCandidates
+ *
+ * 4. 对 configCandidates 进行升序排序。可通过 @Order 实现排序
+ *
+ * 5. 创建解析器
+ * {@link org.springframework.context.annotation.ConfigurationClassParser#ConfigurationClassParser(org.springframework.core.type.classreading.MetadataReaderFactory, org.springframework.beans.factory.parsing.ProblemReporter, org.springframework.core.env.Environment, org.springframework.core.io.ResourceLoader, org.springframework.beans.factory.support.BeanNameGenerator, org.springframework.beans.factory.support.BeanDefinitionRegistry)}
+ *
+ * 6. 使用解析器解析 configCandidates。{@link org.springframework.context.annotation.ConfigurationClassParser#parse(java.util.Set)}
+ *      注：解析是有序的。先解析完非 @Import(DeferredImportSelector.class) 的配置类，在解析 @Import(DeferredImportSelector.class)
+ *
+ *      1. 先解析的内容 @Component、@ComponentScans、@ComponentScan、@Bean、@ImportResource、@Import(非实现DeferredImportSelector.class)
+ *          {@link org.springframework.context.annotation.ConfigurationClassParser#processConfigurationClass(org.springframework.context.annotation.ConfigurationClass, java.util.function.Predicate)}
+ *          为了处理配置类 里面有配置类的情况，采用 do...while 递归解析 保证所有的内容都能解析完
+ *              {@link org.springframework.context.annotation.ConfigurationClassParser#doProcessConfigurationClass(org.springframework.context.annotation.ConfigurationClass, org.springframework.context.annotation.ConfigurationClassParser.SourceClass, java.util.function.Predicate)}
+ *                  1. 有@Component 注解，解析成员内部类信息 {@link org.springframework.context.annotation.ConfigurationClassParser#processMemberClasses(org.springframework.context.annotation.ConfigurationClass, org.springframework.context.annotation.ConfigurationClassParser.SourceClass, java.util.function.Predicate)}
+ *                  2. 解析 @PropertySource
+ *                  3. 对 @ComponentScans、@ComponentScan 解析。
+ *                      实例化 Scanner，默认会添加对@Component 解析的 includeFilter {@link ClassPathBeanDefinitionScanner#ClassPathBeanDefinitionScanner(BeanDefinitionRegistry, boolean, Environment, ResourceLoader)}
+ *                      {@link org.springframework.context.annotation.ComponentScanAnnotationParser#parse(org.springframework.core.annotation.AnnotationAttributes, java.lang.String)}
+ *                      {@link org.springframework.context.annotation.ClassPathBeanDefinitionScanner#doScan(java.lang.String...)}
+ *                      3.1 excludeFilter + includeFilter + @Conditional 的校验 {@link org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#isCandidateComponent(org.springframework.core.type.classreading.MetadataReader)}
+ *                          注：
+ *                      3.2 设置BeanDefinition信息：beanName、@Autowired、@Lazy、@Primary、@DependsOn、@Role、@Description
+ *                      3.3 校验是否可以注册到BeanDefinitionMap中 {@link org.springframework.context.annotation.ClassPathBeanDefinitionScanner#checkCandidate(java.lang.String, org.springframework.beans.factory.config.BeanDefinition)}
+ *                      3.4 注册 BeanDefinition 到 IOC 容器中{@link ClassPathBeanDefinitionScanner#registerBeanDefinition(BeanDefinitionHolder, BeanDefinitionRegistry)}
+ *                      
+ *      2. 后解析的内容 @Import(DeferredImportSelector.class)
+ *          {@link org.springframework.context.annotation.ConfigurationClassParser.DeferredImportSelectorHandler#process()}
+ *              最终还是调用该方法解析配置类 {@link org.springframework.context.annotation.ConfigurationClassParser#processConfigurationClass(org.springframework.context.annotation.ConfigurationClass, java.util.function.Predicate)}
+ *
+ *      解析完的结果就是 Map<ConfigurationClass, ConfigurationClass> configurationClasses
+ *
+ * 7. 遍历 configurationClasses，将解析完的配置内容 定义成 BeanDefinition 注册到 BeanDefinitionMap中
+ *      {@link org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader#loadBeanDefinitions(java.util.Set)}
+ *      {@link org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsForConfigurationClass(org.springframework.context.annotation.ConfigurationClass, org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader.TrackedConditionEvaluator)}
+ *          1. 注册 @Import(非BeanDefinitionRegistry.class) 导入的类 {@link ConfigurationClassBeanDefinitionReader#registerBeanDefinitionForImportedConfigurationClass(ConfigurationClass)}
+ *          2. 注册 @Bean {@link ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsForBeanMethod(BeanMethod)}
+ *          3. 注册 @ImportResource {@link ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsFromImportedResources(Map)}
+ *          4. 注册 @Import(BeanDefinitionRegistry.class) {@link ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsFromRegistrars(Map)}
  * */
 ```

@@ -26,6 +26,6 @@ public class MyBeanFactoryPostProcessor4 implements BeanDefinitionRegistryPostPr
 
     @Override
     public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
-
+        System.out.println("MyBeanFactoryPostProcessor4#postProcessBeanFactory");
     }
 }

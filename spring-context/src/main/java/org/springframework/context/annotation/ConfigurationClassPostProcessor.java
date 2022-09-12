@@ -327,9 +327,16 @@ public class ConfigurationClassPostProcessor implements BeanDefinitionRegistryPo
 			 * 在这个过程中会进行扫描、导入等步骤，从而会找到其他的 ConfigurationClass
 			 *
 			 * 解析完 configClasses 中记录的信息：
-			 * 	1. @Bean 标注的方法
-			 * 	2. @ImportResource
-			 * 	3. @Import
+			 * 	1. @Bean 标注的方法，  --> beanMethods属性
+			 * 	2. @ImportResource  --> importedResources属性
+			 * 	3. @Import(ImportBeanDefinitionRegistrar.class)  --> importBeanDefinitionRegistrars属性
+			 *  4. @Import(ImportSelector.class) --> 执行 ImportSelector#selectImports，返回值都解析成配置类
+			 *  5. @Import() --> 解析成configClass
+			 *  6. @Import(DeferredImportSelector.class) --> 解析成 configClass
+			 *
+			 * 	注：
+			 * 	1. @Import 解析成 配置类
+			 * 	2. @Import(DeferredImportSelector.class) 会延时解析，SpringBoot 的自动转配 就是通过这个机制实现的。通过延时解析保证 @ConditionalOnXx 注解能正确判断
 			 */
 			parser.parse(candidates); // AppConfig.class ---> BeanDefinition
 			parser.validate();
