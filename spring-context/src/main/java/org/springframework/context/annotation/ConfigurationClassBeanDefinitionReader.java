@@ -41,6 +41,7 @@ import org.springframework.core.type.StandardMethodMetadata;
 import org.springframework.lang.NonNull;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
+import org.xml.sax.InputSource;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -135,7 +136,7 @@ class ConfigurationClassBeanDefinitionReader {
 		}
 
 		if (configClass.isImported()) {
-			System.out.println(configClass.getSimpleName());
+			// 是通过 @Import 导入的类
 			registerBeanDefinitionForImportedConfigurationClass(configClass);
 		}
 		for (BeanMethod beanMethod : configClass.getBeanMethods()) {
@@ -145,7 +146,18 @@ class ConfigurationClassBeanDefinitionReader {
 			loadBeanDefinitionsForBeanMethod(beanMethod);
 		}
 
+		/**
+		 * 加载 @ImportResource
+		 * 会使用  XmlBeanDefinitionReader 进行读取和解析
+		 * {@link XmlBeanDefinitionReader#loadBeanDefinitions(Resource)}
+		 * {@link XmlBeanDefinitionReader#doLoadBeanDefinitions(InputSource, Resource)}
+		 * */
 		loadBeanDefinitionsFromImportedResources(configClass.getImportedResources());
+
+		/**
+		 *  回调 {@link ImportBeanDefinitionRegistrar#registerBeanDefinitions(AnnotationMetadata, BeanDefinitionRegistry, BeanNameGenerator)}
+		 *  ioc 容器已经作为入参传入了，你想做啥任你开心
+		 * */
 		loadBeanDefinitionsFromRegistrars(configClass.getImportBeanDefinitionRegistrars());
 	}
 

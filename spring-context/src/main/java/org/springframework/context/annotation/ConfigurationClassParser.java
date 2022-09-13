@@ -145,12 +145,56 @@ class ConfigurationClassParser {
         for (BeanDefinitionHolder holder : configCandidates) {
             /**
              * 加载完所有的配置类里面的信息。
-             * 先解析的内容有：
-             * 1. @Bean
-             * 2. @ImportResource
-             * 3. @Import(非实现DeferredImportSelector的类)
-             * 4. 等等
-             * @see org.springframework.context.annotation.ConfigurationClassParser#doProcessConfigurationClass(org.springframework.context.annotation.ConfigurationClass, org.springframework.context.annotation.ConfigurationClassParser.SourceClass, java.util.function.Predicate)
+             * 这里会解析的内容是：
+             * 1. @Component
+             *      1.1 获取所有的成员内部类 {@link ConfigurationClassParser#processMemberClasses(ConfigurationClass, SourceClass, Predicate)}
+             *      1.2 判断是否是配置类 {@link ConfigurationClassUtils#isConfigurationCandidate(AnnotationMetadata)}
+             *      1.3 递归解析 {@link ConfigurationClassParser#processConfigurationClass(ConfigurationClass, Predicate)}
+             *
+             * 2. @PropertySources
+             *
+             * 3. @ComponentScans、@ComponentScan
+             *      3.1 扫描指定包的内容，并注册到IOC容器中 {@link ComponentScanAnnotationParser#parse(AnnotationAttributes, String)}
+             *      3.2 判断是否是配置类 {@link ConfigurationClassUtils#checkConfigurationClassCandidate(BeanDefinition, MetadataReaderFactory)}
+             *      3.3 是配置类，就解析配置类 {@link ConfigurationClassParser#parse(String, String)}
+             *
+             * 4. @Import(非DeferredImportSelector的类)    --> 递归调用 {@link ConfigurationClassParser#processConfigurationClass(ConfigurationClass, Predicate)}
+             *      处理 @Import(selector.class)，最终的结果都是按照配置类来解析 {@link ConfigurationClassParser#processImports(ConfigurationClass, SourceClass, Collection, Predicate, boolean)}
+             *      4.1 selector instanceof DeferredImportSelector 。先存起来，这种类型需要延时解析 {@link DeferredImportSelectorHandler#handle(ConfigurationClass, DeferredImportSelector)}
+             *      4.2 selector instanceof ImportSelector。递归解析Import {@link ConfigurationClassParser#processImports(ConfigurationClass, SourceClass, Collection, Predicate, boolean)}
+             *      4.3 select instanceof ImportBeanDefinitionRegistrar。设置为 configClass 的属性 {@link ConfigurationClass#addImportBeanDefinitionRegistrar(ImportBeanDefinitionRegistrar, AnnotationMetadata)}
+             *      4.4 兜底方法,这个就是关键，通过这就能看出 所有@Import导入的类，都会被解析成配置类 {@link ConfigurationClassParser#processConfigurationClass(ConfigurationClass, Predicate)}
+             *
+             *      可以发现 @Import(DeferredImportSelector.class) 没有立即解析，而是先存起来 带所有配置类解析完之后。在遍历 回调接口方法，递归执行 {@link ConfigurationClassParser#processImports(ConfigurationClass, SourceClass, Collection, Predicate, boolean)}
+             *      虽然 @Import(ImportBeanDefinitionRegistrar.class) 也是存起来，但是他是作为 configClass的属性，后面注册BeanDefinition的时候，直接回调方法。不像
+             *          @Import(DeferredImportSelector.class) 还会解析回调的结果
+             *
+             * 6. @ImportResource
+             *      设置为 configClass 的属性 {@link ConfigurationClass#addImportedResource(String, Class)}
+             *
+             * 7. @Bean
+             *      设置为 configClass 的属性 {@link ConfigurationClass#addBeanMethod(BeanMethod)}
+             *
+             * 8. 有父类，且父类含有@Bean方法
+             *      8.1 knownSuperclasses.put(superclass, configClass);  记录父类被加载了，避免多个子类是配置类的情况 其父类配置类会被解析多次的问题
+             *      8.2 返回父类
+             *      8.2 因为是 do...while 执行 {@link ConfigurationClassParser#doProcessConfigurationClass(ConfigurationClass, SourceClass, Predicate)}
+             *          所以实现了递归解析配置类的父类
+             *      8.3 最终解析的 @Bean 会添加到子类配置类的属性中。比如：
+             *          @Configuration
+             *          class A extends C {}
+             *          @Configuration
+             *          class B extends C {}
+             *          class C {
+             *              @Bean
+             *              public A bean(){
+             *                  return new A();
+             *              }
+             *          }
+             *
+             *          假设 A 比 B 先解析,也就是执行 {@link ConfigurationClassParser#processConfigurationClass(ConfigurationClass, Predicate)}
+             *          那么 bean 是属于 A配置类的，不是属于B配置类的
+             *
              * */
             BeanDefinition bd = holder.getBeanDefinition();
             try {
@@ -265,14 +309,14 @@ class ConfigurationClassParser {
             }
         }
 
-        // Process any @ComponentScan annotations
         // 会进行扫描，得到的 BeanDefinition会注册到 Spring容器中，并且会检查是不是配置类并进行解析
+        // Process any @ComponentScan annotations
         Set<AnnotationAttributes> componentScans = AnnotationConfigUtils.attributesForRepeatable(sourceClass.getMetadata(), ComponentScans.class, ComponentScan.class);
         if (!componentScans.isEmpty()
             && !this.conditionEvaluator.shouldSkip(sourceClass.getMetadata(), ConfigurationPhase.REGISTER_BEAN)) {
             for (AnnotationAttributes componentScan : componentScans) {
-                // The config class is annotated with @ComponentScan -> perform the scan immediately
                 // 这里就会进行扫描，得到的 BeanDefinition会注册到 Spring容器中
+                // The config class is annotated with @ComponentScan -> perform the scan immediately
                 Set<BeanDefinitionHolder> scannedBeanDefinitions = this.componentScanParser.parse(componentScan, sourceClass.getMetadata()
                         .getClassName());
                 // Check the set of scanned definitions for any further config classes and parse recursively if needed
@@ -282,8 +326,9 @@ class ConfigurationClassParser {
                     if (bdCand == null) {
                         bdCand = holder.getBeanDefinition();
                     }
-                    // 检查扫描出来的 BeanDefinition是不是配置类(full和lite)
+
                     if (ConfigurationClassUtils.checkConfigurationClassCandidate(bdCand, this.metadataReaderFactory)) {
+                        // 扫描的结果是配置类，就按照解析配置类的规则解析
                         parse(bdCand.getBeanClassName(), holder.getBeanName());
                     }
                 }
@@ -739,8 +784,22 @@ class ConfigurationClassParser {
         public void handle(ConfigurationClass configClass, DeferredImportSelector importSelector) {
             DeferredImportSelectorHolder holder = new DeferredImportSelectorHolder(configClass, importSelector);
             if (this.deferredImportSelectors == null) {
+                /**
+                 * 解析完所有的配置类后会执行 {@link DeferredImportSelectorHandler#process()} 延时解析 @Import(DeferredImportSelector.class)
+                 * 解析的时候 会把这个属性 deferredImportSelectors 置空
+                 * */
                 DeferredImportSelectorGroupingHandler handler = new DeferredImportSelectorGroupingHandler();
+                /**
+                 * configurationClasses.add() 就是添加到配置类Map中
+                 * */
                 handler.register(holder);
+                /**
+                 * 回调 {@link DeferredImportSelector.Group#selectImports()}
+                 * 回调结果遍历执行 递归解析 {@link ConfigurationClassParser#processImports(ConfigurationClass, SourceClass, Collection, Predicate, boolean)}
+                 * 最终就是解析配置类 {@link ConfigurationClassParser#processConfigurationClass(ConfigurationClass, Predicate)}
+                 *
+                 * 所以说 使用 @Import(A.class) 导入的类，一定会注册为配置类
+                 * */
                 handler.processGroupImports();
             } else {
                 this.deferredImportSelectors.add(holder);
