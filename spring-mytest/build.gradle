@@ -10,25 +10,30 @@ repositories {
 }
 
 dependencies {
-    optional("org.apache.tomcat.embed:tomcat-embed-core")
     implementation project(":spring-context")
     implementation project(":spring-web")
-    implementation "org.aspectj:aspectjweaver"
     implementation project(":spring-jdbc")
-    implementation 'mysql:mysql-connector-java:8.0.30'
-    implementation 'org.mybatis:mybatis:3.5.8'
+
 
     // 导入 mybatis 整合 spring的jar包，实现原理和之前的基本一致
     implementation 'org.mybatis:mybatis-spring:2.0.7'
+    implementation 'org.mybatis:mybatis:3.5.8'
+    implementation 'mysql:mysql-connector-java:8.0.30'
+
 
     // lombok
-    implementation 'org.projectlombok:lombok:1.18.24'
+    annotationProcessor 'org.projectlombok:lombok:1.18.2'
+    compileOnly 'org.projectlombok:lombok:1.18.2'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.2'
+    testCompileOnly 'org.projectlombok:lombok:1.18.2'
 
     // 测试依赖
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
-}
 
+    optional("org.apache.tomcat.embed:tomcat-embed-core")
+    implementation "org.aspectj:aspectjweaver"
+}
 test {
     useJUnitPlatform()
 }
