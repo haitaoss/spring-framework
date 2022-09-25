@@ -20,4 +20,13 @@
     <bean id="parentComponent" class="cn.haitaoss.xml.TestXml" abstract="true"/>
     <bean id="songComponent" class="cn.haitaoss.xml.TestXml" parent="parentComponent"/>
     <bean id="testInit" class="cn.haitaoss.xml.TestXml" init-method="myInit"/>
+
+    <!-- 默认命名空间支持的标签 -->
+    <bean class="cn.haitaoss.Test" id="test1"></bean>
+    <alias name="testInit" alias="testInit2"/>
+    <import resource="spring.xml"/>
+    <beans>
+        <bean class="cn.haitaoss.Test"/>
+    </beans>
+
 </beans>

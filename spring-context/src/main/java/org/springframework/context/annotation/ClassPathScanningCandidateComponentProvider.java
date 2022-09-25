@@ -531,6 +531,9 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
      */
     protected boolean isCandidateComponent(AnnotatedBeanDefinition beanDefinition) {
         AnnotationMetadata metadata = beanDefinition.getMetadata();
+        /**
+         * metadata.isIndependent() 成员内部类 不是独立类
+         * */
         return (metadata.isIndependent() && (metadata.isConcrete() || (metadata.isAbstract()
                                                                        && metadata.hasAnnotatedMethods(Lookup.class.getName()))));
     }

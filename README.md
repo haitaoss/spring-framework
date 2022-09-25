@@ -53,7 +53,6 @@ IDEA配置：
 ![img1.png](.README_imgs/img_1.png)
 
 # 源码分析
-
 ## [ASM 技术](https://asm.ow2.io/)
 
 > 简单来说，ASM是一个操作Java字节码的类库。
@@ -72,101 +71,97 @@ IDEA配置：
 
 - 扫描到所有的 class 资源后，要判断该 class 是否作为一个 bean对象（比如标注了@Component 注解），
   如果我们通过反射来判断，那么在 Spring 启动阶段就会加载很多的bean，这势必会浪费系统资源和耗时（因为可能很多的工具类，是不需要Spring进行管理的）。
-
 ## Spring容器创建的核心流程
-
 ```java
-        /**
-         *  `new AnnotationConfigApplicationContext(AppConfig.class)` 会发生什么？？？
-         *
-         * 1. 执行AnnotationConfigApplicationContext构造器 {@link AnnotationConfigApplicationContext#AnnotationConfigApplicationContext()}
-         *      实例化属性reader {@link AnnotatedBeanDefinitionReader#AnnotatedBeanDefinitionReader(BeanDefinitionRegistry)}
-         *      reader 属性的构造器里面会注册BeanFactoryPostProcessor {@link AnnotationConfigUtils#registerAnnotationConfigProcessors(BeanDefinitionRegistry)}
-         *          默认会注册这五个鬼东西：
-         *
-         *              1. ConfigurationClassPostProcessor 类型：BeanFactoryPostProcessor
-         *                  - 在BeanFactory初始化阶段，会使用该处理器 扫描配置类注册BeanDefinition到IOC容器中
-         *
-         *              2. CommonAnnotationBeanPostProcessor    类型：BeanPostProcessor
-         *
-         *              3. AutowiredAnnotationBeanPostProcessor 类型：BeanPostProcessor
-         *
-         *              4. EventListenerMethodProcessor 类型：BeanFactoryPostProcessor、SmartInitializingSingleton
-         *                  - 作为 BeanFactoryPostProcessor 的功能。会存储IOC容器中所有的 EventListenerFactory 类型的bean，作为处理器的属性
-         *                  - 作为 SmartInitializingSingleton 的功能。：用来处理 @EventListener 注解的，会在提前实例化单例bean的流程中 回调该实例的方法
-         *                      BeanFactory 的{@link DefaultListableBeanFactory#preInstantiateSingletons()}：
-         *                          - 创建所有单例bean。
-         *                          - 回调 {@link SmartInitializingSingleton#afterSingletonsInstantiated()}
-         *
-         *              5. DefaultEventListenerFactory 类型：EventListenerFactory
-         *                  就是 EventListenerMethodProcessor 解析 @EventListener 的时候会用这个工厂来创建 ApplicationListener
-         *
-         *  2. 解析入参,添加到BeanDefinitionMap中 {@link AnnotationConfigApplicationContext#register(Class[])}
-         *
-         *  3. 刷新IOC容器 {@link AbstractApplicationContext#refresh()}
-         *
-         *      准备刷新 {@link AbstractApplicationContext#prepareRefresh()}
-         *          - 初始化属性
-         *          - 为IOC容器设置两个属性：applicationListeners、earlyApplicationEvents
-         *
-         *      获取并刷新BeanFactory {@link AbstractApplicationContext#obtainFreshBeanFactory()}
-         *          - 是 AnnotationConfigApplicationContext 类型的IOC容器，直接返回IOC容器的BeanFactory
-         *          - 是 ClassPathXmlApplicationContext 类型的IOC容器，会创建新的BeanFactory，并解析xml 注册BeanDefinition 到BeanFactory中
-         *
-         *      准备BeanFactory {@link AbstractApplicationContext#prepareBeanFactory(ConfigurableListableBeanFactory)}
-         *          - 给BeanFactory 的属性设置值：beanClassLoader、beanExpressionResolver、propertyEditorRegistrars、
-         *              ignoredDependencyInterfaces、resolvableDependencies、tempClassLoader
-         *          - 往BeanFactory注册 BeanPostProcessor
-         *              比如 {@link ApplicationContextAwareProcessor},该处理器是处理bean实现了XxAware接口的 {@link ApplicationContextAwareProcessor#postProcessBeforeInitialization(Object, String)}
-         *          - 往BeanFactory注册 单例bean，比如 environment
-         *
-         *      留给子类的模板方法，入参就是准备好的BeanFactory。 {@link AbstractApplicationContext#postProcessBeanFactory(ConfigurableListableBeanFactory)}
-         *
-         *      执行BeanFactoryPostProcessor,完成BeanFactory的创建 {@link AbstractApplicationContext#invokeBeanFactoryPostProcessors(ConfigurableListableBeanFactory)}
-         *          先执行 {@link BeanDefinitionRegistryPostProcessor#postProcessBeanDefinitionRegistry(BeanDefinitionRegistry)}
-         *          这里会使用while循环保证 如果在postProcessBeanDefinitionRegistry 里面注册了BeanDefinitionRegistryPostProcessor也能执行。
-         *          然后再执行 {@link BeanFactoryPostProcessor#postProcessBeanFactory(ConfigurableListableBeanFactory)}
-         *
-         *          注：解析配置类并注册BeanDefinition就是在这个环节实现的，通过 {@link ConfigurationClassPostProcessor#postProcessBeanDefinitionRegistry(BeanDefinitionRegistry)}
-         *
-         *      注册 BeanPostProcessor。 {@link AbstractApplicationContext#registerBeanPostProcessors(ConfigurableListableBeanFactory)}
-         *          其实就是 获取 BeanFactory 的 BeanDefinitionMap 属性中，从属性中获取 BeanPostProcessor 类型的bean，getBean() 创建，
-         *          然后添加到 BeanFactory 的beanPostProcessors属性中
-         *
-         *          注：
-         *              - BeanPostProcessor的注册是有序的。优先级：PriorityOrdered 大于 Ordered 大于 nonOrdered 大于 internalPostProcessors(MergedBeanDefinitionPostProcessor类型)
-         *              - 最后在添加一个 `beanFactory.addBeanPostProcessor(new ApplicationListenerDetector(applicationContext));`
-         *                  该后置处理器有两个作用：
-         *                      - bean初始化后阶段：处理的bean 继承 ApplicationListener，那就将当前bean添加到IOC容器的 applicationEventMulticaster 属性中
-         *                      - bean销毁阶段：从IOC容器的 ApplicationEventMulticaster 属性移除当前 bean
-         *
-         *      初始化MessageSource,就是往BeanFactory注册国际化资源解析器。 {@link AbstractApplicationContext#initMessageSource()}
-         *
-         *      初始化 ApplicationEventMulticaster，就是往BeanFactory注册事件广播器 {@link AbstractApplicationContext#initApplicationEventMulticaster()}
-         *
-         *      开始刷新，留给子类实现的。{@link AbstractApplicationContext#onRefresh()}
-         *          SpringBoot web应用，就是在这里启动的web容器，或者是初始化web容器
-         *          注：可以在这里往 {@link AbstractApplicationContext#earlyApplicationEvents} 属性设置值，这样子就可以在下面注册监听器环节发布早期事件，然后对应的
-         *              事件监听器就能收到 BeanFactory已经准备好了，可以在事件监听器里面做操作
-         *
-         *      注册监听器 {@link AbstractApplicationContext#registerListeners()}
-         *          - 实例化 BeanFactory 中类型为 ApplicationListener 的bean，然后添加到 BeanFactory 的属性 ApplicationEventMulticaster 中(这个就是在上面穿件的)
-         *          - IOC容器的 earlyApplicationEvents 属性不为空，通过 ApplicationEventMulticaster 将时间发布到 ApplicationListener
-         *
-         *      完成BeanFactory的初始化 {@link AbstractApplicationContext#finishBeanFactoryInitialization(ConfigurableListableBeanFactory)}
-         *          - 设置 BeanFactory 的一些属性：conversionService、embeddedValueResolvers
-         *          - 提前创建 LoadTimeWeaverAware 类型的bean
-         *          - 提前实例化单例bean {@link DefaultListableBeanFactory#preInstantiateSingletons()}
-         *
-         *      完成刷新 {@link AbstractApplicationContext#finishRefresh()}
-         *          - 清缓存 {@link DefaultResourceLoader#clearResourceCaches()}
-         *          - 初始化LifecycleProcessor，BeanFactory中没有这个bean就注册个默认值，会作为IOC容器的lifecycleProcessor属性 {@link AbstractApplicationContext#initLifecycleProcessor()}
-         *          - refresh完成了 传播给 LifecycleProcessor {@link getLifecycleProcessor().onRefresh()}
-         *          - 发布 ContextRefreshedEvent 事件  {@link AbstractApplicationContext#publishEvent(ApplicationEvent)}
-         * */
-
+/**
+ *  `new AnnotationConfigApplicationContext(AppConfig.class)` 会发生什么？？？
+ *
+ * 1. 执行AnnotationConfigApplicationContext构造器 {@link AnnotationConfigApplicationContext#AnnotationConfigApplicationContext()}
+ *      实例化属性reader {@link AnnotatedBeanDefinitionReader#AnnotatedBeanDefinitionReader(BeanDefinitionRegistry)}
+ *      reader 属性的构造器里面会注册BeanFactoryPostProcessor {@link AnnotationConfigUtils#registerAnnotationConfigProcessors(BeanDefinitionRegistry)}
+ *          默认会注册这五个鬼东西：
+ *
+ *              1. ConfigurationClassPostProcessor 类型：BeanFactoryPostProcessor
+ *                  - 在BeanFactory初始化阶段，会使用该处理器 扫描配置类注册BeanDefinition到IOC容器中
+ *
+ *              2. CommonAnnotationBeanPostProcessor    类型：BeanPostProcessor
+ *
+ *              3. AutowiredAnnotationBeanPostProcessor 类型：BeanPostProcessor
+ *
+ *              4. EventListenerMethodProcessor 类型：BeanFactoryPostProcessor、SmartInitializingSingleton
+ *                  - 作为 BeanFactoryPostProcessor 的功能。会存储IOC容器中所有的 EventListenerFactory 类型的bean，作为处理器的属性
+ *                  - 作为 SmartInitializingSingleton 的功能。：用来处理 @EventListener 注解的，会在提前实例化单例bean的流程中 回调该实例的方法
+ *                      BeanFactory 的{@link DefaultListableBeanFactory#preInstantiateSingletons()}：
+ *                          - 创建所有单例bean。
+ *                          - 回调 {@link SmartInitializingSingleton#afterSingletonsInstantiated()}
+ *
+ *              5. DefaultEventListenerFactory 类型：EventListenerFactory
+ *                  就是 EventListenerMethodProcessor 解析 @EventListener 的时候会用这个工厂来创建 ApplicationListener
+ *
+ *  2. 解析入参,添加到BeanDefinitionMap中 {@link AnnotationConfigApplicationContext#register(Class[])}
+ *
+ *  3. 刷新IOC容器 {@link AbstractApplicationContext#refresh()}
+ *
+ *      准备刷新 {@link AbstractApplicationContext#prepareRefresh()}
+ *          - 初始化属性
+ *          - 为IOC容器设置两个属性：applicationListeners、earlyApplicationEvents
+ *
+ *      获取并刷新BeanFactory {@link AbstractApplicationContext#obtainFreshBeanFactory()}
+ *          - 是 AnnotationConfigApplicationContext 类型的IOC容器，直接返回IOC容器的BeanFactory
+ *          - 是 ClassPathXmlApplicationContext 类型的IOC容器，会创建新的BeanFactory，并解析xml 注册BeanDefinition 到BeanFactory中
+ *
+ *      准备BeanFactory {@link AbstractApplicationContext#prepareBeanFactory(ConfigurableListableBeanFactory)}
+ *          - 给BeanFactory 的属性设置值：beanClassLoader、beanExpressionResolver、propertyEditorRegistrars、
+ *              ignoredDependencyInterfaces、resolvableDependencies、tempClassLoader
+ *          - 往BeanFactory注册 BeanPostProcessor
+ *              比如 {@link ApplicationContextAwareProcessor},该处理器是处理bean实现了XxAware接口的 {@link ApplicationContextAwareProcessor#postProcessBeforeInitialization(Object, String)}
+ *          - 往BeanFactory注册 单例bean，比如 environment
+ *
+ *      留给子类的模板方法，入参就是准备好的BeanFactory。 {@link AbstractApplicationContext#postProcessBeanFactory(ConfigurableListableBeanFactory)}
+ *
+ *      执行BeanFactoryPostProcessor,完成BeanFactory的创建 {@link AbstractApplicationContext#invokeBeanFactoryPostProcessors(ConfigurableListableBeanFactory)}
+ *          先执行 {@link BeanDefinitionRegistryPostProcessor#postProcessBeanDefinitionRegistry(BeanDefinitionRegistry)}
+ *          这里会使用while循环保证 如果在postProcessBeanDefinitionRegistry 里面注册了BeanDefinitionRegistryPostProcessor也能执行。
+ *          然后再执行 {@link BeanFactoryPostProcessor#postProcessBeanFactory(ConfigurableListableBeanFactory)}
+ *
+ *          注：解析配置类并注册BeanDefinition就是在这个环节实现的，通过 {@link ConfigurationClassPostProcessor#postProcessBeanDefinitionRegistry(BeanDefinitionRegistry)}
+ *
+ *      注册 BeanPostProcessor。 {@link AbstractApplicationContext#registerBeanPostProcessors(ConfigurableListableBeanFactory)}
+ *          其实就是 获取 BeanFactory 的 BeanDefinitionMap 属性中，从属性中获取 BeanPostProcessor 类型的bean，getBean() 创建，
+ *          然后添加到 BeanFactory 的beanPostProcessors属性中
+ *
+ *          注：
+ *              - BeanPostProcessor的注册是有序的。优先级：PriorityOrdered 大于 Ordered 大于 nonOrdered 大于 internalPostProcessors(MergedBeanDefinitionPostProcessor类型)
+ *              - 最后在添加一个 `beanFactory.addBeanPostProcessor(new ApplicationListenerDetector(applicationContext));`
+ *                  该后置处理器有两个作用：
+ *                      - bean初始化后阶段：处理的bean 继承 ApplicationListener，那就将当前bean添加到IOC容器的 applicationEventMulticaster 属性中
+ *                      - bean销毁阶段：从IOC容器的 ApplicationEventMulticaster 属性移除当前 bean
+ *
+ *      初始化MessageSource,就是往BeanFactory注册国际化资源解析器。 {@link AbstractApplicationContext#initMessageSource()}
+ *
+ *      初始化 ApplicationEventMulticaster，就是往BeanFactory注册事件广播器 {@link AbstractApplicationContext#initApplicationEventMulticaster()}
+ *
+ *      开始刷新，留给子类实现的。{@link AbstractApplicationContext#onRefresh()}
+ *          SpringBoot web应用，就是在这里启动的web容器，或者是初始化web容器
+ *          注：可以在这里往 {@link AbstractApplicationContext#earlyApplicationEvents} 属性设置值，这样子就可以在下面注册监听器环节发布早期事件，然后对应的
+ *              事件监听器就能收到 BeanFactory已经准备好了，可以在事件监听器里面做操作
+ *
+ *      注册监听器 {@link AbstractApplicationContext#registerListeners()}
+ *          - 实例化 BeanFactory 中类型为 ApplicationListener 的bean，然后添加到 BeanFactory 的属性 ApplicationEventMulticaster 中(这个就是在上面穿件的)
+ *          - IOC容器的 earlyApplicationEvents 属性不为空，通过 ApplicationEventMulticaster 将时间发布到 ApplicationListener
+ *
+ *      完成BeanFactory的初始化 {@link AbstractApplicationContext#finishBeanFactoryInitialization(ConfigurableListableBeanFactory)}
+ *          - 设置 BeanFactory 的一些属性：conversionService、embeddedValueResolvers
+ *          - 提前创建 LoadTimeWeaverAware 类型的bean
+ *          - 提前实例化单例bean {@link DefaultListableBeanFactory#preInstantiateSingletons()}
+ *
+ *      完成刷新 {@link AbstractApplicationContext#finishRefresh()}
+ *          - 清缓存 {@link DefaultResourceLoader#clearResourceCaches()}
+ *          - 初始化LifecycleProcessor，BeanFactory中没有这个bean就注册个默认值，会作为IOC容器的lifecycleProcessor属性 {@link AbstractApplicationContext#initLifecycleProcessor()}
+ *          - refresh完成了 传播给 LifecycleProcessor {@link getLifecycleProcessor().onRefresh()}
+ *          - 发布 ContextRefreshedEvent 事件  {@link AbstractApplicationContext#publishEvent(ApplicationEvent)}
+ * */
 ```
-
 ## BeanFactoryPostProcessor
 
 特点：只会在 IOC 生命周期中 执行一次。就是一个bean工厂执行一次
@@ -182,7 +177,6 @@ IDEA配置：
     - 此时的参数就是beanFactory，可以注册BeanDefinition、创建Bean
     - 可以在这里创建bean 来实现提前创建的目的，但是会破坏bean的生命周期，因为此时容器中还没有创建出BeanPostProcessor
     - 在这里注册 BeanDefinitionRegistryPostProcessor、BeanFactoryPostProcessor 是没有用的，不会作为BeanFactory 来执行回调方法
-
 ## BeanPostProcessor
 
 特点：每个bean的生命周期中都会执行一次。实例化前、构造器初始化、实例化后、属性填充前、初始化前、初始化后
@@ -236,7 +230,6 @@ IDEA配置：
  *     org.springframework.beans.factory.config.DestructionAwareBeanPostProcessor#requiresDestruction(java.lang.Object)
  * */
 ```
-
 ## 详解ConfigurationClassPostProcessor
 
 ```java
@@ -295,9 +288,6 @@ IDEA配置：
  *          4. 注册 @Import(BeanDefinitionRegistry.class) {@link ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsFromRegistrars(Map)}
  * */
 ```
-
-
-
 ## bean 创建的生命周期
 
 ```java
@@ -439,7 +429,6 @@ IDEA配置：
  *          @see org.springframework.beans.factory.config.DestructionAwareBeanPostProcessor.requiresDestruction
  * */
 ```
-
 ## 如何实现bean创建的优先级
 
 ```java
@@ -503,9 +492,6 @@ public class MyApplicationListener implements ApplicationListener<MyApplicationE
 }
 
 ```
-
-
-
 ## 单例bean循环依赖导致的错误
 
 ```java
@@ -522,6 +508,201 @@ public class MyApplicationListener implements ApplicationListener<MyApplicationE
  * 2. 使用 @Lazy 注解，不要在初始化的时间就从容器中获取bean，而是直接返回一个代理对象
  * 3. 使用 @Lookup 注解，延迟bean的创建，避免出现循环依赖问题
  */
+```
+## @Lookup 
+
+### 有啥用？
+- 这个注解标注在方法上。
+- 如果一个bean对象中的方法标注了 Lookup注解，那么会生成代理对象放入 bean容器中(在是实例化阶段通过后置处理器实现的)。
+- 执行代理对象的方法，如果方法是标注了 Lookup 注解的方法时，会直接返回 Lookup 需要查找的bean，并不会执行方法体
+
+使用说明：如果Lookup注解的value没有指定，那么会根据方法的返回值类型查找bean，如果指定了value 那就根据name查找bean
+
+使用场景：A 依赖多例bean B，可以使用Lookup 注解在A中定义一个方法，该方法每次都会从容器中获取一个bean，因为B 是多例的，所以每次都是返回新的对象
+
+@Lookup 使用场景：
+```java
+@Component
+public class LookupService {
+    @Autowired
+    private Demo demo;
+
+    @Lookup("demo")
+    public Demo getDemo() {
+        System.out.println("哈哈哈，我是废物");
+        return null;
+    }
+
+    public void test1() {
+        System.out.println(demo); // 单例的，不符合 Demo 这个bean的作用域
+    }
+
+    public void test2() {
+        System.out.println(getDemo()); // 多例的
+    }
+
+}
+
+@Component
+@Scope("prototype")
+class Demo {
+
+}
+```
+@Lookup 失效的情况：
+```java
+@Component
+@Data
+public class Test {
+    @Autowired
+    private A a;
+
+    @Lookup("a")
+    // @Lookup
+    public A x() {
+        System.out.println("哈哈哈哈，我是不会执行的");
+        return a;
+    }
+}
+
+@Component
+class A {
+
+}
+
+@Component
+class MyBeanDefinitionRegistryPostProcessor implements BeanDefinitionRegistryPostProcessor {
+
+    @Override
+    public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
+
+    }
+
+    @Override
+    public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
+        // 测试 @Lookup 失效的情况
+        AbstractBeanDefinition beanDefinition = BeanDefinitionBuilder.genericBeanDefinition(Test.class)
+                .getBeanDefinition();
+        beanDefinition.setInstanceSupplier(() -> {
+            System.out.println("setInstanceSupplier--->");
+            return new Test();
+        });
+        registry.registerBeanDefinition("SupplierTest", beanDefinition);
+    }
+}
+```
+
+### 原理
+```java
+/**
+ * @Lookup 注解原理
+ *
+ * 1. 创建bean
+ *      {@link AbstractAutowireCapableBeanFactory#createBean(String, RootBeanDefinition, Object[])}
+ *      {@link AbstractAutowireCapableBeanFactory#doCreateBean(String, RootBeanDefinition, Object[])}
+ *      {@link AbstractAutowireCapableBeanFactory#createBeanInstance(String, RootBeanDefinition, Object[])}
+ *
+ * 2. 如果是 BeanDefinition设置了instanceSupplier属性，那就直接调用函数是接口返回实例对象。不会通过 {@link AbstractAutowireCapableBeanFactory#instantiateBean(String, RootBeanDefinition)} 的方式实例化，也就是@Lookup会失效
+ *      {@link AbstractAutowireCapableBeanFactory#obtainFromSupplier(Supplier, String)}
+ *
+ * 3. 通过 AutowiredAnnotationBeanPostProcessor 处理 @Lookup 注解 给 bd 设置属性
+ *      {@link AutowiredAnnotationBeanPostProcessor#determineCandidateConstructors(Class, String)}
+ *
+ * 4. 实例化bean
+ *      {@link AbstractAutowireCapableBeanFactory#instantiateBean(String, RootBeanDefinition)}
+ *      {@link SimpleInstantiationStrategy#instantiate(RootBeanDefinition, String, BeanFactory)}
+ *          1. bd.methodOverrides.isEmpty();：反射创建对象`BeanUtils.instantiateClass(constructorToUse);`
+ *          2. 否则 cglib 创建代理对象 {@link CglibSubclassingInstantiationStrategy#instantiateWithMethodInjection(RootBeanDefinition, String, BeanFactory)}
+ *                      Enhancer enhancer = new Enhancer();
+ *                      setCallbackFilter(new MethodOverrideCallbackFilter(beanDefinition));
+ *                      setCallbacks(new Callback[] {NoOp.INSTANCE,
+ * 	        				new LookupOverrideMethodInterceptor(this.beanDefinition, this.owner),
+ * 	        				new ReplaceOverrideMethodInterceptor(this.beanDefinition, this.owner)});
+ *
+ *          Tips：标注了@Lookup 注解的bean，在实例化的时候会返回cglib生成的代理对象，所以执行方法的时候就会被代理对象拦截，具体的拦截动作看 LookupOverrideMethodInterceptor
+ *
+ * 5. 增强逻辑是啥 {@link CglibSubclassingInstantiationStrategy.LookupOverrideMethodInterceptor#intercept(Object, Method, Object[], MethodProxy)}
+ *      增强逻辑：@Lookup('') 有值，就通过参数值获取bean，没有就通过方法返回值类型获取bean `return getBean()`
+ *
+ * */
+```
+## @DependsOn
+
+`@DependsOn` 表示依赖关系，在获取当前bean的时候会先获取`@DependsOn`的值。比如：在getBean(A) 的时候，会获取`@DependsOn` 的值，遍历注解的值 getBean(b)
+```java
+@Component
+@DependsOn("b")
+class A {
+
+}
+
+@Component
+class B {
+
+}
+```
+
+`@DependsOn` 原理
+```java
+/**
+ * {@link AbstractBeanFactory#getBean(String, Class, Object...)}
+ *
+ * {@link AbstractBeanFactory#doGetBean(String, Class, Object[], boolean)}
+ *
+ *      单例池中存在bean，就返回不创建了 {@link DefaultSingletonBeanRegistry#getSingleton(String)}
+ *
+ *      当前BeanFactory中没有该bean的定义，且存在父BeanFactory 就调用父类的 {@link AbstractBeanFactory#doGetBean(String, Class, Object[], boolean)}
+ *
+ *      遍历当前bean的 @DependsOn 的值 执行 {@link AbstractBeanFactory#getBean(String)}
+ *
+ *      创建bean {@link AbstractBeanFactory#createBean(String, RootBeanDefinition, Object[])}
+ * */
+```
+## @Lazy
+
+```java
+@Component
+@Data
+public class Test {
+    @Autowired
+    @Lazy
+    private X x;
+
+    @Autowired
+    private X x2;
+}
+
+@Component
+@Lazy
+class X {
+
+}
+```
+
+```java
+/**
+ * 创建bean
+ * {@link AbstractAutowireCapableBeanFactory#createBean(String, RootBeanDefinition, Object[])}
+ * {@link AbstractAutowireCapableBeanFactory#doCreateBean(String, RootBeanDefinition, Object[])}
+ *
+ * 填充bean
+ * {@link AbstractAutowireCapableBeanFactory#populateBean(String, RootBeanDefinition, BeanWrapper)}
+ *
+ * 后置处理器 解析属性值
+ * {@link AutowiredAnnotationBeanPostProcessor#postProcessProperties(PropertyValues, Object, String)}
+ *      {@link InjectionMetadata#inject(Object, String, PropertyValues)}
+ *      {@link AutowiredAnnotationBeanPostProcessor.AutowiredFieldElement#inject(Object, String, PropertyValues)}
+ *      {@link AutowiredAnnotationBeanPostProcessor.AutowiredFieldElement#resolveFieldValue(Field, Object, String)}
+ *      {@link DefaultListableBeanFactory#resolveDependency(DependencyDescriptor, String, Set, TypeConverter)}
+ *          判断是否是 @Lazy 有就创建代理对象 {@link ContextAnnotationAutowireCandidateResolver#getLazyResolutionProxyIfNecessary(DependencyDescriptor, String)}
+ *              {@link ContextAnnotationAutowireCandidateResolver#isLazy(DependencyDescriptor)}
+ *              {@link ContextAnnotationAutowireCandidateResolver#buildLazyResolutionProxy(DependencyDescriptor, String)}
+ *                  创建代理对象，两种策略 cglib 或者 jdk {@link ProxyFactory#getProxy(ClassLoader)}
+ *                      cglib 的代理逻辑是这个 {@link CglibAopProxy.DynamicAdvisedInterceptor#intercept(Object, Method, Object[], MethodProxy)}
+ *                      jdk 的代理逻辑是这个 {@link JdkDynamicAopProxy#invoke(Object, Method, Object[])}
+ *                      
+ * 将解析的属性值设置到bean中 {@link AbstractAutowireCapableBeanFactory#applyPropertyValues(String, BeanDefinition, BeanWrapper, PropertyValues)}
+ * */
 ```
 
 # 待整理
@@ -554,45 +735,6 @@ Mybatis 官网：https://mybatis.org/mybatis-3/getting-started.html
 7. 进行独立类、接口、抽样类 @Lookup的判断
 8. 判断生成的BeanDefinition是否重复
 9. 添加到Spring容器中
-
-### Lookup 注解
-
-这个注解标注在方法上，如果一个bean对象中的方法标注了 Lookup注解，那么会生成代理对象放入 bean容器中，
-当标注了 Lookup 注解的方法时，会直接返回 Lookup 需要查找的bean，并不会执行方法，
-所以说 Lookup 的value值要指定，否则没有意义。
-
-使用说明：如果Lookup注解的value没有指定，那么会根据方法的返回值类型查找bean，如果指定了value 那就根据name查找bean
-
-使用场景：A 依赖多例bean B，可以使用Lookup 注解在A中定义一个方法，该方法每次都会从容器中获取一个bean，因为B 是多例的，所以每次都是返回新的对象
-
-```java
-
-@Component
-public class LookupService {
-    @Autowired
-    private Demo demo;
-
-    @Lookup("demo")
-    public Demo getDemo() {
-        return null;
-    }
-
-    public void test1() {
-        System.out.println(demo); // 单例的，不符合 Demo 这个bean的作用域
-    }
-
-    public void test2() {
-        System.out.println(getDemo()); // 多例的
-    }
-
-}
-
-@Component
-@Scope("prototype")
-class Demo {
-
-}
-```
 
 ### @Bean 如何解析的
 

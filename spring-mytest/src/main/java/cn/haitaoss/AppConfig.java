@@ -16,7 +16,11 @@ import org.springframework.context.annotation.ComponentScan;
 // @DependsOn({"user"})
 // @Import({MyImportSelector.class, MyImportBeanDefinitionRegistrar.class})
 // @ComponentScan("cn.haitaoss.javaconfig.circular")
-@ComponentScan("cn.haitaoss.javaconfig.configclass")
+// @ComponentScan("cn.haitaoss.javaconfig.configclass")
+// @ComponentScan("cn.haitaoss.javaconfig.aop")
+// @ComponentScan("cn.haitaoss.javaconfig.beanpostprocessor")
+// @ComponentScan("cn.haitaoss.javaconfig.Lookup")
+@ComponentScan("cn.haitaoss.javaconfig.Lazy")
 public class AppConfig {
 
     public AppConfig() {
