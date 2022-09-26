@@ -704,6 +704,86 @@ class X {
  * 将解析的属性值设置到bean中 {@link AbstractAutowireCapableBeanFactory#applyPropertyValues(String, BeanDefinition, BeanWrapper, PropertyValues)}
  * */
 ```
+## @EventListener
+源码解析：
+```java
+/**
+ * 创建 IOC 容器 `new AnnotationConfigApplicationContext(AppConfig.class);`
+ *
+ * 构造器默认注入两个bean(后面有大用)
+ *      - EventListenerMethodProcessor：
+ *          - 作为 BeanFactoryPostProcessor 的功能。会存储IOC容器中所有的 EventListenerFactory 类型的bean，作为处理器的属性
+ *          - 作为 SmartInitializingSingleton 的功能。用来处理 @EventListener 注解的，会在提前实例化单例bean的流程中 回调该实例的方法
+ *
+ *      - DefaultEventListenerFactory：用来创建 ApplicationListener
+ *
+ * 刷新 IOC 容器 {@link AbstractApplicationContext#refresh()}
+ *
+ * 完成 BeanFactory 的初始化 {@link AbstractApplicationContext#finishBeanFactoryInitialization(ConfigurableListableBeanFactory)}
+ *
+ * 提前实例化单例bean {@link DefaultListableBeanFactory#preInstantiateSingletons()}
+ *
+ * 完成所有单例bean初始化后 {@link SmartInitializingSingleton#afterSingletonsInstantiated()}
+ *      也就是一开始实例化IOC容器的时候 注入的这个 EventListenerMethodProcessor
+ *
+ * 回调 {@link EventListenerMethodProcessor#afterSingletonsInstantiated()}
+ *      遍历容器里面所有的 bean 进行处理 {@link EventListenerMethodProcessor#processBean(String, Class)}
+ *          使用 EventListenerFactory 判断是否适配 {@link EventListenerFactory#supportsMethod(Method)}
+ *              将 @EventListener 解析成 ApplicationListener {@link DefaultEventListenerFactory#createApplicationListener(String, Class, Method)}
+ *                  解析 @EventListener {@link ApplicationListenerMethodAdapter#resolveDeclaredEventTypes(Method, EventListener)}
+ *              注册到 ApplicationListener 到 IOC 容器中 {@link ConfigurableApplicationContext#addApplicationListener(ApplicationListener)}
+ * */
+```
+示例代码：
+```java
+@ComponentScan
+public class Test extends AnnotationConfigApplicationContext {
+    public Test() {
+    }
+
+    public Test(Class<?> clazz) {
+        super(clazz);
+    }
+
+    @Override
+    protected void onRefresh() throws BeansException {
+        //  发布早期事件 测试一下
+        publishEvent(new DemoEvent("早期事件"));
+    }
+
+    public static void main(String[] args) {
+        Test test = new Test(Test.class);
+        test.publishEvent(new DemoEvent("context刷新好了"));
+    }
+}
+
+@Component
+class MyEventListener {
+    @EventListener(classes = DemoEvent.class)
+    public void a(DemoEvent demoEvent) {
+        /**
+         * @EventListener 是在刷新bean的时候在解析注册的，所以 早期事件 是不能通过
+         * */
+        System.out.println("MyEventListener------>" + demoEvent);
+    }
+}
+
+@Component
+class MyApplicationListener implements ApplicationListener<DemoEvent> {
+    @Override
+    public void onApplicationEvent(DemoEvent event) {
+        System.out.println("MyApplicationListener---->" + event);
+    }
+}
+
+class DemoEvent extends ApplicationEvent {
+    private static final long serialVersionUID = 7099057708183571937L;
+    public DemoEvent(Object source) {
+        super(source);
+    }
+}
+
+```
 
 # 待整理
 

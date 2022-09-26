@@ -16,20 +16,5 @@
                 http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
                 http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.0.xsd
                  http://mybatis.org/schema/mybatis-spring http://mybatis.org/schema/mybatis-spring-1.2.xsd">
-    <!--    <context:component-scan base-package="cn.haitaoss.xml"/>-->
-    <bean id="parentComponent" class="cn.haitaoss.xml.TestXml" abstract="true"/>
-    <bean id="songComponent" class="cn.haitaoss.xml.TestXml" parent="parentComponent"/>
-    <bean id="testInit" class="cn.haitaoss.xml.TestXml" init-method="myInit"/>
-
-    <bean class="cn.haitaoss.javaconfig.Lookup.A" id="a0"></bean>
-    <!-- 默认命名空间支持的标签 -->
-    <bean class="cn.haitaoss.javaconfig.Lookup.Test" id="test1">
-        <lookup-method bean="a0" name="x2"></lookup-method>
-    </bean>
-    <alias name="testInit" alias="testInit2"/>
-    <import resource="spring2.xml"/>
-    <beans>
-        <bean class="cn.haitaoss.Test"/>
-    </beans>
 
 </beans>

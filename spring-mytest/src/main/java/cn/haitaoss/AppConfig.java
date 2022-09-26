@@ -1,6 +1,7 @@
 package cn.haitaoss;
 
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.ImportResource;
 
 /**
  * @author haitao.chen
@@ -20,7 +21,9 @@ import org.springframework.context.annotation.ComponentScan;
 // @ComponentScan("cn.haitaoss.javaconfig.aop")
 // @ComponentScan("cn.haitaoss.javaconfig.beanpostprocessor")
 // @ComponentScan("cn.haitaoss.javaconfig.Lookup")
-@ComponentScan("cn.haitaoss.javaconfig.Lazy")
+// @ComponentScan("cn.haitaoss.javaconfig.Lazy")
+@ComponentScan("cn.haitaoss.javaconfig.EventListener")
+@ImportResource("spring.xml")
 public class AppConfig {
 
     public AppConfig() {

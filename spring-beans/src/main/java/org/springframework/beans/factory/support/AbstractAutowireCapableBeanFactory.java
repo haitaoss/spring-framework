@@ -492,6 +492,10 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
              * 我们知道在bean实例化的过程中如果检测到存在 methodOverrides,
              * 则会动态地为当前 bean 生成代理并使用对应的栏截器为 bean 做增强处理。
              * 具体的实现我们后续分析，现在先看 mbdToUse.prepareMethodOverrides() 代码块
+             *
+             * <bean class="cn.haitaoss.javaconfig.Lookup.Test" id="test1">
+             *         <lookup-method bean="a0" name="x2"></lookup-method>
+             * </bean>
              * */
             mbdToUse.prepareMethodOverrides();
         } catch (BeanDefinitionValidationException ex) {

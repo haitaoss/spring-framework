@@ -29,6 +29,10 @@ public class Test {
         System.out.println("哈哈哈哈，我是不会执行的");
         return a;
     }
+    public A x2() {
+        System.out.println("哈哈哈哈，我是不会执行的");
+        return a;
+    }
 }
 
 @Component

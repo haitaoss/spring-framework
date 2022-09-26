@@ -15,8 +15,12 @@ import org.springframework.stereotype.Component;
 @Data
 public class Test {
     @Autowired
-    @Lazy
+    @Lazy(false)
     private X x;
+
+    public Test(@Lazy(false) X x) {
+        this.x = x;
+    }
 
     @Autowired
     private X x2;
