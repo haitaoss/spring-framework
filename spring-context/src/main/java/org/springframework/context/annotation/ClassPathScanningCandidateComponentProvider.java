@@ -302,10 +302,19 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
      * @return a corresponding Set of autodetected bean definitions
      */
     public Set<BeanDefinition> findCandidateComponents(String basePackage) {
+        /**
+         * 1. componentsIndex != null  存在组件索引，该属性是在构造器的时候注入的
+         *      主要的逻辑就是 META-INF/spring.components 这个文件有内容，该属性就不为空
+         *
+         * 2. 所有的 includeFilter 都有 @Indexed 或者 注解是 javax.包下的
+         * */
         if (this.componentsIndex != null && indexSupportsIncludeFilters()) {
-            // spring 扫描优化机制，如果我们写了 META-INF/spring.components 只会扫描文件里面定义的类
+            /**
+             *  spring 扫描优化机制，如果我们写了 META-INF/spring.components 只会扫描文件里面定义的类
+             * */
             return addCandidateComponentsFromIndex(this.componentsIndex, basePackage);
         } else {
+            // 扫描包下的所有类
             return scanCandidateComponents(basePackage);
         }
     }

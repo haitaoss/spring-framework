@@ -6,6 +6,8 @@ import org.springframework.beans.factory.config.DependencyDescriptor;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.ContextAnnotationAutowireCandidateResolver;
 
+import java.util.Arrays;
+
 /**
  * @author haitao.chen
  * email haitaoss@aliyun.com
@@ -14,7 +16,10 @@ import org.springframework.context.annotation.ContextAnnotationAutowireCandidate
 public class Test {
     public static void main(String[] args) throws Exception {
         // ClassPathXmlApplicationContext classPathXmlApplicationContext = new ClassPathXmlApplicationContext("spring.xml");
-        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+        // AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.Test.class);
+        // System.out.println(context.getBean("AService"));
+        System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
 
         /**
          *

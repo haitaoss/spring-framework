@@ -785,36 +785,235 @@ class DemoEvent extends ApplicationEvent {
 
 ```
 
+## 注册事件监听器的两种方式
+
+注册`ApplicationListener`的两种方式：
+
+1. 在任意的一个bean 方法上标注 `@EventListener` 注解。方法只能有一个参数，该参数就是事件对象
+2. 一个 bean 实现 `ApplicationListener` 接口
+
+两种注册事件监听器的区别：
+
+1. Spring 发布时间默认是通过 `ApplicationEventMulticaster` 进行广播的，该实例里面注册了IOC容器中类型 `ApplicationListener` 的 bean，当发布事件时 是遍历实例里所有的 `ApplicationListener` ,判断是否能适配，可以适配就回调`ApplicationListener#onApplicationEvent` 也就是要想`ApplicationListener` 能被回调，首先要注册到`ApplicationEventMulticaster` 中
+2. 实现 `ApplicationListener` 接口的方式，是在实例化单例bean之前就注册到 `ApplicationEventMulticaster` 中
+3. `@EventListener` 是在所有单例bean都注册到IOC容器后，才解析的。
+
+注：所以如果在IOC容器创建单例bean的过程中发布事件，`@EventListener` 的方式是收不到的
+
+
+```java
+@ComponentScan
+public class Test extends AnnotationConfigApplicationContext {
+
+    public Test() {
+    }
+
+    public Test(Class<?> clazz) {
+        super(clazz);
+    }
+
+    @Override
+    protected void onRefresh() throws BeansException {
+        //  发布早期事件 测试一下
+        publishEvent(new DemoEvent("早期事件"));
+    }
+
+    public static void main(String[] args) {
+        Test test = new Test(Test.class);
+        test.publishEvent(new DemoEvent("context刷新好了"));
+        /* 
+控制台输出结果：
+MyApplicationListener---->cn.haitaoss.javaconfig.EventListener.DemoEvent[source=早期事件]
+MyApplicationListener---->cn.haitaoss.javaconfig.EventListener.DemoEvent[source=单例bean实例化事件]
+MyApplicationListener---->cn.haitaoss.javaconfig.EventListener.DemoEvent[source=单例bean初始化事件]
+MyApplicationListener---->cn.haitaoss.javaconfig.EventListener.DemoEvent[source=context刷新好了]
+MyEventListener------>cn.haitaoss.javaconfig.EventListener.DemoEvent[source=context刷新好了]
+         
+        */
+    }
+
+
+}
+
+@Component
+class MyEventListener {
+    @EventListener(classes = DemoEvent.class)
+    public void a(DemoEvent demoEvent) {
+        /**
+         * @EventListener 是在刷新bean的时候在解析注册的，所以 早期事件 是不能通过
+         * */
+        System.out.println("MyEventListener------>" + demoEvent);
+    }
+}
+
+@Component
+class MyApplicationListener implements ApplicationListener<DemoEvent> {
+    @Override
+    public void onApplicationEvent(DemoEvent event) {
+        System.out.println("MyApplicationListener---->" + event);
+    }
+}
+
+class DemoEvent extends ApplicationEvent {
+    private static final long serialVersionUID = 7099057708183571937L;
+
+    public DemoEvent(Object source) {
+        super(source);
+    }
+}
+
+
+@Component
+class SingleObject implements InitializingBean {
+    @Autowired
+    ApplicationEventMulticaster applicationEventMulticaster;
+
+    public SingleObject(ApplicationEventMulticaster applicationEventMulticaster) {
+        applicationEventMulticaster.multicastEvent(new DemoEvent("单例bean实例化事件"));
+    }
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        applicationEventMulticaster.multicastEvent(new DemoEvent("单例bean初始化事件"));
+    }
+}
+```
+
+
+
+## ClassPathBeanDefinitionScanner
+
+`ClassPathBeanDefinitionScanner` 是用来扫描包路径下的文件，判断是否符合bean的约定，满足就注册到BeanDefinitionMap中
+
+两种扫描机制：
+
+- 索引扫描：文件`META-INF/spring.components`内写上索引，只扫描索引里面的bean
+
+  ```shell
+  # key 是要注册的bean
+  # value 是includefilter所能解析的注解,可以写多个默认按照`,`分割
+  # 会在实例化 ClassPathBeanDefinitionScanner 的时候，解析 META-INF/spring.components 内容解析到 CandidateComponentsIndex 属性中 
+  cn.haitaoss.service.UserService=org.springframework.stereotype.Component
+  ```
+
+- 包扫描：扫描包下面所有`.class`文件
+
+注：包扫描，默认是扫描包下所有的`.class`文件，你可以搞花活，重写匹配文件的规则
+
+### 原理分析
+
+> 简单描述：
+>
+> 1. @ComponentScan 注解
+> 2. 构造扫描器 ClassPathBeanDefinitionScanner
+> 3. 根据 @ComponentScan 注解的属性配置扫描器
+> 4. 扫描: 两种扫描方式
+>    - 扫描指定的类：工具目录配置了 `resources/META-INF/spring.components` 内容，就只会扫描里面定义的类。这是Spring扫描的优化机制
+>    - 扫描指定包下的所有类：获得扫描路径下所有的class文件（Resource对象）
+> 5. 利用 ASM 技术读取class文件信息
+> 6. ExcludeFile + IncludeFilter + @Conditional 的判断
+> 7. 进行独立类、接口、抽象类 @Lookup的判断  `isCandidateComponent`
+> 8. 判断生成的BeanDefinition是否重复
+> 9. 添加到BeanDefinitionMap容器中
+
+```java
+/**
+         * 构造器 {@link ClassPathBeanDefinitionScanner#ClassPathBeanDefinitionScanner(BeanDefinitionRegistry)}
+         *      构造器会设置这些属性：
+         *      1. this.registry = registry; 因为需要将解析的结果注册到IOC容器中，所以必须要得给个IOC容器
+         *      2. 如果参数 useDefaultFilters == true，那么就设置添加默认的(识别@Component注解的) includeFilter {@link ClassPathScanningCandidateComponentProvider#registerDefaultFilters()}
+         *          useDefaultFilters 默认就是true
+         *      3. setEnvironment(environment); 就是用来读取系统属性和环境变量的
+         *      4. setResourceLoader(resourceLoader); 这个很关键，扫描优化机制  {@link ClassPathScanningCandidateComponentProvider#setResourceLoader(ResourceLoader)}
+         *          会设置这个属性 componentsIndex，该属性的实例化是执行 {@link CandidateComponentsIndexLoader#loadIndex(ClassLoader)}
+         *              然后执行 {@link CandidateComponentsIndexLoader#doLoadIndex(ClassLoader)}
+         *              就是会读取ClassLoader里面所有的 META-INF/spring.components 文件 {@link CandidateComponentsIndexLoader#COMPONENTS_RESOURCE_LOCATION}
+         *              解析的结果存到 CandidateComponentsIndex 的 LinkedMultiValueMap<String, Entry> 属性中。数据格式： key:注解的全类名 Entry<bean全类名,包名>
+         *
+         *                 举例：META-INF/spring.components
+         *                 cn.haitaoss.service.UserService=org.springframework.stereotype.Component
+         *                 解析的结果就是 < org.springframework.stereotype.Component , Entry(cn.haitaoss.service.UserService,cn.haitaoss.service) >
+         *
+         *
+         * 执行扫描 {@link ClassPathBeanDefinitionScanner#doScan(String...)}
+         *      1. 入参就是包名，遍历包路径，查找候选的组件 {@link ClassPathScanningCandidateComponentProvider#findCandidateComponents(String)}
+         *          有两种查找机制(会将查找结果返回)：
+         *              第一种：属性componentsIndex不为空(也就是存在META-INF/spring.components) 且 所有includeFilter都满足{@link ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilter(TypeFilter)}
+         *                     走索引优化策略 {@link ClassPathScanningCandidateComponentProvider#addCandidateComponentsFromIndex(CandidateComponentsIndex, String)}
+         *
+         *              第二种：扫描包下所有的资源 {@link ClassPathScanningCandidateComponentProvider#scanCandidateComponents(String)}
+         *
+         *      2. 返回结果，检查容器中是否存在这个 BeanDefinition，{@link ClassPathBeanDefinitionScanner#checkCandidate(String, BeanDefinition)}
+         *
+         *      3. 返回结果 注册到 BeanDefinitionMap 中 {@link ClassPathBeanDefinitionScanner#registerBeanDefinition(BeanDefinitionHolder, BeanDefinitionRegistry)}
+         *
+         *
+         * 第一种查找机制流程：{@link ClassPathScanningCandidateComponentProvider#addCandidateComponentsFromIndex(CandidateComponentsIndex, String)}
+         *      - 遍历includeFilters属性，拿到要扫描的注解值(默认就是@Compoent)，这个就是key {@link ClassPathScanningCandidateComponentProvider#extractStereotype(TypeFilter)}
+         *      - key 取 CandidateComponentsIndex#index，拿到的就是 META-INF/spring.components 按照value分组后的key的集合信息
+         *             然后判断 META-INF/spring.components 文件内容定义的bean的包名是否满足 扫描的包路径 {@link CandidateComponentsIndex#getCandidateTypes(String, String)}
+         *      - 进行 ExcludeFiles + IncludeFilters + @Conditional 判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(MetadataReader)}
+         *      - 进行独立类、接口、抽象类 @Lookup的判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(AnnotatedBeanDefinition)}
+         *      - 满足条件添加到集合 candidates 中
+         *
+         * 第二种查找机制：{@link ClassPathScanningCandidateComponentProvider#scanCandidateComponents(String)}
+         *      - 拿到包下所有的 class 文件 {@link ClassPathScanningCandidateComponentProvider#DEFAULT_RESOURCE_PATTERN}
+         *      - 进行 ExcludeFiles + IncludeFilters + @Conditional 判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(MetadataReader)}
+         *      - 进行独立类、接口、抽象类 @Lookup的判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(AnnotatedBeanDefinition)}
+         *      - 满足条件添加到集合 candidates 中
+         * */
+```
+
+### 索引扫描示例
+
+```java
+@Component
+// @ComponentScan(includeFilters = {@ComponentScan.Filter(type = FilterType.CUSTOM, classes = MyAnnotationTypeFilter.class)})
+@ComponentScan(includeFilters = {@ComponentScan.Filter(type = FilterType.ANNOTATION, classes = Haitao.class)})
+// @ComponentScan(includeFilters = {@ComponentScan.Filter(type = FilterType.ANNOTATION, classes = MyAnnotation2.class)}) // 这个研究一下是杂用的
+/**
+ * FilterType.ANNOTATION 解析逻辑：{@link ComponentScanAnnotationParser#typeFiltersFor(AnnotationAttributes)}
+ * */ public class Test {}
+
+// @Haitao
+class AService {}
+
+@Indexed // 这个必须要有，否则无法左右 索引扫描的 类型
+class MyAnnotation implements Annotation {
+    @Override
+    public Class<? extends Annotation> annotationType() {
+        return MyAnnotation.class;
+    }
+}
+
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@interface Haitao {}
+
+class MyAnnotation2 implements Annotation {
+    @Override
+    public Class<? extends Annotation> annotationType() {
+        return Haitao.class;
+    }
+}
+
+class MyAnnotationTypeFilter extends AnnotationTypeFilter {
+    public MyAnnotationTypeFilter() {
+        super(MyAnnotation.class);
+    }
+
+    @Override
+    public boolean match(MetadataReader metadataReader, MetadataReaderFactory metadataReaderFactory) throws IOException {
+        return true;
+    }
+}
+```
+
+
+
 # 待整理
 
-## Spring 整合 Mybatis
 
-Mybatis 官网：https://mybatis.org/mybatis-3/getting-started.html
-
-## Spring 扫描源码
-
-### 源码分析
-
-关键的几个方法：
-
-- org.springframework.context.annotation.ConfigurationClassPostProcessor
-    - org.springframework.context.annotation.ConfigurationClassPostProcessor.postProcessBeanDefinitionRegistry
-        - org.springframework.context.annotation.ConfigurationClassParser.doProcessConfigurationClass
-            - org.springframework.context.annotation.ClassPathBeanDefinitionScanner.doScan
-
-核心步骤：
-
-1. @ComponentScan 注解
-2. 构造扫描器 ClassPathBeanDefinitionScanner
-3. 根据 @ComponentScan 注解的属性配置扫描器
-4. 扫描: 两种扫描方式
-    - 扫描指定的类：工具目录配置了 `resources/META-INF/spring.components` 内容，就只会扫描里面定义的类。这是Spring扫描的优化机制
-    - 扫描指定包下的所有类：获得扫描路径下所有的class文件（Resource对象）
-5. 利用 ASM 技术读取class文件信息
-6. 进行filter+条件注解的判断
-7. 进行独立类、接口、抽样类 @Lookup的判断
-8. 判断生成的BeanDefinition是否重复
-9. 添加到Spring容器中
 
 ### @Bean 如何解析的
 
@@ -839,6 +1038,12 @@ Mybatis 官网：https://mybatis.org/mybatis-3/getting-started.html
  * @see org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsForBeanMethod(org.springframework.context.annotation.BeanMethod)
  * */
 ```
+
+
+
+## Spring 整合 Mybatis
+
+Mybatis 官网：https://mybatis.org/mybatis-3/getting-started.html
 
 ## Conditional 注解的作用
 

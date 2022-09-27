@@ -1,10 +1,13 @@
 package cn.haitaoss.javaconfig.EventListener;
 
 import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.event.ApplicationEventMulticaster;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +18,7 @@ import org.springframework.stereotype.Component;
  */
 @ComponentScan
 public class Test extends AnnotationConfigApplicationContext {
+
     public Test() {
     }
 
@@ -31,7 +35,18 @@ public class Test extends AnnotationConfigApplicationContext {
     public static void main(String[] args) {
         Test test = new Test(Test.class);
         test.publishEvent(new DemoEvent("context刷新好了"));
+        /*
+控制台输出结果：
+MyApplicationListener---->cn.haitaoss.javaconfig.EventListener.DemoEvent[source=早期事件]
+MyApplicationListener---->cn.haitaoss.javaconfig.EventListener.DemoEvent[source=单例bean实例化事件]
+MyApplicationListener---->cn.haitaoss.javaconfig.EventListener.DemoEvent[source=单例bean初始化事件]
+MyApplicationListener---->cn.haitaoss.javaconfig.EventListener.DemoEvent[source=context刷新好了]
+MyEventListener------>cn.haitaoss.javaconfig.EventListener.DemoEvent[source=context刷新好了]
+
+        */
     }
+
+
 }
 
 @Component
@@ -55,7 +70,24 @@ class MyApplicationListener implements ApplicationListener<DemoEvent> {
 
 class DemoEvent extends ApplicationEvent {
     private static final long serialVersionUID = 7099057708183571937L;
+
     public DemoEvent(Object source) {
         super(source);
+    }
+}
+
+
+@Component
+class SingleObject implements InitializingBean {
+    @Autowired
+    ApplicationEventMulticaster applicationEventMulticaster;
+
+    public SingleObject(ApplicationEventMulticaster applicationEventMulticaster) {
+        applicationEventMulticaster.multicastEvent(new DemoEvent("单例bean实例化事件"));
+    }
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        applicationEventMulticaster.multicastEvent(new DemoEvent("单例bean初始化事件"));
     }
 }
