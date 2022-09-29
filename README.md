@@ -51,7 +51,6 @@ dependencies {
 
 IDEA配置：
 ![img1.png](.README_imgs/img_1.png)
-
 # 源码分析
 ## [ASM 技术](https://asm.ow2.io/)
 
@@ -784,7 +783,6 @@ class DemoEvent extends ApplicationEvent {
 }
 
 ```
-
 ## 注册事件监听器的两种方式
 
 注册`ApplicationListener`的两种方式：
@@ -878,9 +876,6 @@ class SingleObject implements InitializingBean {
     }
 }
 ```
-
-
-
 ## ClassPathBeanDefinitionScanner
 
 `ClassPathBeanDefinitionScanner` 是用来扫描包路径下的文件，判断是否符合bean的约定，满足就注册到BeanDefinitionMap中
@@ -918,104 +913,180 @@ class SingleObject implements InitializingBean {
 
 ```java
 /**
-         * 构造器 {@link ClassPathBeanDefinitionScanner#ClassPathBeanDefinitionScanner(BeanDefinitionRegistry)}
-         *      构造器会设置这些属性：
-         *      1. this.registry = registry; 因为需要将解析的结果注册到IOC容器中，所以必须要得给个IOC容器
-         *      2. 如果参数 useDefaultFilters == true，那么就设置添加默认的(识别@Component注解的) includeFilter {@link ClassPathScanningCandidateComponentProvider#registerDefaultFilters()}
-         *          useDefaultFilters 默认就是true
-         *      3. setEnvironment(environment); 就是用来读取系统属性和环境变量的
-         *      4. setResourceLoader(resourceLoader); 这个很关键，扫描优化机制  {@link ClassPathScanningCandidateComponentProvider#setResourceLoader(ResourceLoader)}
-         *          会设置这个属性 componentsIndex，该属性的实例化是执行 {@link CandidateComponentsIndexLoader#loadIndex(ClassLoader)}
-         *              然后执行 {@link CandidateComponentsIndexLoader#doLoadIndex(ClassLoader)}
-         *              就是会读取ClassLoader里面所有的 META-INF/spring.components 文件 {@link CandidateComponentsIndexLoader#COMPONENTS_RESOURCE_LOCATION}
-         *              解析的结果存到 CandidateComponentsIndex 的 LinkedMultiValueMap<String, Entry> 属性中。数据格式： key:注解的全类名 Entry<bean全类名,包名>
-         *
-         *                 举例：META-INF/spring.components
-         *                 cn.haitaoss.service.UserService=org.springframework.stereotype.Component
-         *                 解析的结果就是 < org.springframework.stereotype.Component , Entry(cn.haitaoss.service.UserService,cn.haitaoss.service) >
-         *
-         *
-         * 执行扫描 {@link ClassPathBeanDefinitionScanner#doScan(String...)}
-         *      1. 入参就是包名，遍历包路径，查找候选的组件 {@link ClassPathScanningCandidateComponentProvider#findCandidateComponents(String)}
-         *          有两种查找机制(会将查找结果返回)：
-         *              第一种：属性componentsIndex不为空(也就是存在META-INF/spring.components) 且 所有includeFilter都满足{@link ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilter(TypeFilter)}
-         *                     走索引优化策略 {@link ClassPathScanningCandidateComponentProvider#addCandidateComponentsFromIndex(CandidateComponentsIndex, String)}
-         *
-         *              第二种：扫描包下所有的资源 {@link ClassPathScanningCandidateComponentProvider#scanCandidateComponents(String)}
-         *
-         *      2. 返回结果，检查容器中是否存在这个 BeanDefinition，{@link ClassPathBeanDefinitionScanner#checkCandidate(String, BeanDefinition)}
-         *
-         *      3. 返回结果 注册到 BeanDefinitionMap 中 {@link ClassPathBeanDefinitionScanner#registerBeanDefinition(BeanDefinitionHolder, BeanDefinitionRegistry)}
-         *
-         *
-         * 第一种查找机制流程：{@link ClassPathScanningCandidateComponentProvider#addCandidateComponentsFromIndex(CandidateComponentsIndex, String)}
-         *      - 遍历includeFilters属性，拿到要扫描的注解值(默认就是@Compoent)，这个就是key {@link ClassPathScanningCandidateComponentProvider#extractStereotype(TypeFilter)}
-         *      - key 取 CandidateComponentsIndex#index，拿到的就是 META-INF/spring.components 按照value分组后的key的集合信息
-         *             然后判断 META-INF/spring.components 文件内容定义的bean的包名是否满足 扫描的包路径 {@link CandidateComponentsIndex#getCandidateTypes(String, String)}
-         *      - 进行 ExcludeFiles + IncludeFilters + @Conditional 判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(MetadataReader)}
-         *      - 进行独立类、接口、抽象类 @Lookup的判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(AnnotatedBeanDefinition)}
-         *      - 满足条件添加到集合 candidates 中
-         *
-         * 第二种查找机制：{@link ClassPathScanningCandidateComponentProvider#scanCandidateComponents(String)}
-         *      - 拿到包下所有的 class 文件 {@link ClassPathScanningCandidateComponentProvider#DEFAULT_RESOURCE_PATTERN}
-         *      - 进行 ExcludeFiles + IncludeFilters + @Conditional 判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(MetadataReader)}
-         *      - 进行独立类、接口、抽象类 @Lookup的判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(AnnotatedBeanDefinition)}
-         *      - 满足条件添加到集合 candidates 中
-         * */
+ * 构造器 {@link ClassPathBeanDefinitionScanner#ClassPathBeanDefinitionScanner(BeanDefinitionRegistry)}
+ *      构造器会设置这些属性：
+ *      1. this.registry = registry; 因为需要将解析的结果注册到IOC容器中，所以必须要得给个IOC容器
+ *      2. 如果参数 useDefaultFilters == true，那么就设置添加默认的(识别@Component注解的) includeFilter {@link ClassPathScanningCandidateComponentProvider#registerDefaultFilters()}
+ *          useDefaultFilters 默认就是true
+ *      3. setEnvironment(environment); 就是用来读取系统属性和环境变量的
+ *      4. setResourceLoader(resourceLoader); 这个很关键，扫描优化机制  {@link ClassPathScanningCandidateComponentProvider#setResourceLoader(ResourceLoader)}
+ *          会设置这个属性 componentsIndex，该属性的实例化是执行 {@link CandidateComponentsIndexLoader#loadIndex(ClassLoader)}
+ *              然后执行 {@link CandidateComponentsIndexLoader#doLoadIndex(ClassLoader)}
+ *              就是会读取ClassLoader里面所有的 META-INF/spring.components 文件 {@link CandidateComponentsIndexLoader#COMPONENTS_RESOURCE_LOCATION}
+ *              解析的结果存到 CandidateComponentsIndex 的 LinkedMultiValueMap<String, Entry> 属性中。数据格式： key:注解的全类名 Entry<bean全类名,包名>
+ *
+ *                 举例：META-INF/spring.components
+ *                 cn.haitaoss.service.UserService=org.springframework.stereotype.Component
+ *                 解析的结果就是 < org.springframework.stereotype.Component , Entry(cn.haitaoss.service.UserService,cn.haitaoss.service) >
+ *
+ *
+ * 执行扫描 {@link ClassPathBeanDefinitionScanner#doScan(String...)}
+ *      1. 入参就是包名，遍历包路径，查找候选的组件 {@link ClassPathScanningCandidateComponentProvider#findCandidateComponents(String)}
+ *          有两种查找机制(会将查找结果返回)：
+ *              第一种：属性componentsIndex不为空(也就是存在META-INF/spring.components) 且 所有includeFilter都满足{@link ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilter(TypeFilter)}
+ *                     走索引优化策略 {@link ClassPathScanningCandidateComponentProvider#addCandidateComponentsFromIndex(CandidateComponentsIndex, String)}
+ *
+ *              第二种：扫描包下所有的资源 {@link ClassPathScanningCandidateComponentProvider#scanCandidateComponents(String)}
+ *
+ *      2. 返回结果，检查容器中是否存在这个 BeanDefinition，{@link ClassPathBeanDefinitionScanner#checkCandidate(String, BeanDefinition)}
+ *
+ *      3. 返回结果 注册到 BeanDefinitionMap 中 {@link ClassPathBeanDefinitionScanner#registerBeanDefinition(BeanDefinitionHolder, BeanDefinitionRegistry)}
+ *
+ *
+ * 第一种查找机制流程：{@link ClassPathScanningCandidateComponentProvider#addCandidateComponentsFromIndex(CandidateComponentsIndex, String)}
+ *      - 遍历includeFilters属性，拿到要扫描的注解值(默认就是@Compoent)，这个就是key {@link ClassPathScanningCandidateComponentProvider#extractStereotype(TypeFilter)}
+ *      - key 取 CandidateComponentsIndex#index，拿到的就是 META-INF/spring.components 按照value分组后的key的集合信息
+ *             然后判断 META-INF/spring.components 文件内容定义的bean的包名是否满足 扫描的包路径 {@link CandidateComponentsIndex#getCandidateTypes(String, String)}
+ *      - 进行 ExcludeFiles + IncludeFilters + @Conditional 判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(MetadataReader)}
+ *      - 进行独立类、接口、抽象类 @Lookup的判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(AnnotatedBeanDefinition)}
+ *      - 满足条件添加到集合 candidates 中
+ *
+ * 第二种查找机制：{@link ClassPathScanningCandidateComponentProvider#scanCandidateComponents(String)}
+ *      - 拿到包下所有的 class 文件 {@link ClassPathScanningCandidateComponentProvider#DEFAULT_RESOURCE_PATTERN}
+ *      - 进行 ExcludeFiles + IncludeFilters + @Conditional 判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(MetadataReader)}
+ *      - 进行独立类、接口、抽象类 @Lookup的判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(AnnotatedBeanDefinition)}
+ *      - 满足条件添加到集合 candidates 中
+ * */
+```
+
+### 索引扫描判断流程
+
+```java
+/**
+ * 索引扫描判断流程：
+ *
+ * 1. 扫描组件 {@link ClassPathScanningCandidateComponentProvider#findCandidateComponents(String)}
+ *
+ * 2. 判断扫描器的 includeFilters 是否都支持索引扫描 {@link org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilters()}
+ *
+ * 3. 判断是否支持索引扫描的逻辑{@link ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilter(TypeFilter)}
+ *      是这种类型 filter instanceof AnnotationTypeFilter
+ *          filter.getAnnotationType() 有@Indexed注解 或者 是javax. 包下的类
+ *
+ *      是这种类型 filter instanceof AssignableTypeFilter
+ *          filter.getTargetType() 有@Indexed注解
+ */
+```
+
+### AnnotationTypeFilter 匹配逻辑
+
+```java
+/**
+ * {@link AbstractTypeHierarchyTraversingFilter#match(MetadataReader, MetadataReaderFactory)}
+ * 
+ * 1. 匹配bean是否有注解 {@link AbstractTypeHierarchyTraversingFilter#matchSelf(MetadataReader)}
+ *      返回true，就return
+ *
+ * 2. 属性：considerInherited 为 true(通过构造器设置的)
+ *      bean的父类 {@link AbstractTypeHierarchyTraversingFilter#matchSuperClass(String)}
+ *          返回true，就return
+ *      递归调 {@link AbstractTypeHierarchyTraversingFilter#match(MetadataReader, MetadataReaderFactory)}
+ *
+ * 3. 属性：considerInterfaces 为 true(通过构造器设置的)
+ *      bean的接口 {@link AbstractTypeHierarchyTraversingFilter#matchInterface(String)}
+ *          返回true，就return
+ *      递归调 {@link AbstractTypeHierarchyTraversingFilter#match(MetadataReader, MetadataReaderFactory)}
+ * */
+```
+
+### @ComponentScan
+
+```java
+@ComponentScan(
+        basePackages = "cn", // 扫描包路径
+        useDefaultFilters = true, // 是否注册默认的 includeFilter，默认会注解扫描@Component注解的includeFilter
+        nameGenerator = BeanNameGenerator.class, // beanName 生成器
+    		excludeFilters = {} // 扫描bean 排除filter。其中一个命中就不能作为bean
+        includeFilters = {@ComponentScan.Filter(type = FilterType.CUSTOM, classes = MyAnnotationTypeFilter.class)} // 扫描bean 包含filter。其中一个命中就能作为bean
+)
+public class A{}
 ```
 
 ### 索引扫描示例
 
+`META-INF/spring.components` 文件
+
+```properties
+cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$MyAnnotation
+
+cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$Haitao
+```
+
+代码：
+
 ```java
 @Component
-// @ComponentScan(includeFilters = {@ComponentScan.Filter(type = FilterType.CUSTOM, classes = MyAnnotationTypeFilter.class)})
-@ComponentScan(includeFilters = {@ComponentScan.Filter(type = FilterType.ANNOTATION, classes = Haitao.class)})
-// @ComponentScan(includeFilters = {@ComponentScan.Filter(type = FilterType.ANNOTATION, classes = MyAnnotation2.class)}) // 这个研究一下是杂用的
-/**
- * FilterType.ANNOTATION 解析逻辑：{@link ComponentScanAnnotationParser#typeFiltersFor(AnnotationAttributes)}
- * */ public class Test {}
+/*@ComponentScan( 
+        basePackages = "cn",
+        useDefaultFilters = true,
+        nameGenerator = BeanNameGenerator.class,
+        includeFilters = {@ComponentScan.Filter(type = FilterType.CUSTOM, classes = MyAnnotationTypeFilter.class)}, // 这个可以重写 AbstractTypeHierarchyTraversingFilter#match 定制匹配规则
+        excludeFilters = {}
+)*/
+@ComponentScan(includeFilters = {@ComponentScan.Filter(type = FilterType.ANNOTATION, classes = MyAnnotationTypeFilter.Haitao.class)}) // 这个用起来方便，有这个注解 就可以
+public class Test {}
 
-// @Haitao
+@MyAnnotationTypeFilter.Haitao
 class AService {}
 
-@Indexed // 这个必须要有，否则无法左右 索引扫描的 类型
-class MyAnnotation implements Annotation {
-    @Override
-    public Class<? extends Annotation> annotationType() {
-        return MyAnnotation.class;
-    }
-}
+/**
+ * 索引扫描判断流程：
+ *
+ * 1. 扫描组件 {@link org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#findCandidateComponents(String)}
+ *
+ * 2. 判断扫描器的 includeFilters 是否都支持索引扫描 {@link org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilters()}
+ *
+ * 3. 判断是否支持索引扫描的逻辑{@link org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilter(TypeFilter)}
+ *      是这种类型 filter instanceof AnnotationTypeFilter
+ *          filter.getAnnotationType() 有@Indexed注解 或者 是javax. 包下的类
+ *
+ *      是这种类型 filter instanceof AssignableTypeFilter
+ *          filter.getTargetType() 有@Indexed注解
+ */
 
-@Target(ElementType.TYPE)
-@Retention(RetentionPolicy.RUNTIME)
-@interface Haitao {}
-
-class MyAnnotation2 implements Annotation {
-    @Override
-    public Class<? extends Annotation> annotationType() {
-        return Haitao.class;
-    }
-}
-
+/**
+ * 对应的配置文件：META-INF/spring.components
+ * - cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$MyAnnotation
+ * - cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$Haitao
+ * */
 class MyAnnotationTypeFilter extends AnnotationTypeFilter {
+    @Indexed // 这个是必须的，否则无法使用 索引扫描
+    class MyAnnotation implements Annotation {
+        @Override
+        public Class<? extends Annotation> annotationType() {
+            return MyAnnotation.class;
+        }
+    }
+
+    @Target(ElementType.TYPE)
+    @Indexed
+    @Retention(RetentionPolicy.RUNTIME)
+    @interface Haitao {}
+
     public MyAnnotationTypeFilter() {
-        super(MyAnnotation.class);
+        // super(MyAnnotation.class);
+        super(Haitao.class);
     }
 
     @Override
     public boolean match(MetadataReader metadataReader, MetadataReaderFactory metadataReaderFactory) throws IOException {
+        // 匹配方法
         return true;
     }
 }
+
 ```
-
-
-
-# 待整理
-
-
-
-### @Bean 如何解析的
+## @Bean 如何解析的
 
 ```java
 /**
@@ -1039,24 +1110,24 @@ class MyAnnotationTypeFilter extends AnnotationTypeFilter {
  * */
 ```
 
+## @Conditional
 
-
-## Spring 整合 Mybatis
-
-Mybatis 官网：https://mybatis.org/mybatis-3/getting-started.html
-
-## Conditional 注解的作用
+> ClassPathBeanDefinitionScanner 在扫描bean 注册到BeanFactory的时候会进行判断：ExcludeFile -> IncludeFilter -> @Conditional 的判断
+>
+> ```java
+> /**
+>  * 注意：
+>  * {@link ClassPathScanningCandidateComponentProvider#isConditionMatch(MetadataReader)}
+>  * {@link ClassPathScanningCandidateComponentProvider#isConditionMatch(MetadataReader)}
+>  * {@link ConditionEvaluator#shouldSkip(AnnotatedTypeMetadata, *  ConfigurationCondition.ConfigurationPhase)}
+>  * {@link Condition#matches(ConditionContext, AnnotatedTypeMetadata)}
+>  *      第一个参数是当前的BeanFactory，此时的BeanFactory并不完整，要想保证 @Conditional 能正确判断，应当保证 bean 注册到 BeanFactory 的先后顺序
+>  */
+> ```
+>
+> 扩展知识：SpringBoot的自动转配用到了很多 @Conditional。而SpringBoot是通过@Import(DeferredImportSelector.class) 延时bean注册到BeanFactory中，从而尽可能的保证 @Conditional 判断的准确性
 
 ```java
-@ComponentScan(value = "cn.haitaoss.javaconfig.beanfactorypostprocessor", excludeFilters = {}, includeFilters = {})
-```
-
-执行完 excludeFilters 、includeFilters 会进行 @Conditional 条件的判断
-org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider.isCandidateComponent(
-org.springframework.core.type.classreading.MetadataReader)
-
-```java
-
 @FunctionalInterface
 public interface Condition {
     /**
@@ -1068,6 +1139,40 @@ public interface Condition {
     boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata);
 }
 ```
+
+```java
+@Component
+public class Test {
+    static class A {}
+
+    static class MyCondition implements Condition {
+
+        @Override
+        public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+            return true;
+        }
+    }
+
+    @Bean
+    @Conditional(MyCondition.class)
+    public A a() {
+        return new A();
+    }
+}
+
+```
+
+
+
+# 待整理
+
+
+
+## Spring 整合 Mybatis
+
+Mybatis 官网：https://mybatis.org/mybatis-3/getting-started.html
+
+
 
 ## 类型转换
 

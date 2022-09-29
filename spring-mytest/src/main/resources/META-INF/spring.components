@@ -1,4 +1,4 @@
 # Spring \u626B\u63CF\u4F18\u5316\u673A\u5236\uFF0C\u5982\u679C\u914D\u7F6E\u4E86\u5185\u5BB9\uFF0C\u90A3\u4E48spring\u53EA\u4F1A\u626B\u63CF\u8FD9\u91CC\u9762\u5B9A\u4E49\u7684\u6240\u6709\u7684key\uFF0C\u6839\u636Evalue\u8FDB\u884C\u5206\u7EC4\uFF08\u6CE8\u610F\uFF1A\u8FD9\u91CC\u53EA\u662F\u8BF4\u4E86\u800C\u5DF2\uFF0C\u771F\u6B63\u7684\u7C7B\u91CC\u9762\u9700\u8981\u6807\u6CE8\u4E0A\u6CE8\u89E3\uFF0C\u5426\u5219\u4E5F\u662F\u626B\u63CF\u4E0D\u4E0A\u7684\uFF09
 #cn.haitaoss.service.UserService=org.springframework.stereotype.Component
-cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotation,\
-cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotation2
+#cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$MyAnnotation
+#cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$Haitao
