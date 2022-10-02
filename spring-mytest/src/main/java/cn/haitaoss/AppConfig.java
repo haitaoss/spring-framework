@@ -22,12 +22,12 @@ import org.springframework.context.annotation.ComponentScan;
 // @ComponentScan("cn.haitaoss.javaconfig.Lookup")
 // @ComponentScan("cn.haitaoss.javaconfig.Lazy")
 // @ComponentScan("cn.haitaoss.javaconfig.EventListener")
-@ComponentScan("cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner")
-// @ImportResource("spring.xml")
-public class AppConfig {
 
+// @ImportResource("spring.xml")
+// @Component
+@ComponentScan("cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner")
+public class AppConfig {
     public AppConfig() {
         System.out.println("构造器--->AppConfig");
     }
-
 }

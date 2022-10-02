@@ -16,8 +16,8 @@ import java.util.Arrays;
 public class Test {
     public static void main(String[] args) throws Exception {
         // ClassPathXmlApplicationContext classPathXmlApplicationContext = new ClassPathXmlApplicationContext("spring.xml");
-        // AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
-        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.Test.class);
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+        // AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.Test.class);
         // System.out.println(context.getBean("AService"));
         System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
 
@@ -57,7 +57,7 @@ public class Test {
          beanFactory.registerResolvableDependency(ApplicationContext.class, this);
          伪装关系保存在一个Map<Class<?>, Object>里。
          * */
-
-
     }
 }
+
+

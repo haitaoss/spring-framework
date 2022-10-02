@@ -177,9 +177,7 @@ IDEA配置：
     - 可以在这里创建bean 来实现提前创建的目的，但是会破坏bean的生命周期，因为此时容器中还没有创建出BeanPostProcessor
     - 在这里注册 BeanDefinitionRegistryPostProcessor、BeanFactoryPostProcessor 是没有用的，不会作为BeanFactory 来执行回调方法
 ## BeanPostProcessor
-
 特点：每个bean的生命周期中都会执行一次。实例化前、构造器初始化、实例化后、属性填充前、初始化前、初始化后
-
 ```java
 /**
  * 核心的接口类型：
@@ -227,6 +225,37 @@ IDEA配置：
  *
  *     销毁bean的回调
  *     org.springframework.beans.factory.config.DestructionAwareBeanPostProcessor#requiresDestruction(java.lang.Object)
+ * */
+```
+
+在bean的生命周期中调用BeanPostProcessor的时机点
+```java
+/** 
+ * 万恶的源头 {@link AbstractAutowireCapableBeanFactory#doCreateBean(String, RootBeanDefinition, Object[])}
+ * 
+ * 1. 实例化前 {@link InstantiationAwareBeanPostProcessor#postProcessBeforeInstantiation(Class, String)}
+ * 2. 推断构造器 {@link SmartInstantiationAwareBeanPostProcessor#determineCandidateConstructors(Class, String)}
+ *      下一步会进行bean的实例化 {@link AbstractAutowireCapableBeanFactory#instantiateBean(String, RootBeanDefinition)}
+ *      
+ * 3. 合并BeanDefinition信息 {@link MergedBeanDefinitionPostProcessor#postProcessMergedBeanDefinition(RootBeanDefinition, Class, String)}
+ * 4. 添加提前aop回调到三级缓存{@link SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference(Object, String)}
+ *      通过lambda创建匿名内部类，将提前aop的回调方式存到三级缓存中。第一个参数就是上面刚刚实例化出来的bean对象  
+ *      `addSingletonFactory(beanName, () -> getEarlyBeanReference(beanName, mbd, bean));`
+ *      
+ * 5. 实例化后 {@link InstantiationAwareBeanPostProcessor#postProcessAfterInstantiation(Object, String)}
+ *      这里返回值是boolean，如果返回false  那么将不会执行下面的属性注入流程
+ *      
+ * 6. 解析要注入的属性值 {@link InstantiationAwareBeanPostProcessor#postProcessProperties(PropertyValues, Object, String)}
+ * 7. 解析要注入的属性值(过时方法){@link InstantiationAwareBeanPostProcessor#postProcessPropertyValues(PropertyValues, PropertyDescriptor[], Object, String)}
+ *      然后就是将解析的属性值，注入到bean对象中 {@link AbstractAutowireCapableBeanFactory#applyPropertyValues(String, BeanDefinition, BeanWrapper, PropertyValues)}
+ *      
+ * 8. 初始化前 {@link BeanPostProcessor#postProcessBeforeInitialization(Object, String)}
+ *      此时已经完成了bean的实例化、属性注入、XxAware接口的回调
+ *      
+ * 9. 初始化后 {@link BeanPostProcessor#postProcessAfterInitialization(Object, String)}
+ *      此时完成 初始化方法的回调。afterPropertiesSet
+ *      
+ * 10. 销毁bean的时候回调 {@link DestructionAwareBeanPostProcessor#requiresDestruction(Object)}
  * */
 ```
 ## 详解ConfigurationClassPostProcessor
