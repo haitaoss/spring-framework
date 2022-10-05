@@ -16,11 +16,15 @@
 
 package org.springframework.context.annotation;
 
+import org.springframework.aop.framework.*;
+import org.springframework.cglib.proxy.MethodProxy;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.reflect.Method;
 
 /**
  * Enables support for handling components marked with AspectJ's {@code @Aspect} annotation,
@@ -42,7 +46,7 @@ import java.lang.annotation.Target;
  *         return new MyAspect();
  *     }
  * }</pre>
- *
+ * <p>
  * Where {@code FooService} is a typical POJO component and {@code MyAspect} is an
  * {@code @Aspect}-style aspect:
  *
@@ -61,7 +65,7 @@ import java.lang.annotation.Target;
  *         // advise FooService methods as appropriate
  *     }
  * }</pre>
- *
+ * <p>
  * In the scenario above, {@code @EnableAspectJAutoProxy} ensures that {@code MyAspect}
  * will be properly processed and that {@code FooService} will be proxied mixing in the
  * advice that it contributes.
@@ -89,7 +93,7 @@ import java.lang.annotation.Target;
  * &#064;Aspect
  * &#064;Component
  * public class MyAspect { ... }</pre>
- *
+ * <p>
  * Then use the @{@link ComponentScan} annotation to pick both up:
  *
  * <pre class="code">
@@ -113,8 +117,8 @@ import java.lang.annotation.Target;
  *
  * @author Chris Beams
  * @author Juergen Hoeller
- * @since 3.1
  * @see org.aspectj.lang.annotation.Aspect
+ * @since 3.1
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
@@ -122,18 +126,29 @@ import java.lang.annotation.Target;
 @Import(AspectJAutoProxyRegistrar.class)
 public @interface EnableAspectJAutoProxy {
 
-	/**
-	 * Indicate whether subclass-based (CGLIB) proxies are to be created as opposed
-	 * to standard Java interface-based proxies. The default is {@code false}.
-	 */
-	boolean proxyTargetClass() default false;
+    /**
+     * 这个参数是用来约束是cglib代理或者jdk代理的，但不是强执约束，会优先判断是否符合cglib代理的条件。
+     * true：建议cglib代理。
+     * false：建议jdk代理。
+     * {@link DefaultAopProxyFactory#createAopProxy(AdvisedSupport)}
+     * Indicate whether subclass-based (CGLIB) proxies are to be created as opposed
+     * to standard Java interface-based proxies. The default is {@code false}.
+     */
+    boolean proxyTargetClass() default false;
 
-	/**
-	 * Indicate that the proxy should be exposed by the AOP framework as a {@code ThreadLocal}
-	 * for retrieval via the {@link org.springframework.aop.framework.AopContext} class.
-	 * Off by default, i.e. no guarantees that {@code AopContext} access will work.
-	 * @since 4.3.1
-	 */
-	boolean exposeProxy() default false;
+    /**
+     * 在执行 代理对象的方法前，是否将代理对象缓存到 ThreadLocal 中。
+     * true：缓存
+     * false：不缓存
+     * {@link CglibAopProxy.DynamicAdvisedInterceptor#intercept(Object, Method, Object[], MethodProxy)}
+     * {@link JdkDynamicAopProxy#invoke(Object, Method, Object[])}
+     * {@link AopContext#setCurrentProxy(Object)}
+     * Indicate that the proxy should be exposed by the AOP framework as a {@code ThreadLocal}
+     * for retrieval via the {@link org.springframework.aop.framework.AopContext} class.
+     * Off by default, i.e. no guarantees that {@code AopContext} access will work.
+     *
+     * @since 4.3.1
+     */
+    boolean exposeProxy() default false;
 
 }

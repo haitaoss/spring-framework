@@ -1,10 +1,9 @@
 package cn.haitaoss;
 
 
-import org.springframework.aop.aspectj.annotation.AnnotationAwareAspectJAutoProxyCreator;
-import org.springframework.beans.factory.config.DependencyDescriptor;
+import cn.haitaoss.javaconfig.aop.AopTest;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.annotation.ContextAnnotationAutowireCandidateResolver;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
 
 import java.util.Arrays;
 
@@ -13,32 +12,16 @@ import java.util.Arrays;
  * email haitaoss@aliyun.com
  * date 2022-07-31 16:53
  */
+@EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)
 public class Test {
+
     public static void main(String[] args) throws Exception {
         // ClassPathXmlApplicationContext classPathXmlApplicationContext = new ClassPathXmlApplicationContext("spring.xml");
-        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
         // AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.Test.class);
-        // System.out.println(context.getBean("AService"));
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
         System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
+        context.getBean(AopTest.AopDemo.class).test();
 
-        /**
-         *
-         * 属性注入的时候 注入的是代理对象 {@link ContextAnnotationAutowireCandidateResolver#getLazyResolutionProxyIfNecessary(DependencyDescriptor, String)}
-         * */
-        /**
-         * @EnableAspectJAutoProxy
-         *
-         * @Import(AspectJAutoProxyRegistrar.class)
-         *
-         * 会默认注入 {@link AnnotationAwareAspectJAutoProxyCreator } 继承树，可以看到该类实现的 SmartInstantiationAwareBeanPostProcessor 所以可以在bean创建的声明周期进行拦截
-         *  SmartInstantiationAwareBeanPostProcessor
-         *      AbstractAutoProxyCreator
-         *          AbstractAdvisorAutoProxyCreator
-         *              AspectJAwareAdvisorAutoProxyCreator
-         *                  AnnotationAwareAspectJAutoProxyCreator
-         *
-         *
-         * */
         /**
          依赖解析忽略
          此部分设置哪些接口在进行依赖注入的时候应该被忽略:

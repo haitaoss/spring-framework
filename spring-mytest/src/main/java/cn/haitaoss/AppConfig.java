@@ -25,7 +25,8 @@ import org.springframework.context.annotation.ComponentScan;
 
 // @ImportResource("spring.xml")
 // @Component
-@ComponentScan("cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner")
+//@ComponentScan("cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner")
+@ComponentScan("cn.haitaoss.javaconfig.aop")
 public class AppConfig {
     public AppConfig() {
         System.out.println("构造器--->AppConfig");

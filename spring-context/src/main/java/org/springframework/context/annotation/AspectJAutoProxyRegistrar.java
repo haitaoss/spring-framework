@@ -33,27 +33,44 @@ import org.springframework.core.type.AnnotationMetadata;
  */
 class AspectJAutoProxyRegistrar implements ImportBeanDefinitionRegistrar {
 
-	/**
-	 * Register, escalate, and configure the AspectJ auto proxy creator based on the value
-	 * of the @{@link EnableAspectJAutoProxy#proxyTargetClass()} attribute on the importing
-	 * {@code @Configuration} class.
-	 */
-	@Override
-	public void registerBeanDefinitions(
-			AnnotationMetadata importingClassMetadata, BeanDefinitionRegistry registry) {
+    /**
+     * Register, escalate, and configure the AspectJ auto proxy creator based on the value
+     * of the @{@link EnableAspectJAutoProxy#proxyTargetClass()} attribute on the importing
+     * {@code @Configuration} class.
+     */
+    @Override
+    public void registerBeanDefinitions(AnnotationMetadata importingClassMetadata, BeanDefinitionRegistry registry) {
+        /**
+         * 默认注册 AnnotationAwareAspectJAutoProxyCreator
+         *
+         * 具体的注册逻辑 {@link AopConfigUtils#registerOrEscalateApcAsRequired(Class, BeanDefinitionRegistry, Object)}
+         *  如果发现容器中已经注册了 {@link AopConfigUtils#AUTO_PROXY_CREATOR_BEAN_NAME} 这个名字的bean，那就看看优先级，新注册的优先级大就覆盖bean的定义
+         *  而优先级是这个 {@link AopConfigUtils#APC_PRIORITY_LIST} 属性的索引值
+         *     这里面注册了三个 AbstractAdvisorAutoProxyCreator [InfrastructureAdvisorAutoProxyCreator、AspectJAwareAdvisorAutoProxyCreator、AnnotationAwareAspectJAutoProxyCreator]
+         *
+         *      继承树
+         *      SmartInstantiationAwareBeanPostProcessor
+         *         AbstractAutoProxyCreator (org.springframework.aop.framework.autoproxy)
+         *             AbstractAdvisorAutoProxyCreator (org.springframework.aop.framework.autoproxy)
+         *                 AspectJAwareAdvisorAutoProxyCreator (org.springframework.aop.aspectj.autoproxy)
+         *                     AnnotationAwareAspectJAutoProxyCreator (org.springframework.aop.aspectj.annotation)
+         *                 DefaultAdvisorAutoProxyCreator (org.springframework.aop.framework.autoproxy)
+         *                 InfrastructureAdvisorAutoProxyCreator (org.springframework.aop.framework.autoproxy)
+         *
+         *
+         * */
+        AopConfigUtils.registerAspectJAnnotationAutoProxyCreatorIfNecessary(registry);
 
-		AopConfigUtils.registerAspectJAnnotationAutoProxyCreatorIfNecessary(registry);
-
-		AnnotationAttributes enableAspectJAutoProxy =
-				AnnotationConfigUtils.attributesFor(importingClassMetadata, EnableAspectJAutoProxy.class);
-		if (enableAspectJAutoProxy != null) {
-			if (enableAspectJAutoProxy.getBoolean("proxyTargetClass")) {
-				AopConfigUtils.forceAutoProxyCreatorToUseClassProxying(registry);
-			}
-			if (enableAspectJAutoProxy.getBoolean("exposeProxy")) {
-				AopConfigUtils.forceAutoProxyCreatorToExposeProxy(registry);
-			}
-		}
-	}
+        AnnotationAttributes enableAspectJAutoProxy = AnnotationConfigUtils.attributesFor(importingClassMetadata, EnableAspectJAutoProxy.class);
+        // 将注解的属性值 解析设置到 BeanDefinition 中
+        if (enableAspectJAutoProxy != null) {
+            if (enableAspectJAutoProxy.getBoolean("proxyTargetClass")) {
+                AopConfigUtils.forceAutoProxyCreatorToUseClassProxying(registry);
+            }
+            if (enableAspectJAutoProxy.getBoolean("exposeProxy")) {
+                AopConfigUtils.forceAutoProxyCreatorToExposeProxy(registry);
+            }
+        }
+    }
 
 }

@@ -60,26 +60,25 @@ import org.springframework.lang.Nullable;
 @SuppressWarnings("serial")
 public class LazyInitTargetSource extends AbstractBeanFactoryBasedTargetSource {
 
-	@Nullable
-	private Object target;
+    @Nullable
+    private Object target;
 
 
-	@Override
-	@Nullable
-	public synchronized Object getTarget() throws BeansException {
-		if (this.target == null) {
-			this.target = getBeanFactory().getBean(getTargetBeanName());
-			postProcessTargetObject(this.target);
-		}
-		return this.target;
-	}
+    @Override
+    @Nullable
+    public synchronized Object getTarget() throws BeansException {
+        if (this.target == null) {
+            this.target = getBeanFactory().getBean(getTargetBeanName());
+            postProcessTargetObject(this.target);
+        } return this.target;
+    }
 
-	/**
-	 * Subclasses may override this method to perform additional processing on
-	 * the target object when it is first loaded.
-	 * @param targetObject the target object that has just been instantiated (and configured)
-	 */
-	protected void postProcessTargetObject(Object targetObject) {
-	}
+    /**
+     * Subclasses may override this method to perform additional processing on
+     * the target object when it is first loaded.
+     * @param targetObject the target object that has just been instantiated (and configured)
+     */
+    protected void postProcessTargetObject(Object targetObject) {
+    }
 
 }

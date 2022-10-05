@@ -197,34 +197,35 @@ IDEA配置：
  *
  *  每个 BeanPostProcessor 回调方法的作用：
  *     提前AOP
- *     org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference(java.lang.Object, java.lang.String)
+ *          {@link org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference(java.lang.Object, java.lang.String)}
  *
- *     实例化前。如果该方法返回值不为null，先执行初始化后，然后直接返回该对象。不在执行bean生命周期的构造器初始化、属性填充、初始化操作）
- *     org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessBeforeInstantiation(java.lang.Class, java.lang.String)
+ *     实例化前。如果该方法返回值不为null，在执行初始化后 {@link InstantiationAwareBeanPostProcessor#postProcessAfterInstantiation(Object, String)}，然后直接返回该对象。不在执行bean生命周期的构造器初始化、属性填充、初始化操作）
+ *          {@link org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessBeforeInstantiation(java.lang.Class, java.lang.String)}
  *
  *     构造器初始化。如果返回值不为null，就会使用返回的构造器进行实例化
- *     org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostProcessor#determineCandidateConstructors(java.lang.Class, java.lang.String)
+ *          {@link org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostProcessor#determineCandidateConstructors(java.lang.Class, java.lang.String)}
  *
  *     合并beanDefinition。这里可以拿到BeanDefinition
- *     org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor#postProcessMergedBeanDefinition(org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Class, java.lang.String)
+ *          {@link org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor#postProcessMergedBeanDefinition(org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Class, java.lang.String)}
+ *          注：紧接着会将提前aop的回调函数存到 三级缓存中，被代理对象就是上面刚刚实例化创建出来的对象
  *
  *     实例化后。可以拿到构造器初始化后的对象
- *     org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessAfterInstantiation(java.lang.Object, java.lang.String)
+ *          {@link org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessAfterInstantiation(java.lang.Object, java.lang.String)}
  *
  *     属性注入前。可以拿到解析注解或者xml中设置的属性值
- *     org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessProperties(org.springframework.beans.PropertyValues, java.lang.Object, java.lang.String)
+ *          {@link org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessProperties(org.springframework.beans.PropertyValues, java.lang.Object, java.lang.String)}
  *
  *     属性注入前。可以拿到解析注解或者xml中设置的属性值（过时方法）
- *     org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessPropertyValues(org.springframework.beans.PropertyValues, java.beans.PropertyDescriptor[], java.lang.Object, java.lang.String)
+ *          {@link org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor#postProcessPropertyValues(org.springframework.beans.PropertyValues, java.beans.PropertyDescriptor[], java.lang.Object, java.lang.String)}
  *
  *     初始化前。此时的bean已经完成了属性注入、Wrapper注入，还未执行初始化方法(org.springframework.beans.factory.InitializingBean#afterPropertiesSet())
- *     org.springframework.beans.factory.config.BeanPostProcessor#postProcessBeforeInitialization(java.lang.Object, java.lang.String)
+ *          {@link org.springframework.beans.factory.config.BeanPostProcessor#postProcessBeforeInitialization(java.lang.Object, java.lang.String)}
  *
  *     初始化后。这是bean生命周期的最后一个环节了
- *     org.springframework.beans.factory.config.BeanPostProcessor#postProcessAfterInitialization(java.lang.Object, java.lang.String)
+ *          {@link org.springframework.beans.factory.config.BeanPostProcessor#postProcessAfterInitialization(java.lang.Object, java.lang.String)}
  *
  *     销毁bean的回调
- *     org.springframework.beans.factory.config.DestructionAwareBeanPostProcessor#requiresDestruction(java.lang.Object)
+ *          {@link org.springframework.beans.factory.config.DestructionAwareBeanPostProcessor#requiresDestruction(java.lang.Object)}
  * */
 ```
 
@@ -318,37 +319,44 @@ IDEA配置：
 ```
 ## bean 创建的生命周期
 
-```java
-/**
- * org.springframework.beans.factory.support.AbstractBeanFactory#getBean(java.lang.String, java.lang.Class, java.lang.Object...)
- * org.springframework.beans.factory.support.AbstractBeanFactory#doGetBean(java.lang.String, java.lang.Class, java.lang.Object[], boolean)
- *   循环依赖核心代码：如果bean正在创建 -> 二级缓存获取 -> 三级缓存 对正在创建的bean 进行提前AOP 然后返回
- *      org.springframework.beans.factory.support.DefaultSingletonBeanRegistry#getSingleton(java.lang.String)
- * org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#createBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])
- * org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#doCreateBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])
- *  org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#createBeanInstance(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])
- *  org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#populateBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, org.springframework.beans.BeanWrapper)
- *  org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#initializeBean(java.lang.String, java.lang.Object, org.springframework.beans.factory.support.RootBeanDefinition)
- * */
-```
+> 整体流程
+>
+> ```java
+> /**
+>  * org.springframework.beans.factory.support.AbstractBeanFactory#getBean(java.lang.String, java.lang.Class, java.lang.Object...)
+>  * org.springframework.beans.factory.support.AbstractBeanFactory#doGetBean(java.lang.String, java.lang.Class, java.lang.Object[], boolean)
+>  *   循环依赖核心代码：如果bean正在创建 -> 二级缓存获取 -> 三级缓存 对正在创建的bean 进行提前AOP 然后返回
+>  *      org.springframework.beans.factory.support.DefaultSingletonBeanRegistry#getSingleton(java.lang.String)
+>  * org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#createBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])
+>  * org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#doCreateBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])
+>  *  org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#createBeanInstance(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, java.lang.Object[])
+>  *  org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#populateBean(java.lang.String, org.springframework.beans.factory.support.RootBeanDefinition, org.springframework.beans.BeanWrapper)
+>  *  org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#initializeBean(java.lang.String, java.lang.Object, org.springframework.beans.factory.support.RootBeanDefinition)
+>  * */
+> ```
 
 1. 所有的bean 都是通过 `getBean()` 来创建的
 
 ```java
 /**
  *
- * @see AbstractApplicationContext#refresh()
- * @see AbstractApplicationContext#finishBeanFactoryInitialization(ConfigurableListableBeanFactory)
- * @see DefaultListableBeanFactory#preInstantiateSingletons()
- *  - 遍历 beanNames 
- *  - 不是抽象的 && 是单例的 && 不是懒加载的
- *  - 是不是 FactoryBean :
- *      - 是：
- *          - 创建 FactoryBean 实例
- *          - 判断 是否立即初始化 FactoryBean#getObject 返回的bean
- *      - 不是： 
- *          @see org.springframework.beans.factory.support.AbstractBeanFactory#getBean(java.lang.String)
- *      注：创建bean 都是执行 getBean
+ * {@link AbstractApplicationContext#refresh()}
+ * {@link AbstractApplicationContext#finishBeanFactoryInitialization(ConfigurableListableBeanFactory)}
+ * {@link DefaultListableBeanFactory#preInstantiateSingletons()}
+ *  1. 先完成单例bean的实例化, 遍历 beanDefinitionNames
+ *      - 不是抽象的 && 是单例的 && 不是懒加载的
+ *      - 是不是 FactoryBean :
+ *          - 是：
+ *              - 创建 FactoryBean 实例
+ *              - 判断 是否立即初始化 FactoryBean#getObject 返回的bean
+ *          - 不是：
+ *              @see org.springframework.beans.factory.support.AbstractBeanFactory#getBean(java.lang.String)
+ *          注：创建bean 都是执行 getBean
+ *  
+ *  
+ *  2. 单例bean实例化后，遍历 beanDefinitionNames
+ *      - 是 SmartInitializingSingleton 类型的bean，回调 {@link SmartInitializingSingleton#afterSingletonsInstantiated() }
+ *
  * */
 ```
 
@@ -1029,7 +1037,6 @@ class SingleObject implements InitializingBean {
 ```
 
 ### @ComponentScan
-
 ```java
 @ComponentScan(
         basePackages = "cn", // 扫描包路径
@@ -1040,19 +1047,14 @@ class SingleObject implements InitializingBean {
 )
 public class A{}
 ```
-
 ### 索引扫描示例
-
 `META-INF/spring.components` 文件
-
 ```properties
 cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$MyAnnotation
 
 cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$Haitao
 ```
-
 代码：
-
 ```java
 @Component
 /*@ComponentScan( 
@@ -1138,7 +1140,6 @@ class MyAnnotationTypeFilter extends AnnotationTypeFilter {
  * @see org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsForBeanMethod(org.springframework.context.annotation.BeanMethod)
  * */
 ```
-
 ## @Conditional
 
 > ClassPathBeanDefinitionScanner 在扫描bean 注册到BeanFactory的时候会进行判断：ExcludeFile -> IncludeFilter -> @Conditional 的判断
@@ -1190,8 +1191,694 @@ public class Test {
 }
 
 ```
+## `ProxyFactory#getProxy`
+
+> AdvisorAdapterRegistrationManager
+
+### 示例代码
+
+```java
+@Test
+public void 测试ProxyFactory() {
+  ProxyFactory proxyFactory = new ProxyFactory();
+  proxyFactory.setTarget(new Demo());
+  // 是否优化，这个也是决定是否使用cglib代理的条件之一
+  proxyFactory.setOptimize(true);
+  // 接口类型，这个也是决定是否使用cglib代理的条件之一，代理接口的时候才需要设置这个
+  proxyFactory.setInterfaces();
+  // 约束是否使用cglib代理。但是这个没吊用，会有其他参数一起判断的，而且有优化机制 会优先选择cglib代理
+  proxyFactory.setProxyTargetClass(true);
+  /**
+   * addAdvice 会被装饰成 Advisor
+   * 这里不能乱写，因为后面解析的时候 要判断是否实现xx接口的
+   * 解析逻辑 {@link DefaultAdvisorAdapterRegistry#getInterceptors(Advisor)}
+   * */
+  proxyFactory.addAdvice(new MethodBeforeAdvice() {
+    @Override
+    public void before(Method method, Object[] args, Object target) throws Throwable {
+      method.invoke(target, args);
+    }
+  });
+  // 设置 Advisor，有点麻烦 还不如直接通过 addAdvice 设置，自动解析成advisor方便
+  proxyFactory.addAdvisor(new DefaultPointcutAdvisor(new MethodBeforeAdvice() {
+    @Override
+    public void before(Method method, Object[] args, Object target) throws Throwable {
+      method.invoke(target, args);
+    }
+  }));
+  proxyFactory.getProxy();
+}
+```
+### 代理逻辑实现原理
+
+> ### CGLIB代理
+>
+> ```java
+> Enhancer enhancer = new Enhancer();
+> enhancer.setCallbacks([DynamicAdvisedInterceptor,...]);
+> ```
+>
+> 使用`new DynamicAdvisedInterceptor(this.advised);` 这个callback来实现对被代理对象的增强。this 就是 ObjenesisCglibAopProxy，而其{@link CglibAopProxy#advised}属性 其实就是 ProxyFactory 从而可以拿到Advisors，从而使用Advisor 对方法进行增强
+>
+> ### JDK代理
+>
+> ```java
+> Proxy.newProxyInstance(classLoader, this.proxiedInterfaces, this);
+> ```
+>
+> 可以知道 第三个参数(InvocationHandler) 是 this，也就是 JdkDynamicAopProxy，而其{@link JdkDynamicAopProxy#advised}属性 其实就是 ProxyFactory从而可以拿到Advisors
+>
+> ### DynamicAdvisedInterceptor、JdkDynamicAopProxy
+>
+> 这两个拦截器的执行逻辑如下：
+>
+> 1. 得到与当前执行的method匹配的interceptor集合 `AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice`
+>
+> 2. 创建实例
+>
+>    1. `new CglibMethodInvocation(interceptor集合)`
+>
+>       注：其实是ReflectiveMethodInvocation的子类
+>
+>    2. `new ReflectiveMethodInvocation(interceptor集合)`
+>
+> 3. 执行 `ReflectiveMethodInvocation#proceed()`
+
+```java
+/**
+ * 创建代理对象
+ *  {@link ProxyFactory#getProxy()}
+ *  {@link ProxyCreatorSupport#createAopProxy()}
+ *
+ *
+ * 创建 AopProxy {@link DefaultAopProxyFactory#createAopProxy(AdvisedSupport)}
+ *			- 简单来说，被代理对象 不是接口 且 不是Proxy的子类 且 {@link AdvisedSupport#getProxiedInterfaces()}至多只有一个SpringProxy类型的接口 就创建 `new ObjenesisCglibAopProxy(config);`
+ *      - 否则创建 `new JdkDynamicAopProxy(config);`
+ *      注：config 参数其实就是 ProxyFactory对象
+ *
+ * 使用 AopProxy 创建代理对象 {@link AopProxy#getProxy(ClassLoader)}
+ *      {@link ObjenesisCglibAopProxy#getProxy(ClassLoader)}
+ *      {@link JdkDynamicAopProxy#getProxy(ClassLoader)}
+ *
+ * ObjenesisCglibAopProxy 增强逻辑实现原理 {@link ObjenesisCglibAopProxy#getProxy(ClassLoader)}
+ *      Enhancer enhancer = new Enhancer();
+ *      enhancer.setCallbacks({@link CglibAopProxy#getCallbacks(Class)}); // 执行方法会回调callback
+ *          注：会设置  `new DynamicAdvisedInterceptor(this.advised);` callback，this 就是 ObjenesisCglibAopProxy，而其{@link CglibAopProxy#advised}属性 其实就是 ProxyFactory 从而可以拿到Advisors
+ *      enhancer.setCallbackFilter(ProxyCallbackFilter); // 返回要执行的 callback 的索引
+ *
+ *      执行代理对象的方式时会执行 {@link CglibAopProxy.ProxyCallbackFilter#accept(Method)}
+ *          就是 除了 finalize、equals、hashcode 等，都会执行 DynamicAdvisedInterceptor 这个callback
+ *      也就是执行 {@link CglibAopProxy.DynamicAdvisedInterceptor#intercept(Object, Method, Object[], MethodProxy)}
+ *          1. exposeProxy 属性是 true，往 ThreadLocal中记录当前代理对象  `oldProxy=AopContext.setCurrentProxy(proxy)`
+ *          2. 获取被代理对象 {@link TargetSource#getTarget()}。这里也是很细节，因为TargetSource实例是这个类型的 {@link AbstractBeanFactoryBasedTargetSource}，所以每次获取target都是从IOC容器中拿，
+ *              也就是说 如果bean是多例的，每次执行都会创建出新的对象。
+ *          3. 根据method得到对应的拦截器链 {@link AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice(Method, Class)}
+ *              拦截器链是空：反射执行
+ *              拦截器链不是空：将拦截器链装饰成 CglibMethodInvocation ，然后执行{@link CglibAopProxy.CglibMethodInvocation#proceed()}，其实就是执行其父类 {@link ReflectiveMethodInvocation#proceed()}
+ *              注：拦截器链就是 method 匹配到的 advisor 解析的结果，可以看这里 {@link DefaultAdvisorChainFactory#getInterceptorsAndDynamicInterceptionAdvice(Advised, Method, Class)}
+ *          4. exposeProxy 属性是 true，恢复之前的值  `AopContext.setCurrentProxy(oldProxy);`
+ *
+ * JdkDynamicAopProxy 增强逻辑的实现 {@link JdkDynamicAopProxy#getProxy(ClassLoader)}
+ *      `Proxy.newProxyInstance(classLoader, this.proxiedInterfaces, this);` 可以知道 第三个参数(InvocationHandler) 是 this，也就是 JdkDynamicAopProxy，而其{@link JdkDynamicAopProxy#advised}属性 其实就是 ProxyFactory从而可以拿到Advisors
+ *      所以执行代理对象的方式时会执行 {@link JdkDynamicAopProxy#invoke(Object, Method, Object[])}
+ *          1. 是 equals(子类没有重写的情况下)、hashCode(子类没有重写的情况下)、DecoratingProxy.class 的方法、Advised.class 的方法
+ *              直接反射执行
+ *          2. exposeProxy 属性是 true，往 ThreadLocal中记录当前代理对象  `oldProxy=AopContext.setCurrentProxy(proxy)`
+ *          3. 根据method得到对应的拦截器链 {@link AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice(Method, Class)}
+ *              拦截器链是空：反射执行
+ *              拦截器链不是空：将拦截器链装饰成 ReflectiveMethodInvocation ，然后执行{@link ReflectiveMethodInvocation#proceed()}
+ *              注：拦截器链就是 method 匹配到的 advisor 解析的结果，可以看这里 {@link DefaultAdvisorChainFactory#getInterceptorsAndDynamicInterceptionAdvice(Advised, Method, Class)}
+ *          4. exposeProxy 属性是 true，恢复之前的值  `AopContext.setCurrentProxy(oldProxy);`
+ * */
+```
+
+### `AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice`
+
+```java
+/**
+ * {@link AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice(Method, Class)}
+ * {@link DefaultAdvisorChainFactory#getInterceptorsAndDynamicInterceptionAdvice(Advised, Method, Class)}
+ *      1. 创建AdvisorAdapterRegistry实例 `AdvisorAdapterRegistry registry = GlobalAdvisorAdapterRegistry.getInstance();`
+ *      2. 遍历 {@link Advised#getAdvisors()}属性，其实就是 `new ProxyFactory()` 设置的 advice和advisor参数
+ *      3. advisor 是 PointcutAdvisor 类型
+ *          - 执行 类匹配+AspectJ匹配
+ *          - 匹配正确，使用 AdvisorAdapterRegistry 解析 advisor {@link AdvisorAdapterRegistry#getInterceptors(Advisor)} 成 MethodInterceptor
+ *              - 需要在执行时匹配 {@link MethodMatcher#isRuntime()}
+ *                  将解析的MethodInterceptor和Pointcut的MethodMatcher 装饰成 `new InterceptorAndDynamicMethodMatcher(interceptor, mm)`
+ *                  将装饰结果 一个个添加`interceptorList.add`
+ *              - 不需要执行时匹配
+ *                  直接 `interceptorList.addAll`
+ *      4. advisor 是 IntroductionAdvisor 类型
+ *          - 执行 类匹配
+ *          - 匹配正确，使用 AdvisorAdapterRegistry 解析 advisor {@link AdvisorAdapterRegistry#getInterceptors(Advisor)} 成 MethodInterceptor
+ *              直接 `interceptorList.addAll`
+ *      5. 使用 AdvisorAdapterRegistry 解析 advisor {@link AdvisorAdapterRegistry#getInterceptors(Advisor)} 成 MethodInterceptor
+ *         直接 `interceptorList.addAll`
+ *
+ * advisor 解析成 MethodInterceptor 的逻辑 {@link DefaultAdvisorAdapterRegistry#getInterceptors(Advisor)}
+ *      1. 声明局部变量 `List<MethodInterceptor> interceptors = new ArrayList<>(3);`
+ *      2. 拿到具体Advice `Advice advice = advisor.getAdvice();`
+ *      3. advice 是 MethodInterceptor 类型
+ *          `interceptors.add(advice)`
+ *      4. 遍历AdvisorAdapter {@link DefaultAdvisorAdapterRegistry#adapters}
+ *         是适配器支持的Advice {@link AdvisorAdapter#supportsAdvice(Advice)}
+ *         使用适配器生成 MethodInterceptor {@link AdvisorAdapter#getInterceptor(Advisor)}
+ *         `interceptors.add(MethodInterceptor)`
+ *      5. interceptors.isEmpty()
+ *          抛出异常，说明这个Advice是非法的
+ *      6. 返回 interceptors
+ *
+ *  注：属性{@link DefaultAdvisorAdapterRegistry#adapters}，会在构造器 {@link DefaultAdvisorAdapterRegistry#DefaultAdvisorAdapterRegistry()} 默认设置3个
+ *      1. new MethodBeforeAdviceAdapter()
+ *      2. new AfterReturningAdviceAdapter()
+ *      3. new ThrowsAdviceAdapter()
+ *
+ *      如果需要扩展AdviceAdapter，可以往IOC容器中注入这个PostProcessor {@link AdvisorAdapterRegistrationManager}
+ *      该PostProcessor的功能：发现创建的bean是AdvisorAdapter类型，就往单例bean {@link GlobalAdvisorAdapterRegistry#instance}
+ *          设置AdvisorAdapter {@link AdvisorAdapterRegistry#registerAdvisorAdapter(AdvisorAdapter)}，从而实现扩展adapters
+ * */
+```
+
+### `ReflectiveMethodInvocation#proceed()`
+
+```java
+/**
+ * {@link ReflectiveMethodInvocation#proceed()}
+ *      注：属性{@link ReflectiveMethodInvocation#interceptorsAndDynamicMethodMatchers}(拦截器集合) 是通过这个方法得到的{@link DefaultAdvisorChainFactory#getInterceptorsAndDynamicInterceptionAdvice(Advised, Method, Class)}
+ *
+ *  1. currentInterceptorIndex(当前拦截器索引) 已经是最后一个了
+ *      反射执行被代理对象的方法 {@link ReflectiveMethodInvocation#invokeJoinpoint()}
+ *
+ *  2. `Object interceptorOrInterceptionAdvice = interceptorsAndDynamicMethodMatchers.get(++currentInterceptorIndex)` 当前拦截器索引自增再取出拦截器集合元素
+ *
+ *  3. if-else分支处理：
+ *
+ *  是 interceptorOrInterceptionAdvice instanceof InterceptorAndDynamicMethodMatcher
+ *      执行 interceptorOrInterceptionAdvice.methodMatcher#matches
+ *          true：执行拦截器的拦截逻辑 `dm.interceptor.invoke(this);`
+ *          false：执行 {@link ReflectiveMethodInvocation#proceed()}，也就是跳过当前拦截器，递归执行
+ *
+ *  否则 `((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(this);`
+ *
+ *  注：也就是说只支持 InterceptorAndDynamicMethodMatcher、MethodInterceptor 这两种类型的interceptor。 而 InterceptorAndDynamicMethodMatcher 的特点是
+ *      执行时会判断当前方法是否匹配，匹配才执行其拦截方法
+ * */
+```
+## @EnableAspectJAutoProxy
+> aspectj表达式 https://zhuanlan.zhihu.com/p/63001123
+>
+> CGLIB介绍与原理 https://blog.csdn.net/zghwaicsdn/article/details/50957474
+>
+> 只是看懂 Spring Aop 的实现原理，至于具体的AspectJ表达式如何匹配的没有看
+### 类图
+
+```java
+/**
+ * 是基础类型 {@link AnnotationAwareAspectJAutoProxyCreator#isInfrastructureClass(Class)}
+ * 应该跳过 {@link AspectJAwareAdvisorAutoProxyCreator#shouldSkip(Class, String)}
+ *
+ * 得到 specificInterceptors(这个bean匹配的advice和advisor集合)
+ * {@link AbstractAdvisorAutoProxyCreator#getAdvicesAndAdvisorsForBean(Class, String, TargetSource)}
+ * {@link AbstractAdvisorAutoProxyCreator#findEligibleAdvisors(Class, String)}
+ *      查找候选的advisor集合 {@link AnnotationAwareAspectJAutoProxyCreator#findCandidateAdvisors()}
+ *          执行父类的方法，查到Advisor {@link AbstractAdvisorAutoProxyCreator#findCandidateAdvisors()}
+ *          构建Advisors {@link BeanFactoryAspectJAdvisorsBuilder#buildAspectJAdvisors()}
+ *              使用工厂解析@Aspect创建Advisor{@link AspectJAdvisorFactory#getAdvisors(MetadataAwareAspectInstanceFactory)}
+ *
+ *      查询当前类可以应用的 advisor(这里是筛选可以应用的) {@link AbstractAdvisorAutoProxyCreator#findAdvisorsThatCanApply(List, Class, String)}
+ *
+ *      扩展 Advisor {@link AspectJAwareAdvisorAutoProxyCreator#extendAdvisors(List)}
+ *
+ *      对Advisor进行升序排序 {@link AspectJAwareAdvisorAutoProxyCreator#sortAdvisors(List)}
+ *
+ * 创建代理对象 {@link AbstractAutoProxyCreator#createProxy(Class, String, Object[], TargetSource)}
+ *      构建Advisor，主要是看看是否需要装饰 {@link AbstractAutoProxyCreator#buildAdvisors(String, Object[])}
+ *          `proxyFactory.addAdvisors(advisors);`
+ *      使用ProxyFactory创建代理对象
+ * */
+```
+![PlantUML diagram](.README_imgs/oujZNORuxfKsYibbtAXchfBu3gT4qgzT0SMnYYtiKTjm6vN.png)
+
+> @Aroun、@Before、@After、@AfterThrowing、@AfterReturning 解析成的 Advice
+>
+> @Before 需要使用 MethodBeforeAdviceAdapter 解析成 MethodBeforeAdviceInterceptor
+>
+> @AfterReturning 需要使用 AfterReturningAdviceAdapter 解析成 AfterReturningAdviceInterceptor
+
+![PlantUML diagram](.README_imgs/ZLFgo2bj05bfHFmy4jRg1u0o5tVHKUAhNtU_92Biil.png)
+
+### 1. 使用`@EnableAspectJAutoProxy`会发生什么?
+
+会往容器中添加 `AnnotationAwareAspectJAutoProxyCreator` 类的BeanDefinition，然后在IOC容器创建的时候会进行实例化。
+
+```java
+/**
+ *
+ * 1. 使用注解 {@code @EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)} {@link EnableAspectJAutoProxy}
+ *      该注解会导入 {@code @Import(AspectJAutoProxyRegistrar.class)} {@link AspectJAutoProxyRegistrar}
+ *
+ * 2. 所以会在解析配置类阶段，回调 {@link AspectJAutoProxyRegistrar#registerBeanDefinitions(AnnotationMetadata, BeanDefinitionRegistry)} 来注册bean
+ *
+ * 3. 会执行 {@link AopConfigUtils#registerAspectJAnnotationAutoProxyCreatorIfNecessary(BeanDefinitionRegistry)} 注册bean
+ *      就是注册这个 {@link AnnotationAwareAspectJAutoProxyCreator}
+ *
+ * 4. 将注解的属性值，设置到BeanDefinition中，当bean进行属性填充的设置会设置到bean的属性属性中。
+ *      proxyTargetClass，决定是否使用cglib代理 -> {@link AopConfigUtils#forceAutoProxyCreatorToUseClassProxying(BeanDefinitionRegistry)}
+ *      exposeProxy，在执行 MethodInterceptor时是否将代理对象存到ThreadLocal中 -> {@link AopConfigUtils#forceAutoProxyCreatorToExposeProxy(BeanDefinitionRegistry)}
+ * */
+```
+### 2. `AnnotationAwareAspectJAutoProxyCreator` 的实例化
+
+```java
+/**
+ *
+ * AnnotationAwareAspectJAutoProxyCreator 实现了 SmartInstantiationAwareBeanPostProcessor、BeanFactoryAware
+ *
+ * 1. 刷新IOC容器 {@link AbstractApplicationContext#refresh()}
+ * 2. 注册 BeanPostProcessor {@link AbstractApplicationContext#registerBeanPostProcessors(ConfigurableListableBeanFactory)}
+ *     所以 这里会 创建 AnnotationAwareAspectJAutoProxyCreator
+ *
+ * 3. 创建 AnnotationAwareAspectJAutoProxyCreator {@link BeanFactory#getBean(String, Class)}
+ *
+ * 4. 在实例化后,初始化前会回调 {@link BeanFactoryAware#setBeanFactory(BeanFactory)}
+ *
+ * 5. 也就是会回调 {@link AbstractAdvisorAutoProxyCreator#setBeanFactory(BeanFactory)}
+ *      就是对属性赋值进行初始化，方法体会执行 {@link AnnotationAwareAspectJAutoProxyCreator#initBeanFactory(ConfigurableListableBeanFactory)}
+ *          {@link AbstractAdvisorAutoProxyCreator#initBeanFactory(ConfigurableListableBeanFactory)}
+ *              // 这是用来检索 BeanFactory 中所有 Advisor 类型的bean
+ *              this.advisorRetrievalHelper = new BeanFactoryAdvisorRetrievalHelperAdapter(beanFactory);
+ *
+ *          // 这是用来将 @Aspect 标注的bean，将标注了[@Pointcut,@Around,@Before,@After,@AfterReturning,@AfterThrowing]的方法 解析成 Advisor
+ *          this.aspectJAdvisorFactory = new ReflectiveAspectJAdvisorFactory(beanFactory);
+ *
+ *          // 依赖 aspectJAdvisorFactory。遍历BeanFactory所有的bean，然后使用 aspectJAdvisorFactory 来生成 Advisor，将结果缓存
+ *          this.aspectJAdvisorsBuilder = new BeanFactoryAspectJAdvisorsBuilderAdapter(beanFactory, this.aspectJAdvisorFactory);
+ * */
+```
+### 3. `AnnotationAwareAspectJAutoProxyCreator` 后置处理器回调
+
+#### 实例化前阶段
+```java
+/**
+ * AnnotationAwareAspectJAutoProxyCreator 没有重写方法，所以执行父类的{@link AbstractAutoProxyCreator#postProcessBeforeInstantiation(Class, String)}
+ *
+ * 1. beanName是空 或者 targetSourcedBeans(已AOP代理对象集合)属性没有记录过该beanName
+ *      - advisedBeans(增强bean集合) 中记录了，就 return null
+ *      - 是基础bean {@link AnnotationAwareAspectJAutoProxyCreator#isInfrastructureClass(Class)} 或者 应该跳过 {@link AspectJAwareAdvisorAutoProxyCreator#shouldSkip(Class, String)}
+ *          记录一下 `this.advisedBeans.put(cacheKey, Boolean.FALSE);`
+ *          return null
+ *
+ *  2. 生成 TargetSource {@link AbstractAutoProxyCreator#getCustomTargetSource(Class, String)}
+ *      需要设置 TargetSourceCreator 属性 {@link AbstractAutoProxyCreator#setCustomTargetSourceCreators(TargetSourceCreator...)} 才会有用，
+ *      但是看源码没有用到，所以这个方法一直返回null
+ *
+ *  3. TargetSource 不为null
+ *      - 记录targetSourcedBeans(被代理对象集合) `this.targetSourcedBeans.add(beanName);`
+ *      - 得到这个bean匹配的advice和advisor集合 {@link AbstractAdvisorAutoProxyCreator#getAdvicesAndAdvisorsForBean(Class, String, TargetSource)}
+ *      - 创建代理对象 {@link AbstractAutoProxyCreator#createProxy(Class, String, Object[], TargetSource)}
+ *      - 记录AOP代理对象  `this.proxyTypes.put(cacheKey, proxy.getClass());`
+ *      - 返回生成的代理对象
+ * */
+```
+#### 提前AOP阶段
+```java
+/**
+ *
+ *  AnnotationAwareAspectJAutoProxyCreator 没有重写方法，所以执行父类的 {@link AbstractAutoProxyCreator#getEarlyBeanReference(Object, String)}
+ *
+ *  1. 记录提前代理引用集合 `this.earlyProxyReferences.put(cacheKey, bean);`
+ *  2. 需要就创建代理对象 {@link AbstractAutoProxyCreator#wrapIfNecessary(Object, String, Object)}
+ * */
+```
+#### 初始化后阶段
+```java
+/**
+ * AnnotationAwareAspectJAutoProxyCreator 没有重写方法，所以执行父类的 {@link AbstractAutoProxyCreator#postProcessAfterInitialization(Object, String)}
+ *
+ * 1. earlyProxyReferences(提前代理引用集合) 中没有这个 bean
+ * 2. 需要就创建代理对象 {@link AbstractAutoProxyCreator#wrapIfNecessary(Object, String, Object)}
+ * */
+```
+#### 细说`AbstractAutoProxyCreator#wrapIfNecessary`
+```java
+/**
+ * 1. targetSourcedBeans(已AOP代理对象集合) 中记录了当前bean
+ *      说明已经在实例化前阶段就创建好了代理对象，这里啥都不干直接返回入参bean
+ * 2. Advisor相关的bean 或者 是不符合AOP增强的bean `Boolean.FALSE.equals(this.advisedBeans.get(cacheKey))`
+ *      直接返回入参bean
+ *      
+ * 3. 是基础类型{@link AnnotationAwareAspectJAutoProxyCreator#isInfrastructureClass(Class)} 或者 应该跳过{@link AspectJAwareAdvisorAutoProxyCreator#shouldSkip(Class, String)}
+ *      - 记录 `this.advisedBeans.put(cacheKey, Boolean.FALSE);`
+ *      - 直接返回bean
+ *      
+ * 4. 得到 specificInterceptors(这个bean匹配的advice和advisor集合) {@link AbstractAdvisorAutoProxyCreator#getAdvicesAndAdvisorsForBean(Class, String, TargetSource)}
+ *
+ * 5. specificInterceptors 是空，也就是说没有匹配的advisor，那就不需要创建代理对象
+ *      - 记录 `this.advisedBeans.put(cacheKey, Boolean.FALSE);`
+ *      - 直接返回bean
+ * 6. specificInterceptors 不是空
+ *      - 记录 advisedBeans(处理过的bean集合) `this.advisedBeans.put(cacheKey, Boolean.TRUE);`
+ *      - 创建代理对象 {@link AbstractAutoProxyCreator#createProxy(Class, String, Object[], TargetSource)}
+ *          `Object proxy = createProxy(bean.getClass(), beanName, specificInterceptors, new SingletonTargetSource(bean));`
+ *      - 记录AOP代理对象  `this.proxyTypes.put(cacheKey, proxy.getClass());`
+ *      
+ *  写本本上：TargetSource 是 SingletonTargetSource
+ * */
+```
+### 细说`isInfrastructureClass`
+```java
+/**
+ * 是基础类型{@link AnnotationAwareAspectJAutoProxyCreator#isInfrastructureClass(Class)}
+ *
+ * 调用父类的方法进行判断 {@link AbstractAutoProxyCreator#isInfrastructureClass(Class)}
+ *      是这些类型 Advice、Pointcut、Advisor、AopInfrastructureBean 就 return true
+ *
+ * 是否是Aspect {@link AspectJAdvisorFactory#isAspect(Class)}
+ *     有@Aspect 注解 且不是 AspectJ language 的语法 就 return true
+ * */
+```
+### 细说`shouldSkip`
+```java
+/**
+ * 应该跳过{@link AspectJAwareAdvisorAutoProxyCreator#shouldSkip(Class, String)}
+ *
+ * 1. 查找候选的Advisors {@link AnnotationAwareAspectJAutoProxyCreator#findCandidateAdvisors()}
+ *      - 执行父类的方法，查到Advisor {@link AbstractAdvisorAutoProxyCreator#findCandidateAdvisors()}
+ *          执行这个方法，找到BeanFactory中Advisor类型的bean {@link BeanFactoryAdvisorRetrievalHelper#findAdvisorBeans()}
+ *
+ *      - 构建Advisors {@link BeanFactoryAspectJAdvisorsBuilder#buildAspectJAdvisors()}
+ *          找到BeanFactory中标注了@Aspect注解的bean，然后解析(@Around、@Before、@After、@AfterReturning、@AfterThrowing)注解的方法生成Advisor {@link AspectJAdvisorFactory#getAdvisors(MetadataAwareAspectInstanceFactory)}
+ *      
+ *      - 返回List<Advisor>
+ *
+ * 2. 当前beanName是advisor中的一个。
+ *      遍历Advisors，advisor.getAspectName.equals(beanName) return true
+ *
+ * 3. 执行父类的方法 {@link AbstractAutoProxyCreator#shouldSkip(Class, String)}
+ *      beanName 是类全名开头 且 结尾是.ORIGINAL return true
+ * */
+```
+### 细说 `getAdvicesAndAdvisorsForBean`
+```java
+/**
+ *
+ * 查找符合条件的Advisor集合
+ *  {@link AbstractAdvisorAutoProxyCreator#getAdvicesAndAdvisorsForBean(Class, String, TargetSource)}
+ *  {@link AbstractAdvisorAutoProxyCreator#findEligibleAdvisors(Class, String)}
+ *
+ * 查找候选的advisor集合 {@link AnnotationAwareAspectJAutoProxyCreator#findCandidateAdvisors()}
+ *      - 执行父类的方法，查到Advisor {@link AbstractAdvisorAutoProxyCreator#findCandidateAdvisors()}
+ *          执行这个方法，找到BeanFactory中Advisor类型的bean {@link BeanFactoryAdvisorRetrievalHelper#findAdvisorBeans()}
+ *      - 构建Advisors {@link BeanFactoryAspectJAdvisorsBuilder#buildAspectJAdvisors()}
+ *          找到BeanFactory中标注了@Aspect注解的bean，然后解析(@Around、@Before、@After、@AfterReturning、@AfterThrowing)注解的方法生成Advisor {@link AspectJAdvisorFactory#getAdvisors(MetadataAwareAspectInstanceFactory)}
+ *
+ * 查询当前类可以应用的 advisor(这里是筛选可以应用的) {@link AbstractAdvisorAutoProxyCreator#findAdvisorsThatCanApply(List, Class, String)}
+ *      匹配规则：类匹配 + 切入点表达式匹配
+ *      {@link AopUtils#findAdvisorsThatCanApply(List, Class)}
+ *          {@link AopUtils#canApply(Advisor, Class, boolean)}
+ *              - 符合 advisor instanceof IntroductionAdvisor，只需要类匹配
+ *                  `((IntroductionAdvisor) advisor).getClassFilter().matches(targetClass)` return true
+ *
+ *              - 符合 advisor instanceof PointcutAdvisor，{@link AopUtils#canApply(Pointcut, Class, boolean)}
+ *                  `((PointcutAdvisor) advisor).getPointcut()`
+ *                   类匹配 + bean所有的父类和接口的方法，只要 Pointcut的AspectJ表达式匹配其中一个方法  return true
+ *              - 其余情况，return true
+ *
+ * 扩展 Advisor {@link AspectJAwareAdvisorAutoProxyCreator#extendAdvisors(List)}
+ *     符合条件 {@link AspectJProxyUtils#isAspectJAdvice(Advisor)}
+ *     就扩展一个 `ExposeInvocationInterceptor.ADVISOR`
+ *
+ * 对Advisor进行升序排序 {@link AspectJAwareAdvisorAutoProxyCreator#sortAdvisors(List)}
+ *      默认的排序规则 {@link AnnotationAwareOrderComparator.sort(advisors);} ，可以通过 Ordered接口、@Order、@Priority 设置排序值
+ *
+ * 返回排序后的Advisor集合 eligibleAdvisors
+ * */
+```
+### 细说`AbstractAutoProxyCreator#createProxy`
+
+> 就是构建Advisor然后使用ProxyFactory创建代理对象
+
+```java
+/**
+ * 创建代理对象 {@link AbstractAutoProxyCreator#createProxy(Class, String, Object[], TargetSource)}
+ *
+ * 使用 ProxyFactory 来创建代理对象
+ *
+ * 构建Advisor，主要是看看是否需要装饰 {@link AbstractAutoProxyCreator#buildAdvisors(String, Object[])}
+ *      - 解析属性，装饰成Advisor commonInterceptors {@link AbstractAutoProxyCreator#resolveInterceptorNames()}
+ *          注：
+ *              - 但是没啥用，我看这个属性是空的。子类需要调用 {@link AbstractAutoProxyCreator#setInterceptorNames(String...)} 才能设置属性值
+ *              - commonInterceptors 就是 BeanFactory.getBean("interceptorName") ，就是随便的一个bean，所有后面需要 wrap成Advisor
+ *
+ *      - 合并集合 allInterceptors = specificInterceptors + commonInterceptors
+ *
+ *      - 装饰成Advisor {@link DefaultAdvisorAdapterRegistry#wrap(Object)}
+ *          1. 是 adviceObject instanceof Advisor 直接返回
+ *          2. 不是 adviceObject instanceof Advice 直接抛异常
+ *          3. 是 advice instanceof MethodInterceptor，装饰成`new DefaultPointcutAdvisor(advice);`返回
+ *          4. 遍历 adapters 找到适配的，就装饰成`new DefaultPointcutAdvisor(advice);`返回
+ *              注：{@link DefaultAdvisorAdapterRegistry#DefaultAdvisorAdapterRegistry()} 默认注册这三个适配器：MethodBeforeAdviceAdapter、AfterReturningAdviceAdapter、ThrowsAdviceAdapter
+ *
+ * 设置ProxyFactory参数：
+ *      ProxyFactory proxyFactory = new ProxyFactory();
+ *      proxyFactory.addAdvisors(advisors);
+ *      proxyFactory.setTargetSource(targetSource); // AnnotationAwareAspectJAutoProxyCreator 使用的是 SingletonTargetSource
+ *      proxyFactory.addAdvisors(advisors);
+ *
+ * 创建代理对象 proxyFactory.getProxy(classLoader);
+ * */
+```
+### 细说`AnnotationAwareAspectJAutoProxyCreator#findCandidateAdvisors`
+
+> 就是解析容器中标注了`@Aspect`的bean
+>
+>  * @Aspect 类的方法上的`@Pointcut、@Around、@Before、@After、@AfterReturning、@AfterThrowing` 会解析成 {@link InstantiationModelAwarePointcutAdvisorImpl}
+>  * @Aspect 类的字段上的`@DeclareParents()` 会被解析成 {@link DeclareParentsAdvisor}
+>
+> 我们应该关注Advisor的Advice属性是什么类型的，因为代理对象的拦截器是使用Advice来解析成MethodInterceptor的
+>
+> - DeclareParentsAdvisor 的Advice 是这个DelegatePerTargetObjectIntroductionInterceptor
+> - InstantiationModelAwarePointcutAdvisorImpl 的Advice 是通过工厂创建的
+>   - 所以我们应当关注这个`InstantiationModelAwarePointcutAdvisorImpl#getAdvice()`
+
+```java
+/**
+ * 查找候选的Advisor，第一次会触发对@Aspect标注的类进行解析，然后将其中的增强method解析成Advisor 实例
+ *
+ * {@link AnnotationAwareAspectJAutoProxyCreator#findCandidateAdvisors()}
+ * {@link BeanFactoryAspectJAdvisorsBuilder#buildAspectJAdvisors()}
+ * {@link ReflectiveAspectJAdvisorFactory#getAdvisors(MetadataAwareAspectInstanceFactory)}
+ *
+ * 校验类，就是判断类有@Aspect注解 {@link AbstractAspectJAdvisorFactory#validate(Class)}
+ *
+ * 声明局部变量
+ *      `List<Advisor> advisors = new ArrayList<>();` 用来记录切面类解析生成的Advisor
+ *      `MetadataAwareAspectInstanceFactory lazySingletonAspectInstanceFactory = new LazySingletonAspectInstanceFactoryDecorator(aspectInstanceFactory);` 用来记录当前切面类的元数据的
+ *
+ * 获取 methods {@link ReflectiveAspectJAdvisorFactory#getAdvisorMethods(Class)}
+ *      1. 找到类中除了@Pointcut注解的方法 {@link ReflectiveAspectJAdvisorFactory#adviceMethodFilter}
+ *      2. 对方法进行排序 {@link ReflectiveAspectJAdvisorFactory#adviceMethodComparator}
+ *          升序排序：先按照 method 上面的注解排序(Around、Before、After、AfterReturning、AfterThrowing)，如果相同在按照 methodName 排序。
+ *          注：没有这些注解的方法，的排序是最大的，所以会在最后面
+ *
+ *
+ * 遍历 methods 生成Advisor {@link ReflectiveAspectJAdvisorFactory#getAdvisor(Method, MetadataAwareAspectInstanceFactory, int, String)}
+ *      - 通过方法的注解值生成 AspectJExpressionPointcut 对象 {@link ReflectiveAspectJAdvisorFactory#getPointcut(Method, Class)}
+ *          {@link AbstractAspectJAdvisorFactory#findAspectJAnnotationOnMethod(Method)}
+ *          比如,就是拿到 `execution(* test(..))`
+ *              @Before("execution(* test(..))")
+ *              public void enhanceBefore() {}
+ *
+ *      - 创建Advisor实例 {@link InstantiationModelAwarePointcutAdvisorImpl#InstantiationModelAwarePointcutAdvisorImpl(AspectJExpressionPointcut, Method, AspectJAdvisorFactory, MetadataAwareAspectInstanceFactory, int, String)}
+ *          InstantiationModelAwarePointcutAdvisorImpl 记录了 Pointcut、AspectJAdvisorFactory。因为Advisor的使用是{@link Advisor#getAdvice()} 拿到其Advice属性,将Advice解析成MethodInterceptor的。
+ *          而 {@link InstantiationModelAwarePointcutAdvisorImpl#getAdvice()} 就是通过AspectJAdvisorFactory创建Advice。
+ *          这个工厂就是这个 ReflectiveAspectJAdvisorFactory
+ *
+ *      - Advisor不是null，添加到局部变量 `advisors.add(advisor);`
+ *
+ * 遍历所有的Field 执行 {@link ReflectiveAspectJAdvisorFactory#getDeclareParentsAdvisor(Field)}
+ *      就是字段上有这个 @DeclareParents(value="",defaultImpl=A.class)  会解析成 {@link DeclareParentsAdvisor}
+ *      DeclareParentsAdvisor 的Advice 是这个类型{@link DelegatePerTargetObjectIntroductionInterceptor}
+ *
+ * 总结：
+ *  - @Aspect 类的方法上的@Pointcut、@Around、@Before、@After、@AfterReturning、@AfterThrowing 会解析成 {@link InstantiationModelAwarePointcutAdvisorImpl}
+ *  - @Aspect 类的字段上的@DeclareParents() 会被解析成 {@link DeclareParentsAdvisor}
+ * */
+```
+### 细说`InstantiationModelAwarePointcutAdvisorImpl#getAdvice()`
+> 就是解析 @Around、@Before、@After、@AfterThrowing、@AfterReturning 成 Advice
+```java
+/**
+ *
+ * 获取Advice {@link InstantiationModelAwarePointcutAdvisorImpl#getAdvice()}
+ *
+ * 属性 {@link InstantiationModelAwarePointcutAdvisorImpl#instantiatedAdvice} 不是空
+ *      return instantiatedAdvice
+ *
+ * 实例化Advice {@link InstantiationModelAwarePointcutAdvisorImpl#instantiateAdvice(AspectJExpressionPointcut)}
+ *      通过工厂创建Advice{@link ReflectiveAspectJAdvisorFactory#getAdvice(Method, AspectJExpressionPointcut, MetadataAwareAspectInstanceFactory, int, String)}
+ *          1. 拿到方法的注解(@Pointcut、@Around、@Before、@After、@AfterReturning、@AfterThrowing)信息
+ *              {@link AbstractAspectJAdvisorFactory#findAspectJAnnotationOnMethod(Method)}
+ *              {@link AbstractAspectJAdvisorFactory#findAnnotation(Method, Class)}
+ *              得到的就是 AspectJAnnotation 对象
+ *
+ *          2. 使用 AspectJAnnotation 进行 switch-case 匹配
+ *              case AtPointcut:
+ *                 return null; 说白了就是不处理 @Pointcut
+ *              case AtAround:
+ *                 springAdvice = new AspectJAroundAdvice(...);
+ *              case AtBefore:
+ *                 // 使用的时候会通过适配器装成MethodInterceptor {@link MethodBeforeAdviceAdapter}
+ *                 springAdvice = new AspectJMethodBeforeAdvice(...);
+ *              case AtAfter:
+ *                 springAdvice = new AspectJAfterAdvice(...);
+ *              case AtAfterReturning:
+ *                 // 使用的时候会通过适配器装成MethodInterceptor {@link AfterReturningAdviceAdapter}
+ *                 springAdvice = new AspectJAfterReturningAdvice(...);
+ *
+ *          3. argNames 获取注解的参数名 {@link AbstractAspectJAdvisorFactory.AspectJAnnotationParameterNameDiscoverer#getParameterNames(Method)}
+ *              @Before(value = "execution(* test(..))", argNames = "A,B")
+ *              public void enhanceBefore(ProceedingJoinPoint proceedingJoinPoint, String A, String B) {}
+ *              就是拿到 argNames 这个属性
+ *          4. 设置参数name {@link AbstractAspectJAdvice#setArgumentNamesFromStringArray(String...)}
+ *              如果第三步解析的参数 argNames 不为null，会校验参数名字是否合法，然后补全参数。
+ *               argNames = "A,B"是两个参数，而enhanceBefore 的参数列表是三个，只有当参数列表的第一个参数类型是 ProceedingJoinPoint、JoinPoint、JoinPoint.StaticPart 才会设置默认的参数名`THIS_JOIN_POINT`
+ *
+ *          4. 参数绑定 {@link AbstractAspectJAdvice#calculateArgumentBindings()}
+ *              会校验写的增强方法的参数列表是否合法。
+ *              @Around 支持 ProceedingJoinPoint、JoinPoint、JoinPoint.StaticPart 类型
+ *              @Before、@After、@AfterThrowing、@AfterReturning 支持 JoinPoint、JoinPoint.StaticPart 类型
+ *              注：必须是参数列表的第一个参数
+ *
+ *          5. 返回 springAdvice
+ *
+ *      return (advice != null ? advice : EMPTY_ADVICE);
+ *
+ * 属性赋值 `this.instantiatedAdvice = advice`
+ *
+ * return instantiatedAdvice
+ * */
+```
+## @Aspect
+
+> 1. 单独使用 `@Aspect` 是没用的，得使用`@EnableAspectJAutoProxy` 才会解析`@Aspect`的bean
+>
+> 2. 同一个`@Aspect`里面的增强才会有序执行
+>
+> 3. @Aspect("") 注解的属性值有啥用？
+>
+>    ```java
+>    /**
+>     *
+>     * @Aspect("") 注解的属性值有啥用？
+>     *  会根据值选择不同的 MetadataAwareAspectInstanceFactory，这个是描述切面类的
+>     *
+>     *
+>     * {@link BeanFactoryAspectJAdvisorsBuilder#buildAspectJAdvisors()}
+>     *      解析@Aspect("")注解信息 {@link AspectMetadata#AspectMetadata(Class, String)}
+>     *          `AspectMetadata amd = new AspectMetadata(beanType, beanName);`
+>     *
+>     *      条款种类是单例的，创建这个工厂`new BeanFactoryAspectInstanceFactory(this.beanFactory, beanName);`
+>     *          `amd.getAjType().getPerClause().getKind() == PerClauseKind.SINGLETON`
+>     *      条款种类不是单例的，创建这个工厂`new PrototypeAspectInstanceFactory(this.beanFactory, beanName);`
+>     * 
+>     * 注：在创建Advisor的时候会校验 MetadataAwareAspectInstanceFactory {@link AbstractAspectJAdvisorFactory#validate(Class)}
+>     *    会发现不支持 @Aspect("percflow(xxx")、@Aspect("percflowbelow(xxx") 这种
+>     * */
+>    ```
+
+```java
+@EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)
+@Component
+public class AopTest {
+    public AopTest() {
+        System.out.println("AopTest 构造器");
+    }
+
+    @Aspect
+    @Component
+    public static class AspectDemo {
+        /**
+         * 只有@Around支持 ProceedingJoinPoint、JoinPoint、JoinPoint.StaticPart
+         * 其他的支持 JoinPoint、JoinPoint.StaticPart
+         * try{
+         *
+         * @Around、@Before、@AfterReturning }catch(){
+         * @AfterThrowing }finally{
+         * @After }
+         */
+        @Pointcut("execution(* test(..))")
+        private void pointcut() {
+        }
+
+        @Around("pointcut()")
+        public void around(ProceedingJoinPoint proceedingJoinPoint) {
+            try {
+                System.out.println("around...");
+                proceedingJoinPoint.proceed();
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Before("pointcut()")
+        public void before(/*JoinPoint joinPoint,*/JoinPoint.StaticPart staticPart) {
+            System.out.println("before...");
+        }
+
+        @After("pointcut()")
+        public void after(JoinPoint joinPoint) {
+            System.out.println("after...");
+        }
 
 
+        @AfterThrowing("pointcut()")
+        public void afterThrowing(JoinPoint joinPoint) {
+            System.out.println("afterThrowing...");
+        }
+
+        @AfterReturning("pointcut()")
+        public void afterReturning(JoinPoint joinPoint) {
+            System.out.println("afterReturning...");
+        }
+    }
+
+    @Aspect
+    @Component
+    @Order(-1) // 排序，让其优先执行
+    public static class AspectDemo2 {
+
+        @Pointcut("execution(* test(..))")
+        private void pointcut() {
+        }
+
+        // @AfterReturning("pointcut()")
+        @Before("pointcut()")
+        public void afterReturning(JoinPoint joinPoint) {
+            System.out.println("AspectDemo2...");
+        }
+    }
+
+    @Component
+    public static class AopDemo {
+        public void test() {
+            System.out.println("AopDemo.test");
+        }
+    }
+
+    @Component
+    static class AopDemo2 {
+    }
+}
+```
+
+
+
+## @Scope
+
+## @EnableAsync
+
+## @EnableTransactionManagement
 
 # 待整理
 
