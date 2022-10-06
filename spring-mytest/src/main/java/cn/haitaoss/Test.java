@@ -1,9 +1,10 @@
 package cn.haitaoss;
 
 
-import cn.haitaoss.javaconfig.aop.AopTest4;
 import org.springframework.beans.factory.support.AbstractBeanFactory;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+import java.util.Arrays;
 
 /**
  * @author haitao.chen
@@ -15,7 +16,7 @@ public class Test {
         // ClassPathXmlApplicationContext classPathXmlApplicationContext = new ClassPathXmlApplicationContext("spring.xml");
         // AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.Test.class);
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
-        AopTest4.MyIntroduction.class.cast(context.getBean(AopTest4.class)).test1();
+        System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
 
         /**
          * @Scope 源码

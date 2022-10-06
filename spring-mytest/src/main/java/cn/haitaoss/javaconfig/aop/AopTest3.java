@@ -14,20 +14,20 @@ import org.springframework.stereotype.Component;
 public class AopTest3 {
     @Aspect
     @Component
-    public static class AspectDemo3 {
+    public class AspectDemo3 {
         @DeclareParents(value = "cn.haitaoss.javaconfig.aop.AopTest3.AopDemo", defaultImpl = MyIntroductionImpl.class)
         private MyIntroduction x;
     }
 
 
     @Component
-    public static class AopDemo {
+    public class AopDemo {
         public void test() {
             System.out.println("AopDemo.test");
         }
     }
 
-    public static class MyIntroductionImpl implements MyIntroduction {
+    public class MyIntroductionImpl implements MyIntroduction {
 
         @Override
         public void test1() {

@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 public class AopTest2 {
     @Aspect
     @Component
-    public static class AspectDemo {
+    public class AspectDemo {
 
         @Pointcut("execution(* test*(..))")
         private void pointcut() {
@@ -35,7 +35,7 @@ public class AopTest2 {
     @Aspect
     @Component
     @Order(-1) // 排序，让其优先执行
-    public static class AspectDemo2 {
+    public class AspectDemo2 {
 
         @Pointcut("execution(* test(..))")
         private void pointcut() {
@@ -48,7 +48,7 @@ public class AopTest2 {
     }
 
     @Component
-    public static class AopDemo {
+    public class AopDemo {
         public void test() {
             System.out.println("AopDemo.test");
         }

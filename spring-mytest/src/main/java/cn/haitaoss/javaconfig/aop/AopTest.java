@@ -20,7 +20,7 @@ public class AopTest {
 
     @Aspect
     @Component
-    public static class AspectDemo {
+    public class AspectDemo {
         /**
          * 只有@Around支持 ProceedingJoinPoint、JoinPoint、JoinPoint.StaticPart
          * 其他的支持 JoinPoint、JoinPoint.StaticPart
@@ -68,7 +68,7 @@ public class AopTest {
 
 
     @Component
-    public static class AopDemo {
+    public class AopDemo {
         public void test() {
             System.out.println("AopDemo.test");
         }

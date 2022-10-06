@@ -1448,10 +1448,10 @@ public void 测试ProxyFactory() {
 >
 > 在创建代理对象时：
 >
-> - PointcutAdvisor：会获取其Advice属性，转换成MethodInterceptor对象，组成InterceptorChain，在执行代理对象的方法时，会执行与方法匹配就执行Interceptors
+> - PointcutAdvisor：会获取其Advice属性，转换成MethodInterceptor对象，组成InterceptorChain，在执行代理对象的方法时，会执行与方法匹配的Interceptors
 > - IntroductionAdvisor：
 >   1. 会拿到其 interfaces 设置为代理对象的接口，然后创建代理对象，所以创建出来的代理对象可以强转成对应的接口，从而实现 不修改被代理的情况下新增方法。
->   2. 和PointcutAdvisor一样。会获取其Advice属性，转换成MethodInterceptor对象，组成InterceptorChain，在执行代理对象的方法时，会执行与方法匹配就执行Interceptors
+>   2. 和PointcutAdvisor一样。会获取其Advice属性，转换成MethodInterceptor对象，组成InterceptorChain，在执行代理对象的方法时，会执行与方法匹配的Interceptors
 
 ![PlantUML diagram](.README_imgs/pqIb5sweG-5033471.png)
 
@@ -1648,6 +1648,7 @@ public void 测试ProxyFactory() {
 
 ```java
 /**
+ *
  * 创建代理对象 {@link AbstractAutoProxyCreator#createProxy(Class, String, Object[], TargetSource)}
  *
  * 使用 ProxyFactory 来创建代理对象
@@ -1670,7 +1671,7 @@ public void 测试ProxyFactory() {
  * 设置ProxyFactory参数：
  *      ProxyFactory proxyFactory = new ProxyFactory();
  *      // addAdvisor 也是关键点。添加的 advisor 是 IntroductionAdvisor 类型，就拿到Advisor的接口信息{@link DeclareParentsAdvisor#getInterfaces()}设置到proxyFactory中
- * 			proxyFactory.addAdvisors(advisors);
+ * 	    proxyFactory.addAdvisors(advisors);
  *      proxyFactory.setTargetSource(targetSource); // AnnotationAwareAspectJAutoProxyCreator 使用的是 SingletonTargetSource
  *      proxyFactory.addAdvisors(advisors);
  *
@@ -1788,6 +1789,83 @@ public void 测试ProxyFactory() {
  * return instantiatedAdvice
  * */
 ```
+### 使用容器中的Advice
+
+```java
+@EnableAspectJAutoProxy
+@Component
+public class AopTest5 {
+
+    @Component
+    @SuppressWarnings("serial")
+    class BeforeAbstractAdvisorAutoProxyCreator implements InstantiationAwareBeanPostProcessor, PriorityOrdered {
+        @Override
+        public boolean postProcessAfterInstantiation(Object bean, String beanName) throws BeansException {
+            if (AopConfigUtils.AUTO_PROXY_CREATOR_BEAN_NAME.equals(beanName)) {
+                /**
+                 * 设置默认的Advice。
+                 * 因为默认扫描的Advisor 只会扫描 Advisor类型和@Aspect的bean解析成Advisor，所以容器中Advice类型的bean是不会解析的，
+                 * 需要设置这个属性 才能解析定义的Advice类型的bean
+                 * {@link AbstractAutoProxyCreator#resolveInterceptorNames()}
+                 * */
+                AbstractAdvisorAutoProxyCreator.class.cast(bean).setInterceptorNames("myAdvice");
+            }
+            return InstantiationAwareBeanPostProcessor.super.postProcessAfterInstantiation(bean, beanName);
+        }
+
+        @Override
+        public int getOrder() {
+            return 0;
+        }
+    }
+
+    @Component
+    @SuppressWarnings("serial")
+    class MyAdvice implements MethodInterceptor {
+        @Nullable
+        @Override
+        public Object invoke(@Nonnull MethodInvocation invocation) throws Throwable {
+            return invocation.proceed();
+        }
+    }
+}
+```
+
+### 注册`AdvisorAdapter`
+
+```java
+// AdvisorAdapterRegistrationManager 是用来将 AdvisorAdapter 注册到 {@link AbstractAutoProxyCreator#advisorAdapterRegistry}
+@Import(AdvisorAdapterRegistrationManager.class)
+// 要保证myAdvisorAdapter优先于切面类之前创建，否则没用
+@DependsOn("myAdvisorAdapter")
+@EnableAspectJAutoProxy
+@Component
+public class AopTest6 {
+    @Component
+    @SuppressWarnings("serial")
+    class MyAdvice2 implements Advice {
+    }
+
+    @Component
+    @SuppressWarnings("serial")
+    class MyAdvisorAdapter implements AdvisorAdapter {
+
+        @Override
+        public boolean supportsAdvice(Advice advice) {
+            return advice instanceof MyAdvice2;
+        }
+
+        @Override
+        public MethodInterceptor getInterceptor(Advisor advisor) {
+            return MethodInvocation::proceed;
+        }
+
+    }
+}
+```
+
+
+
 ## @Aspect
 
 注：如何解析的看`@EnableAspectJAutoProxy`
