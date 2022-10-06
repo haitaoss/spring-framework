@@ -1,11 +1,10 @@
 package cn.haitaoss;
 
 
-import cn.haitaoss.javaconfig.aop.AopTest;
+import cn.haitaoss.javaconfig.aop.AopTest3;
+import org.springframework.beans.factory.support.AbstractBeanFactory;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
-
-import java.util.Arrays;
 
 /**
  * @author haitao.chen
@@ -14,14 +13,26 @@ import java.util.Arrays;
  */
 @EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)
 public class Test {
-
     public static void main(String[] args) throws Exception {
         // ClassPathXmlApplicationContext classPathXmlApplicationContext = new ClassPathXmlApplicationContext("spring.xml");
         // AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.Test.class);
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
-        System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
-        context.getBean(AopTest.AopDemo.class).test();
+//        AopTest3.MyIntroduction.class.cast(context.getBean(AopTest3.AopDemo.class)).test1();
+        ((AopTest3.MyIntroduction)(context.getBean(AopTest3.AopDemo.class))).test1();
 
+        /**
+         * @Scope 源码
+         *
+         * 通过 introduction(引入) xx 实现的
+         * https://github.com/seaswalker/spring-analysis/blob/master/note/spring-aop.md#%E8%87%AA%E5%AE%9A%E4%B9%89scope
+         * {@link AbstractBeanFactory#doGetBean(String, Class, Object[], boolean)}
+         * else {
+         *                     String scopeName = mbd.getScope();
+         *                     if (!StringUtils.hasLength(scopeName)) {
+         *                         throw new IllegalStateException("No scope name defined for bean ´" + beanName + "'");
+         *                     }
+         *
+         * */
         /**
          依赖解析忽略
          此部分设置哪些接口在进行依赖注入的时候应该被忽略:

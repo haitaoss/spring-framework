@@ -3,17 +3,16 @@ package cn.haitaoss.javaconfig.aop;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.*;
-import org.springframework.context.annotation.EnableAspectJAutoProxy;
-import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+
 
 /**
  * @author haitao.chen
  * email haitaoss@aliyun.com
  * date 2022-09-14 21:08
  */
-@EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)
-@Component
+/*@EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)
+@Component*/
 public class AopTest {
     public AopTest() {
         System.out.println("AopTest 构造器");
@@ -31,7 +30,7 @@ public class AopTest {
          * @AfterThrowing }finally{
          * @After }
          */
-        @Pointcut("execution(* test(..))")
+        @Pointcut("execution(* test*(..))")
         private void pointcut() {
         }
 
@@ -67,21 +66,6 @@ public class AopTest {
         }
     }
 
-    @Aspect
-    @Component
-    @Order(-1) // 排序，让其优先执行
-    public static class AspectDemo2 {
-
-        @Pointcut("execution(* test(..))")
-        private void pointcut() {
-        }
-
-        // @AfterReturning("pointcut()")
-        @Before("pointcut()")
-        public void afterReturning(JoinPoint joinPoint) {
-            System.out.println("AspectDemo2...");
-        }
-    }
 
     @Component
     public static class AopDemo {
@@ -90,7 +74,4 @@ public class AopTest {
         }
     }
 
-    @Component
-    static class AopDemo2 {
-    }
 }

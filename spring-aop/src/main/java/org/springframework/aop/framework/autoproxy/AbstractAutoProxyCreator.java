@@ -19,9 +19,7 @@ package org.springframework.aop.framework.autoproxy;
 import org.aopalliance.aop.Advice;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.aop.Advisor;
-import org.springframework.aop.Pointcut;
-import org.springframework.aop.TargetSource;
+import org.springframework.aop.*;
 import org.springframework.aop.framework.*;
 import org.springframework.aop.framework.adapter.AdvisorAdapterRegistry;
 import org.springframework.aop.framework.adapter.GlobalAdvisorAdapterRegistry;
@@ -592,7 +590,18 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport imp
          * 子类可以回调 {@link AbstractAutoProxyCreator#setInterceptorNames(String...)} 进行设置
          * */
         Advisor[] advisors = buildAdvisors(beanName, specificInterceptors);
-        // 设置 advisor
+        //
+        /**
+         * 设置 advisor
+         * 这里非常的关键，这里就是 IntroductionAdvisor 能实现不修改被代理的情况下还能进行类型转换的原因
+         * 添加的 advisor 是 IntroductionAdvisor 类型
+         *      {@link AdvisedSupport#validateIntroductionAdvisor(IntroductionAdvisor)}
+         *      {@link AdvisedSupport#validateIntroductionAdvisor(IntroductionAdvisor)}
+         *          就是会拿到Advisor的接口信息{@link IntroductionInfo#getInterfaces()}设置到proxyFactory中
+         *
+         * 实例代码 {@link cn.haitaoss.javaconfig.aop.AopTest3.AspectDemo3}
+         *      ((AopTest3.MyIntroduction)(context.getBean(AopTest3.AopDemo.class))).test1();
+         * */
         proxyFactory.addAdvisors(advisors);
         // 被代理对象。我们的普通bean 被装饰成 TargetSource 了
         proxyFactory.setTargetSource(targetSource);
@@ -641,8 +650,8 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport imp
          *          就是 除了 finalize、equals、hashcode 等，都会执行 DynamicAdvisedInterceptor 这个callback
          *      也就是执行 {@link CglibAopProxy.DynamicAdvisedInterceptor#intercept(Object, Method, Object[], MethodProxy)}
          *          1. exposeProxy 属性是 true，往 ThreadLocal中记录当前代理对象  `oldProxy=AopContext.setCurrentProxy(proxy)`
-         *          2. 获取被代理对象 {@link TargetSource#getTarget()}。这里也是很细节，因为TargetSource实例是这个类型的 {@link AbstractBeanFactoryBasedTargetSource}，所以每次获取target都是从IOC容器中拿，
-         *              也就是说 如果bean是多例的，每次执行都会创建出新的对象。
+         *          2. 获取被代理对象 {@link TargetSource#getTarget()}。这里也是很细节，
+         *              比如：TargetSource实例是这个类型的 {@link AbstractBeanFactoryBasedTargetSource}，所以每次获取target都是从IOC容器中拿，也就是说 如果bean是多例的，每次执行都会创建出新的对象。
          *          3. 根据method得到对应的拦截器链 {@link AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice(Method, Class)}
          *              拦截器链是空：反射执行
          *              拦截器链不是空：将拦截器链装饰成 CglibMethodInvocation ，然后执行{@link CglibAopProxy.CglibMethodInvocation#proceed()}，其实就是执行其父类 {@link ReflectiveMethodInvocation#proceed()}

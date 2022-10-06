@@ -1264,6 +1264,8 @@ public void 测试ProxyFactory() {
 >
 > 3. 执行 `ReflectiveMethodInvocation#proceed()`
 
+### 细说`ProxyFactory#getProxy`
+
 ```java
 /**
  * 创建代理对象
@@ -1290,8 +1292,11 @@ public void 测试ProxyFactory() {
  *          就是 除了 finalize、equals、hashcode 等，都会执行 DynamicAdvisedInterceptor 这个callback
  *      也就是执行 {@link CglibAopProxy.DynamicAdvisedInterceptor#intercept(Object, Method, Object[], MethodProxy)}
  *          1. exposeProxy 属性是 true，往 ThreadLocal中记录当前代理对象  `oldProxy=AopContext.setCurrentProxy(proxy)`
- *          2. 获取被代理对象 {@link TargetSource#getTarget()}。这里也是很细节，因为TargetSource实例是这个类型的 {@link AbstractBeanFactoryBasedTargetSource}，所以每次获取target都是从IOC容器中拿，
- *              也就是说 如果bean是多例的，每次执行都会创建出新的对象。
+ *          2. 获取被代理对象 {@link TargetSource#getTarget()}。这里也是很细节。
+ *              比如：
+ *                  - TargetSource实例是这个类型的 {@link AbstractBeanFactoryBasedTargetSource}，所以每次获取target都是从IOC容器中拿，也就是说 如果bean是多例的，每次执行都会创建出新的对象。(@Lazy就是这么实现的)
+ *                  - 而 Spring Aop，使用的是SingletonTargetSource，特点是将容器的对象缓存了，执行 `getTarget` 才能拿到被代理对象
+ *              
  *          3. 根据method得到对应的拦截器链 {@link AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice(Method, Class)}
  *              拦截器链是空：反射执行
  *              拦截器链不是空：将拦截器链装饰成 CglibMethodInvocation ，然后执行{@link CglibAopProxy.CglibMethodInvocation#proceed()}，其实就是执行其父类 {@link ReflectiveMethodInvocation#proceed()}
@@ -1312,7 +1317,7 @@ public void 测试ProxyFactory() {
  * */
 ```
 
-### `AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice`
+### 细说`AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice`
 
 ```java
 /**
@@ -1359,7 +1364,7 @@ public void 测试ProxyFactory() {
  * */
 ```
 
-### `ReflectiveMethodInvocation#proceed()`
+### 细说`ReflectiveMethodInvocation#proceed()`
 
 ```java
 /**
@@ -1641,7 +1646,8 @@ public void 测试ProxyFactory() {
  *
  * 设置ProxyFactory参数：
  *      ProxyFactory proxyFactory = new ProxyFactory();
- *      proxyFactory.addAdvisors(advisors);
+ *      // addAdvisor 也是关键点。添加的 advisor 是 IntroductionAdvisor 类型，就拿到Advisor的接口信息{@link DeclareParentsAdvisor#getInterfaces()}设置到proxyFactory中
+ * 			proxyFactory.addAdvisors(advisors);
  *      proxyFactory.setTargetSource(targetSource); // AnnotationAwareAspectJAutoProxyCreator 使用的是 SingletonTargetSource
  *      proxyFactory.addAdvisors(advisors);
  *
@@ -1761,6 +1767,8 @@ public void 测试ProxyFactory() {
 ```
 ## @Aspect
 
+注：如何解析的看`@EnableAspectJAutoProxy`
+
 > 1. 单独使用 `@Aspect` 是没用的，得使用`@EnableAspectJAutoProxy` 才会解析`@Aspect`的bean
 >
 > 2. 同一个`@Aspect`里面的增强才会有序执行
@@ -1787,6 +1795,21 @@ public void 测试ProxyFactory() {
 >     * */
 >    ```
 
+### @Around、@Before、@After、@AfterReturning、@AfterThrowing
+
+> `@Around`支持 ProceedingJoinPoint、JoinPoint、JoinPoint.StaticPart 作为增强方法的第一个参数
+>
+> `@Before、@After、@AfterReturning、@AfterThrowing` 只支持 JoinPoint、JoinPoint.StaticPart 作为增强方法的第一个参数
+>
+> `@Around、@Before、@After、@AfterReturning、@AfterThrowing` 会被解析成` InstantiationModelAwarePointcutAdvisorImpl`
+>
+> 在解析@Aspect里面的advice方法时，会进行升序排序，也就是这个执行顺序`@Around、@Before、@After、@AfterReturning、@AfterThrowing`
+
+```java
+AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+context.getBean(AopTest.AopDemo.class).test();
+```
+
 ```java
 @EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)
 @Component
@@ -1799,15 +1822,12 @@ public class AopTest {
     @Component
     public static class AspectDemo {
         /**
-         * 只有@Around支持 ProceedingJoinPoint、JoinPoint、JoinPoint.StaticPart
-         * 其他的支持 JoinPoint、JoinPoint.StaticPart
          * try{
-         *
          * @Around、@Before、@AfterReturning }catch(){
          * @AfterThrowing }finally{
          * @After }
          */
-        @Pointcut("execution(* test(..))")
+        @Pointcut("execution(* test*(..))")
         private void pointcut() {
         }
 
@@ -1843,6 +1863,57 @@ public class AopTest {
         }
     }
 
+
+    @Component
+    public static class AopDemo {
+        public void test() {
+            System.out.println("AopDemo.test");
+        }
+    }
+
+}
+```
+
+### 不同切面类的advice执行是无序的
+
+> 因为解析`@Aspect`的过程是
+>
+> 先扫描容器中所有的`@Aspect` 标注的bean，然后通过 `@Order、Ordered、Priority` 进行升序排序
+>
+> 然后遍历`@Aspect`的bean进行解析，找到标注了`@Around、@Before、@After、@AfterReturning、@AfterThrowing`的方法，然后进行升序排序，最终都会解析成`InstantiationModelAwarePointcutAdvisorImpl`实例，
+>
+> 所以下面的demo中 才会出现 @Before 比 @Around 先执行的情况
+
+```java
+AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+context.getBean(AopTest2.AopDemo.class).test();
+/* 
+控制台输出：
+AspectDemo2.before...
+AspectDemo.around...
+*/
+```
+
+```java
+@EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)
+@Component
+public class AopTest2 {
+    @Aspect
+    @Component
+    public static class AspectDemo {
+
+        @Pointcut("execution(* test*(..))")
+        private void pointcut() {
+        }
+
+        @Around("pointcut()")
+        public void around(/*JoinPoint joinPoint,*/JoinPoint.StaticPart staticPart) {
+            System.out.println("AspectDemo.around...");
+        }
+
+    }
+
+
     @Aspect
     @Component
     @Order(-1) // 排序，让其优先执行
@@ -1852,10 +1923,9 @@ public class AopTest {
         private void pointcut() {
         }
 
-        // @AfterReturning("pointcut()")
         @Before("pointcut()")
-        public void afterReturning(JoinPoint joinPoint) {
-            System.out.println("AspectDemo2...");
+        public void before(JoinPoint joinPoint) {
+            System.out.println("AspectDemo2.before...");
         }
     }
 
@@ -1866,8 +1936,63 @@ public class AopTest {
         }
     }
 
+}
+```
+
+### @DeclareParents
+
+> `@DeclareParents(value = "cn.haitaoss.javaconfig.aop.AopTest3.AopDemo", defaultImpl = MyIntroductionImpl.class)`
+>
+> - value：哪些类是需要增强的，类匹配表达式
+>
+> - defaultImpl：增强接口的具体实现类，也就是增强方法
+>
+> - 注解标注的字段类型：得写defaultImpl实现的接口类型
+>
+> 作用：不修改类的情况下，对类进行增强。
+>
+> 使用：将被代理对象强转为注解标注的字段类型即可
+>
+> 为啥能强转？？？
+>
+> -  `proxyFactory.addAdvisors(advisors);`
+>- 该方法会判断 添加的 advisor 是 IntroductionAdvisor 类型，会获取 IntroductionAdvisor 的接口设置到proxyFactory中，从而生成的代理对象就会实现Advisor的接口，所以可以将 代理对象强转成 对应的接口
+
+```JAVA
+AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+AopTest3.MyIntroduction.class.cast(context.getBean(AopTest3.AopDemo.class)).test1();
+```
+
+```JAVA
+@EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)
+@Component
+public class AopTest3 {
+    @Aspect
     @Component
-    static class AopDemo2 {
+    public static class AspectDemo3 {
+        @DeclareParents(value = "cn.haitaoss.javaconfig.aop.AopTest3.AopDemo", defaultImpl = MyIntroductionImpl.class)
+        private MyIntroduction x;
+    }
+
+
+    @Component
+    public static class AopDemo {
+        public void test() {
+            System.out.println("AopDemo.test");
+        }
+    }
+
+    public static class MyIntroductionImpl implements MyIntroduction {
+
+        @Override
+        public void test1() {
+            System.out.println("MyIntroductionImpl.test1");
+        }
+
+    }
+
+    public interface MyIntroduction {
+        void test1();
     }
 }
 ```
