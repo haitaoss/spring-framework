@@ -2157,6 +2157,96 @@ public class AopTest4 {
 
 ## @Scope
 
+> 使用：
+>
+> 1. 先注册Scope `beanFactory.registerScope("haitao", new HaitaoScope());`
+>
+> 2. 使用@Scope描述bean, `@Scope("haitao")`
+>
+> 原理：
+>
+> - `AbstractBeanFactory#doGetBean` 时因为设置了Scope，所以会从Scope中获取bean。就这么简单 没啥特别的
+>
+> 有啥用：
+>
+> - 可能通过自定义Scope使用配置bean的热部署。
+
+```java
+@Component
+public class ScopeTest {
+    @Component
+    public static class MyBeanFactoryPostProcessor implements BeanFactoryPostProcessor {
+
+        @Override
+        public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
+            beanFactory.registerScope("haitao", new HaitaoScope());
+        }
+    }
+
+    @org.springframework.context.annotation.Scope("haitao")
+    @Component
+    public static class Demo {
+    }
+
+    public static class HaitaoScope implements Scope {
+        static Map<String, Object> cache = new ConcurrentHashMap<>();
+
+        @Override
+        public Object get(String name, ObjectFactory<?> objectFactory) {
+            return cache.computeIfAbsent(name, x -> objectFactory.getObject());
+        }
+
+        @Override
+        public Object remove(String name) {
+            return cache.remove(name);
+        }
+
+        @Override
+        public void registerDestructionCallback(String name, Runnable callback) {
+
+        }
+
+        @Override
+        public Object resolveContextualObject(String key) {
+            return null;
+        }
+
+        @Override
+        public String getConversationId() {
+            return null;
+        }
+
+        public static void refresh() {
+            cache.clear();
+        }
+    }
+}
+```
+
+```java
+public class Test {
+    public static void main(String[] args) throws Exception {
+        // ClassPathXmlApplicationContext classPathXmlApplicationContext = new ClassPathXmlApplicationContext("spring.xml");
+        // AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.Test.class);
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+        System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
+
+        ScopeTest.Demo d1 = context.getBean(ScopeTest.Demo.class);
+        System.out.println(d1.hashCode() + "--->");
+
+        ScopeTest.Demo d2 = context.getBean(ScopeTest.Demo.class);
+        System.out.println(d2.hashCode() + "--->");
+
+        ScopeTest.HaitaoScope.refresh();
+
+        ScopeTest.Demo d3 = context.getBean(ScopeTest.Demo.class);
+        System.out.println(d3.hashCode() + "--->");
+    }
+}
+```
+
+
+
 ## @EnableAsync
 
 ## @EnableTransactionManagement

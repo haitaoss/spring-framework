@@ -1,7 +1,7 @@
 package cn.haitaoss;
 
 
-import org.springframework.beans.factory.support.AbstractBeanFactory;
+import cn.haitaoss.javaconfig.Scope.ScopeTest;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 import java.util.Arrays;
@@ -18,19 +18,17 @@ public class Test {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
         System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
 
-        /**
-         * @Scope 源码
-         *
-         *
-         *
-         * {@link AbstractBeanFactory#doGetBean(String, Class, Object[], boolean)}
-         * else {
-         *                     String scopeName = mbd.getScope();
-         *                     if (!StringUtils.hasLength(scopeName)) {
-         *                         throw new IllegalStateException("No scope name defined for bean ´" + beanName + "'");
-         *                     }
-         *
-         * */
+        ScopeTest.Demo d1 = context.getBean(ScopeTest.Demo.class);
+        System.out.println(d1.hashCode() + "--->");
+
+        ScopeTest.Demo d2 = context.getBean(ScopeTest.Demo.class);
+        System.out.println(d2.hashCode() + "--->");
+
+        ScopeTest.HaitaoScope.refresh();
+
+        ScopeTest.Demo d3 = context.getBean(ScopeTest.Demo.class);
+        System.out.println(d3.hashCode() + "--->");
+
         /**
          依赖解析忽略
          此部分设置哪些接口在进行依赖注入的时候应该被忽略:
