@@ -1,30 +1,27 @@
 package cn.haitaoss;
 
 
-import cn.haitaoss.javaconfig.aop.AopTest3;
+import cn.haitaoss.javaconfig.aop.AopTest4;
 import org.springframework.beans.factory.support.AbstractBeanFactory;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.annotation.EnableAspectJAutoProxy;
 
 /**
  * @author haitao.chen
  * email haitaoss@aliyun.com
  * date 2022-07-31 16:53
  */
-@EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)
 public class Test {
     public static void main(String[] args) throws Exception {
         // ClassPathXmlApplicationContext classPathXmlApplicationContext = new ClassPathXmlApplicationContext("spring.xml");
         // AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.Test.class);
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
-//        AopTest3.MyIntroduction.class.cast(context.getBean(AopTest3.AopDemo.class)).test1();
-        ((AopTest3.MyIntroduction)(context.getBean(AopTest3.AopDemo.class))).test1();
+        AopTest4.MyIntroduction.class.cast(context.getBean(AopTest4.class)).test1();
 
         /**
          * @Scope 源码
          *
-         * 通过 introduction(引入) xx 实现的
-         * https://github.com/seaswalker/spring-analysis/blob/master/note/spring-aop.md#%E8%87%AA%E5%AE%9A%E4%B9%89scope
+         *
+         *
          * {@link AbstractBeanFactory#doGetBean(String, Class, Object[], boolean)}
          * else {
          *                     String scopeName = mbd.getScope();

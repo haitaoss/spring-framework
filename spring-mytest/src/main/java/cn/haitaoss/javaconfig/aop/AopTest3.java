@@ -2,7 +2,6 @@ package cn.haitaoss.javaconfig.aop;
 
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.DeclareParents;
-import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.stereotype.Component;
 
 /**
@@ -10,8 +9,8 @@ import org.springframework.stereotype.Component;
  * email haitaoss@aliyun.com
  * date 2022-09-14 21:08
  */
-@EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)
-@Component
+/*@EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)
+@Component*/
 public class AopTest3 {
     @Aspect
     @Component

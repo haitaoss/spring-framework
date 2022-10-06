@@ -1390,11 +1390,12 @@ public void 测试ProxyFactory() {
  * */
 ```
 ## @EnableAspectJAutoProxy
-> aspectj表达式 https://zhuanlan.zhihu.com/p/63001123
+> pointcut表达式 https://zhuanlan.zhihu.com/p/63001123
 >
 > CGLIB介绍与原理 https://blog.csdn.net/zghwaicsdn/article/details/50957474
 >
 > 只是看懂 Spring Aop 的实现原理，至于具体的AspectJ表达式如何匹配的没有看
+
 ### 类图
 
 ```java
@@ -1431,6 +1432,28 @@ public void 测试ProxyFactory() {
 > @AfterReturning 需要使用 AfterReturningAdviceAdapter 解析成 AfterReturningAdviceInterceptor
 
 ![PlantUML diagram](.README_imgs/ZLFgo2bj05bfHFmy4jRg1u0o5tVHKUAhNtU_92Biil.png)
+
+> ### Advisor是啥
+>
+> `@Around、@Before、@After、@AfterReturning、@AfterThrowing` 会被解析成 `PointcutAdvisor`
+>
+> `DeclareParents` 会被解析成 `IntroductionAdvisor`
+>
+> ### PointcutAdvisor 和 IntroductionAdvisor 的区别
+>
+> 在进行切入点匹配时：
+>
+> - PointcutAdvisor：使用其Poincut属性，进行ClassFilter+MethodMatcher
+> - IntroductionAdvisor：进行ClassFilter
+>
+> 在创建代理对象时：
+>
+> - PointcutAdvisor：会获取其Advice属性，转换成MethodInterceptor对象，组成InterceptorChain，在执行代理对象的方法时，会执行与方法匹配就执行Interceptors
+> - IntroductionAdvisor：
+>   1. 会拿到其 interfaces 设置为代理对象的接口，然后创建代理对象，所以创建出来的代理对象可以强转成对应的接口，从而实现 不修改被代理的情况下新增方法。
+>   2. 和PointcutAdvisor一样。会获取其Advice属性，转换成MethodInterceptor对象，组成InterceptorChain，在执行代理对象的方法时，会执行与方法匹配就执行Interceptors
+
+![PlantUML diagram](.README_imgs/pqIb5sweG-5033471.png)
 
 ### 1. 使用`@EnableAspectJAutoProxy`会发生什么?
 
@@ -1991,6 +2014,61 @@ public class AopTest3 {
 
     }
 
+    public interface MyIntroduction {
+        void test1();
+    }
+}
+```
+
+### IntroductionAdvisor
+
+```java
+public class Test {
+    public static void main(String[] args) throws Exception {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+        AopTest4.MyIntroduction.class.cast(context.getBean(AopTest4.class)).test1();
+    }
+}
+```
+
+```java
+@EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)
+@Component
+public class AopTest4 {
+    @Component
+    public static class MyIntroductionAdvisor implements IntroductionAdvisor {
+        private MyIntroduction delegate = new MyIntroductionImpl();
+        @Override
+        public Advice getAdvice() {
+            return new MethodInterceptor() {
+                @Nullable
+                @Override
+                public Object invoke(@Nonnull MethodInvocation invocation) throws Throwable {
+                    return AopUtils.invokeJoinpointUsingReflection(delegate, invocation.getMethod(), invocation.getArguments());
+                }
+            };
+        }
+        @Override
+        public boolean isPerInstance() {
+            return false;
+        }
+        @Override
+        public ClassFilter getClassFilter() {
+            return ClassFilter.TRUE;
+        }
+        @Override
+        public void validateInterfaces() throws IllegalArgumentException {}
+        @Override
+        public Class<?>[] getInterfaces() {
+            return new Class<?>[]{MyIntroduction.class};
+        }
+    }
+    public static class MyIntroductionImpl implements MyIntroduction {
+        @Override
+        public void test1() {
+            System.out.println("MyIntroductionImpl.test1");
+        }
+    }
     public interface MyIntroduction {
         void test1();
     }
