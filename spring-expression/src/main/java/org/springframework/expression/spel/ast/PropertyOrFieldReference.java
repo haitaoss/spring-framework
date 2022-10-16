@@ -176,7 +176,9 @@ public class PropertyOrFieldReference extends SpelNodeImpl {
             this.cachedReadAccessor = null;
         }
 
-        // 拿到符合条件的 PropertyAccessor
+        /**
+         * 拿到符合条件的 PropertyAccessor
+         * */
         List<PropertyAccessor> accessorsToTry =
                 getPropertyAccessorsToTry(contextObject.getValue(), evalContext.getPropertyAccessors());
         // Go through the accessors that may be able to resolve it. If they are a cacheable accessor then

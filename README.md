@@ -1421,9 +1421,18 @@ public class Test {
 *
 *  标记一下，正在进行依赖解析 `InjectionPoint previousInjectionPoint = ConstructorResolver.setCurrentInjectionPoint(descriptor);`
 *
-*  处理@Value `Object value = getAutowireCandidateResolver().getSuggestedValue(descriptor);` {@link QualifierAnnotationAutowireCandidateResolver#getSuggestedValue(DependencyDescriptor)}
-*      - 使用BeanFactory的AutowireCandidateResolver 解析@Value
-*      - value不为null
+*  处理有@Value的情况，没有@Value就会往下判断了
+*      - 拿到@Value注解的值。查找顺序: 字段、方法参数没有@Value() -> 如果是方法参数依赖，就看看方法上有没有@Value
+*          `Object value = getAutowireCandidateResolver().getSuggestedValue(descriptor);`
+*          {@link QualifierAnnotationAutowireCandidateResolver#getSuggestedValue(DependencyDescriptor)}
+*
+*      - value是String类型
+*          - 解析占位符 {@link AbstractBeanFactory#resolveEmbeddedValue(String)}
+*              `String strVal = resolveEmbeddedValue((String) value);`
+*          - 进行SpEL的解析,这里就会从容器中获取bean
+*              `value = evaluateBeanDefinitionString(strVal, bd);`
+*              {@link AbstractBeanFactory#evaluateBeanDefinitionString(String, BeanDefinition)}
+*
 *      - 拿到 TypeConverter `TypeConverter converter = (typeConverter != null ? typeConverter : getTypeConverter());`
 *              SimpleTypeConverter typeConverter = new SimpleTypeConverter();
 *              typeConverter.setConversionService(getConversionService()); // 从容器中获取一个name 是 conversionService 的bean
@@ -1526,8 +1535,43 @@ public class Test {
  * */
 ```
 
-### 细说`QualifierAnnotationAutowireCandidateResolver#getSuggestedValue`
+### 细说`AbstractBeanFactory#evaluateBeanDefinitionString`
+[看SpEL](#SpEL)
 
+说白了就是解析SpEL表达式。对于`#{beanA}` 就是从BeanFactory中获取bean对象
+
+```java
+/**
+ * 比如 @Value("#{beanA}")
+ *
+ * {@link AbstractBeanFactory#evaluateBeanDefinitionString(String, BeanDefinition)}
+ *
+ * 使用 `StandardBeanExpressionResolver` 进行计算 {@link StandardBeanExpressionResolver#evaluate(String, BeanExpressionContext)}
+ *      `return this.beanExpressionResolver.evaluate(value, new BeanExpressionContext(this, scope));`
+ *
+ *      // value 就是 "#{beanA}" ,而beanExpressionParserContext 就是替换掉 #{}。也就是变成了 beanA ，也就是要访问 beanA这个属性
+ *      Expression expr = new SpelExpressionParser().parseExpression(value, this.beanExpressionParserContext);
+ *      StandardEvaluationContext sec = new StandardEvaluationContext(evalContext);
+ *      // 设置属性访问器，就是用来解析 beanA 属性时，会调用这个访问器来获取值
+ *      sec.addPropertyAccessor(new BeanExpressionContextAccessor());
+ *      // 返回SpEL解析的结果
+ *      expr.getValue(sec);
+ *
+ * 通过属性访问器，读取 beanA 属性值 {@link BeanExpressionContextAccessor#read(EvaluationContext, Object, String)}
+ *      `(BeanExpressionContext) target).getObject(name)` {@link BeanExpressionContext#getObject(String)}
+ *      而 BeanExpressionContext 包装了BeanFactory和Scope。所以`getObject`
+ *
+ *      if (this.beanFactory.containsBean(key)) {
+ * 			return this.beanFactory.getBean(key);
+ *      }
+ * 		else if (this.scope != null) {
+ * 			return this.scope.resolveContextualObject(key);
+ *      }
+ * 		else {
+ * 			return null;
+ *      }
+ * */
+```
 ### 细说`TypeConverterSupport#convertIfNecessary` 
 
 > 对依赖进行转换是执行`TypeConverterSupport#convertIfNecessary`。
@@ -1755,6 +1799,95 @@ public class TypeConverterTest {
         });
         simpleTypeConverter.setConversionService(conversionService);*/
         System.out.println(simpleTypeConverter.convertIfNecessary("123", A.class));
+    }
+}
+```
+
+## SpEL
+
+> [Spring官方文档](https://docs.spring.io/spring-framework/docs/3.0.x/reference/expressions.html)
+
+```java
+public class Demo {
+    private String name;
+
+
+    @Test
+    public void test_spel() {
+        Demo demo = new Demo();
+
+        ExpressionParser parser = new SpelExpressionParser();
+
+        StandardEvaluationContext context = new StandardEvaluationContext(demo);
+        context.setVariable("newName", "Mike Tesla");
+
+        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
+        // 字符串
+        System.out.println(consumer.apply("'a'"));
+        // 运算
+        System.out.println(consumer.apply("1+1"));
+        /**
+         * name 表示 context中的属性名
+         * #newName 表示获取变量
+         *
+         * 意思就是给name赋值
+         * */
+        System.out.println(consumer.apply("name = #newName"));
+        /**
+         * name变量的值，这样子写就是访问属性
+         * */
+        System.out.println(consumer.apply("name"));
+        /**
+         * 设置BeanResolver,就是 @ 开头的会通过这个解析值
+         * */
+        context.setBeanResolver(new BeanResolver() {
+            @Override
+            public Object resolve(EvaluationContext context, String beanName) throws AccessException {
+                return "通过BeanResolver解析的值-->" + beanName;
+            }
+        });
+        // 会使用BeanResolver 解析
+        System.out.println(consumer.apply("@a"));
+        // 模板解析上下文，就是可以去掉模板字符
+        System.out.println(parser.parseExpression("#{@x}", new TemplateParserContext()).getValue(context));
+
+        // PropertyAccessor 用来解析属性是怎么取值的
+        context.addPropertyAccessor(new PropertyAccessor() {
+            @Override
+            public Class<?>[] getSpecificTargetClasses() {
+                //                return new Class[0];
+                /**
+                 * 返回 null，表示都满足
+                 * 不会null，就会匹配 EvaluationContext 类型，匹配了才会使用这个 PropertyAccessor
+                 * {@link PropertyOrFieldReference#readProperty(TypedValue, EvaluationContext, String)}
+                 *  {@link PropertyOrFieldReference#getPropertyAccessorsToTry(Object, List)}
+                 * */
+                return null;
+            }
+
+            @Override
+            public boolean canRead(EvaluationContext context, Object target, String name) throws AccessException {
+                System.out.println("canRead...." + name);
+                return true;
+            }
+
+            @Override
+            public TypedValue read(EvaluationContext context, Object target, String name) throws AccessException {
+                System.out.println("read...." + name);
+                return null;
+            }
+
+            @Override
+            public boolean canWrite(EvaluationContext context, Object target, String name) throws AccessException {
+                return false;
+            }
+
+            @Override
+            public void write(EvaluationContext context, Object target, String name, Object newValue) throws AccessException {
+
+            }
+        });
+        System.out.println(consumer.apply("testPropertyAccessor"));
     }
 }
 ```

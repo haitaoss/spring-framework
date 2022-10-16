@@ -24,6 +24,7 @@ import org.springframework.core.convert.ConversionService;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.ParserContext;
+import org.springframework.expression.PropertyAccessor;
 import org.springframework.expression.spel.SpelParserConfiguration;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
@@ -151,20 +152,33 @@ public class StandardBeanExpressionResolver implements BeanExpressionResolver {
                  * 默认设置的这个类型 SpelExpressionParser
                  *
                  * "#{a}"  解析的结果是 "a"
-                 * ---> SpelExpression
+                 * ---> SpEl Expression
                  * */
                 expr = this.expressionParser.parseExpression(value, this.beanExpressionParserContext);
                 this.expressionCache.put(value, expr);
             }
             StandardEvaluationContext sec = this.evaluationCache.get(evalContext);
             if (sec == null) {
+                // SpEL 的根对象
                 sec = new StandardEvaluationContext(evalContext);
 
+                /**
+                 * SpEL 属性访问器，"a" 会使用 PropertyAccessor 来解析
+                 *
+                 * 具体使用哪个 {@link StandardEvaluationContext#rootObject}
+                 * 这个 {@link PropertyAccessor#getSpecificTargetClasses()} 属性是null，表示所有的 evalContext 都会使用这个 PropertyAccessor 来解析属性
+                 * 这个 {@link PropertyAccessor#getSpecificTargetClasses()} 属性不是null，只有 evalContext 类型匹配了才会使用这个 PropertyAccessor 来解析属性
+                 *
+                 * Tips: @Value("#{beanA}") 就是使用这个 BeanExpressionContextAccessor 来获取的
+                 * */
                 sec.addPropertyAccessor(new BeanExpressionContextAccessor());
                 sec.addPropertyAccessor(new BeanFactoryAccessor());
                 sec.addPropertyAccessor(new MapAccessor());
                 sec.addPropertyAccessor(new EnvironmentAccessor());
 
+                /**
+                 * SpEL "@a" 就是以@开头 会使用BeanResolver来解析
+                 * */
                 sec.setBeanResolver(new BeanFactoryResolver(evalContext.getBeanFactory()));
                 sec.setTypeLocator(new StandardTypeLocator(evalContext.getBeanFactory().getBeanClassLoader()));
                 ConversionService conversionService = evalContext.getBeanFactory().getConversionService();

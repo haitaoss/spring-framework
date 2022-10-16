@@ -1434,7 +1434,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
              *
              * 执行的 ContextAnnotationAutowireCandidateResolver 父类的方法{@link QualifierAnnotationAutowireCandidateResolver#getSuggestedValue(DependencyDescriptor)}
              *
-             * 这里是处理@Value注解，拿到@Value注解的值
+             * 这里是处理@Value注解，拿到@Value注解的值。查找顺序: 字段、方法参数没有@Value() -> 如果是方法参数依赖，就看看方法上有没有@Value
              * */
             Object value = getAutowireCandidateResolver().getSuggestedValue(descriptor);
             if (value != null) {
@@ -1445,6 +1445,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
                             beanName != null && containsBean(beanName) ? getMergedBeanDefinition(beanName) : null);
                     /**
                      * 如果是 @Value("#{a}")，会从容器中获取 a 这个bean
+                     * 进行SpEl解析
                      * */
                     value = evaluateBeanDefinitionString(strVal, bd);
                 }

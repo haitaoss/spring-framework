@@ -1,8 +1,6 @@
 package cn.haitaoss;
 
 
-import org.springframework.beans.factory.annotation.QualifierAnnotationAutowireCandidateResolver;
-import org.springframework.beans.factory.config.DependencyDescriptor;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 /**
@@ -22,9 +20,6 @@ public class Test {
          * BeanPostProcessor执行过程：
          * 实例化前后置->推断构造器后置->实例化bean->合并BeanDefinition后置(hit)->实例化后后置->属性注入后置(hit)->初始化前后置(hit)->初始化后后置->销毁前后置(hit)
          *
-         * */
-        /**
-         * {@link QualifierAnnotationAutowireCandidateResolver#getSuggestedValue(DependencyDescriptor)}
          * */
 
     }
