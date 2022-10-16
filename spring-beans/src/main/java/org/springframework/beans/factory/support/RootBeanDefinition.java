@@ -75,6 +75,8 @@ public class RootBeanDefinition extends AbstractBeanDefinition {
     volatile Class<?> resolvedTargetType;
 
     /**
+     * 缓存是不是 FactoryBean
+     * {@link AbstractBeanFactory#isFactoryBean(String, RootBeanDefinition)}
      * Package-visible field for caching if the bean is a factory bean.
      */
     @Nullable

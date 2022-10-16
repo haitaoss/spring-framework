@@ -1,0 +1,33 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AutowiredAnnotationBeanPostProcessor {
+  - buildAutowiringMetadata(Class<?>): InjectionMetadata
+  + postProcessPropertyValues(PropertyValues, PropertyDescriptor[], Object, String): PropertyValues?
+  + determineCandidateConstructors(Class<?>, String): Constructor<?>[]?
+  + postProcessMergedBeanDefinition(RootBeanDefinition, Class<?>, String): void
+  + postProcessProperties(PropertyValues, Object, String): PropertyValues?
+}
+interface BeanPostProcessor << interface >> {
+
+}
+interface InstantiationAwareBeanPostProcessor << interface >> {
+  + postProcessProperties(PropertyValues, Object, String): PropertyValues?
+  + postProcessPropertyValues(PropertyValues, PropertyDescriptor[], Object, String): PropertyValues?
+}
+interface MergedBeanDefinitionPostProcessor << interface >> {
+  + postProcessMergedBeanDefinition(RootBeanDefinition, Class<?>, String): void
+}
+interface SmartInstantiationAwareBeanPostProcessor << interface >> {
+  + determineCandidateConstructors(Class<?>, String): Constructor<?>[]?
+}
+
+AutowiredAnnotationBeanPostProcessor      -[#008200,dashed]-^  MergedBeanDefinitionPostProcessor
+AutowiredAnnotationBeanPostProcessor      -[#008200,dashed]-^  SmartInstantiationAwareBeanPostProcessor
+InstantiationAwareBeanPostProcessor       -[#008200,plain]-^  BeanPostProcessor
+MergedBeanDefinitionPostProcessor         -[#008200,plain]-^  BeanPostProcessor
+SmartInstantiationAwareBeanPostProcessor  -[#008200,plain]-^  InstantiationAwareBeanPostProcessor
+@enduml

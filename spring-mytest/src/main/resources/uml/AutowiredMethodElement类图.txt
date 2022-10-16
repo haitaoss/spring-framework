@@ -1,0 +1,18 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AutowiredMethodElement {
+  # inject(Object, String?, PropertyValues?): void
+  - resolveMethodArguments(Method, Object, String?): Object[]?
+  - resolveCachedArguments(String?): Object[]?
+}
+class InjectedElement {
+  # inject(Object, String?, PropertyValues?): void
+  # checkPropertySkipping(PropertyValues?): boolean
+}
+
+AutowiredMethodElement  -[#000082,plain]-^  InjectedElement
+@enduml

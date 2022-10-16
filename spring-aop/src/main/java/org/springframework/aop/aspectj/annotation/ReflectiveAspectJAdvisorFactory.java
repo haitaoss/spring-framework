@@ -138,7 +138,7 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
         // 校验一下，简单来说就是类得有 @Aspect 注解
         validate(aspectClass);
 
-        // 记录当前切面类的元数据。
+        // 记录当前切面类的元数据。后面排序Advisor的时候 是根据@Aspect这个切面类来排序的
         // We need to wrap the MetadataAwareAspectInstanceFactory with a decorator
         // so that it will only instantiate once.
         MetadataAwareAspectInstanceFactory lazySingletonAspectInstanceFactory = new LazySingletonAspectInstanceFactoryDecorator(aspectInstanceFactory);

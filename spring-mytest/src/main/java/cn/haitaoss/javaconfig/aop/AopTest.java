@@ -3,7 +3,11 @@ package cn.haitaoss.javaconfig.aop;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.*;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.stereotype.Component;
+
+import java.util.Arrays;
 
 
 /**
@@ -11,11 +15,16 @@ import org.springframework.stereotype.Component;
  * email haitaoss@aliyun.com
  * date 2022-09-14 21:08
  */
-/*@EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)
-@Component*/
+@EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)
+@Component
 public class AopTest {
     public AopTest() {
         System.out.println("AopTest 构造器");
+    }
+
+    public static void main(String[] args) {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AopTest.class);
+        System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
     }
 
     @Aspect

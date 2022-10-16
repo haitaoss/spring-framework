@@ -1,0 +1,22 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class InjectedElement {
+  # inject(Object, String?, PropertyValues?): void
+  # getResourceToInject(Object, String?): Object?
+}
+class LookupElement {
+  + getLookupType(): Class<?>
+  + getDependencyDescriptor(): DependencyDescriptor
+  + getName(): String
+}
+class ResourceElement {
+  # getResourceToInject(Object, String?): Object?
+}
+
+LookupElement    -[#000082,plain]-^  InjectedElement
+ResourceElement  -[#000082,plain]-^  LookupElement
+@enduml

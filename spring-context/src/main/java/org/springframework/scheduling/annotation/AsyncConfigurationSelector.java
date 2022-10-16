@@ -33,26 +33,26 @@ import org.springframework.lang.Nullable;
  */
 public class AsyncConfigurationSelector extends AdviceModeImportSelector<EnableAsync> {
 
-	private static final String ASYNC_EXECUTION_ASPECT_CONFIGURATION_CLASS_NAME =
-			"org.springframework.scheduling.aspectj.AspectJAsyncConfiguration";
+    private static final String ASYNC_EXECUTION_ASPECT_CONFIGURATION_CLASS_NAME =
+            "org.springframework.scheduling.aspectj.AspectJAsyncConfiguration";
 
 
-	/**
-	 * Returns {@link ProxyAsyncConfiguration} or {@code AspectJAsyncConfiguration}
-	 * for {@code PROXY} and {@code ASPECTJ} values of {@link EnableAsync#mode()},
-	 * respectively.
-	 */
-	@Override
-	@Nullable
-	public String[] selectImports(AdviceMode adviceMode) {
-		switch (adviceMode) {
-			case PROXY:
-				return new String[] {ProxyAsyncConfiguration.class.getName()};
-			case ASPECTJ:
-				return new String[] {ASYNC_EXECUTION_ASPECT_CONFIGURATION_CLASS_NAME};
-			default:
-				return null;
-		}
-	}
+    /**
+     * Returns {@link ProxyAsyncConfiguration} or {@code AspectJAsyncConfiguration}
+     * for {@code PROXY} and {@code ASPECTJ} values of {@link EnableAsync#mode()},
+     * respectively.
+     */
+    @Override
+    @Nullable
+    public String[] selectImports(AdviceMode adviceMode) {
+        switch (adviceMode) {
+            case PROXY:
+                return new String[]{ProxyAsyncConfiguration.class.getName()};
+            case ASPECTJ:
+                return new String[]{ASYNC_EXECUTION_ASPECT_CONFIGURATION_CLASS_NAME};
+            default:
+                return null;
+        }
+    }
 
 }

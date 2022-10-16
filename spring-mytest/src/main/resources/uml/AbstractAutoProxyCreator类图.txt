@@ -4,48 +4,23 @@
 top to bottom direction
 skinparam linetype ortho
 
-interface BeanPostProcessor << interface >> {
-  + postProcessAfterInitialization(Object, String): Object?
-}
-interface InstantiationAwareBeanPostProcessor << interface >> {
-  + postProcessBeforeInstantiation(Class<?>, String): Object?
-}
-interface SmartInstantiationAwareBeanPostProcessor << interface >> {
-  + getEarlyBeanReference(Object, String): Object
-}
 class AbstractAdvisorAutoProxyCreator {
-  # isEligibleAdvisorBean(String): boolean
-  + setBeanFactory(BeanFactory): void
-  # findAdvisorsThatCanApply(List<Advisor>, Class<?>, String): List<Advisor>
-  # sortAdvisors(List<Advisor>): List<Advisor>
-  # extendAdvisors(List<Advisor>): void
-  # getAdvicesAndAdvisorsForBean(Class<?>, String, TargetSource?): Object[]?
-  # initBeanFactory(ConfigurableListableBeanFactory): void
-  # findEligibleAdvisors(Class<?>, String): List<Advisor>
   # findCandidateAdvisors(): List<Advisor>
-}
-class AbstractAutoProxyCreator {
+  # isEligibleAdvisorBean(String): boolean
+  # findAdvisorsThatCanApply(List<Advisor>, Class<?>, String): List<Advisor>
+  # extendAdvisors(List<Advisor>): void
+  # initBeanFactory(ConfigurableListableBeanFactory): void
+  # getAdvicesAndAdvisorsForBean(Class<?>, String, TargetSource?): Object[]?
   + setBeanFactory(BeanFactory): void
-  + postProcessBeforeInstantiation(Class<?>, String): Object?
-  + getEarlyBeanReference(Object, String): Object
-  + postProcessAfterInitialization(Object?, String): Object?
-  # getCustomTargetSource(Class<?>, String): TargetSource?
-  + setApplyCommonInterceptorsFirst(boolean): void
-  # customizeProxyFactory(ProxyFactory): void
- # createProxy(Class<?>, String?, Object[]?, TargetSource): Object
- # buildAdvisors(String?, Object[]?): Advisor[]
-  # wrapIfNecessary(Object, String, Object): Object
-  # isInfrastructureClass(Class<?>): boolean
-  # shouldSkip(Class<?>, String): boolean
-  # shouldProxyTargetClass(Class<?>, String?): boolean
+  # findEligibleAdvisors(Class<?>, String): List<Advisor>
+  # sortAdvisors(List<Advisor>): List<Advisor>
 }
 class AnnotationAwareAspectJAutoProxyCreator {
-  + setIncludePatterns(List<String>): void
-  + setAspectJAdvisorFactory(AspectJAdvisorFactory): void
-  # initBeanFactory(ConfigurableListableBeanFactory): void
   # findCandidateAdvisors(): List<Advisor>
-  # isInfrastructureClass(Class<?>): boolean
+  + setAspectJAdvisorFactory(AspectJAdvisorFactory): void
   # isEligibleAspectBean(String): boolean
+  # initBeanFactory(ConfigurableListableBeanFactory): void
+  # isInfrastructureClass(Class<?>): boolean
 }
 class AspectJAwareAdvisorAutoProxyCreator {
   # shouldSkip(Class<?>, String): boolean
@@ -55,24 +30,25 @@ class AspectJAwareAdvisorAutoProxyCreator {
 interface BeanFactoryAware << interface >> {
   + setBeanFactory(BeanFactory): void
 }
-
+interface BeanPostProcessor << interface >> {
+  + postProcessAfterInitialization(Object, String): Object?
+}
 class DefaultAdvisorAutoProxyCreator {
-  + isUsePrefix(): boolean
-  + setAdvisorBeanNamePrefix(String?): void
-  + setBeanName(String): void
   # isEligibleAdvisorBean(String): boolean
-  + setUsePrefix(boolean): void
-  + getAdvisorBeanNamePrefix(): String?
 }
 class InfrastructureAdvisorAutoProxyCreator {
   # initBeanFactory(ConfigurableListableBeanFactory): void
   # isEligibleAdvisorBean(String): boolean
 }
+interface InstantiationAwareBeanPostProcessor << interface >> {
+  + postProcessBeforeInstantiation(Class<?>, String): Object?
+}
+interface SmartInstantiationAwareBeanPostProcessor << interface >> {
+  + getEarlyBeanReference(Object, String): Object
+}
 
-
-AbstractAdvisorAutoProxyCreator           -[#000082,plain]-^  AbstractAutoProxyCreator
-AbstractAutoProxyCreator                  -[#008200,dashed]-^  BeanFactoryAware
-AbstractAutoProxyCreator                  -[#008200,dashed]-^  SmartInstantiationAwareBeanPostProcessor
+AbstractAdvisorAutoProxyCreator           -[#008200,dashed]-^  BeanFactoryAware
+AbstractAdvisorAutoProxyCreator           -[#008200,dashed]-^  SmartInstantiationAwareBeanPostProcessor
 AnnotationAwareAspectJAutoProxyCreator    -[#000082,plain]-^  AspectJAwareAdvisorAutoProxyCreator
 AspectJAwareAdvisorAutoProxyCreator       -[#000082,plain]-^  AbstractAdvisorAutoProxyCreator
 DefaultAdvisorAutoProxyCreator            -[#000082,plain]-^  AbstractAdvisorAutoProxyCreator

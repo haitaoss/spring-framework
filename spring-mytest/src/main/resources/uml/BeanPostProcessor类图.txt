@@ -1,0 +1,35 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+interface BeanPostProcessor << interface >> {
+  + postProcessBeforeInitialization(Object, String): Object?
+  + postProcessAfterInitialization(Object, String): Object?
+}
+interface DestructionAwareBeanPostProcessor << interface >> {
+  + postProcessBeforeDestruction(Object, String): void
+  + requiresDestruction(Object): boolean
+}
+interface InstantiationAwareBeanPostProcessor << interface >> {
+  + postProcessAfterInstantiation(Object, String): boolean
+  + postProcessProperties(PropertyValues, Object, String): PropertyValues?
+  + postProcessPropertyValues(PropertyValues, PropertyDescriptor[], Object, String): PropertyValues?
+  + postProcessBeforeInstantiation(Class<?>, String): Object?
+}
+interface MergedBeanDefinitionPostProcessor << interface >> {
+  + postProcessMergedBeanDefinition(RootBeanDefinition, Class<?>, String): void
+  + resetBeanDefinition(String): void
+}
+interface SmartInstantiationAwareBeanPostProcessor << interface >> {
+  + predictBeanType(Class<?>, String): Class<?>?
+  + determineCandidateConstructors(Class<?>, String): Constructor<?>[]?
+  + getEarlyBeanReference(Object, String): Object
+}
+
+DestructionAwareBeanPostProcessor         -[#008200,plain]-^  BeanPostProcessor
+InstantiationAwareBeanPostProcessor       -[#008200,plain]-^  BeanPostProcessor
+MergedBeanDefinitionPostProcessor         -[#008200,plain]-^  BeanPostProcessor
+SmartInstantiationAwareBeanPostProcessor  -[#008200,plain]-^  InstantiationAwareBeanPostProcessor
+@enduml

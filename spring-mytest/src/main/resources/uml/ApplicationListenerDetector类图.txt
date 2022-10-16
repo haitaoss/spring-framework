@@ -1,0 +1,26 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class ApplicationListenerDetector {
+  + postProcessBeforeDestruction(Object, String): void
+  + postProcessMergedBeanDefinition(RootBeanDefinition, Class<?>, String): void
+  + postProcessAfterInitialization(Object, String): Object?
+}
+interface BeanPostProcessor << interface >> {
+  + postProcessAfterInitialization(Object, String): Object?
+}
+interface DestructionAwareBeanPostProcessor << interface >> {
+  + postProcessBeforeDestruction(Object, String): void
+}
+interface MergedBeanDefinitionPostProcessor << interface >> {
+  + postProcessMergedBeanDefinition(RootBeanDefinition, Class<?>, String): void
+}
+
+ApplicationListenerDetector        -[#008200,dashed]-^  DestructionAwareBeanPostProcessor
+ApplicationListenerDetector        -[#008200,dashed]-^  MergedBeanDefinitionPostProcessor
+DestructionAwareBeanPostProcessor  -[#008200,plain]-^  BeanPostProcessor
+MergedBeanDefinitionPostProcessor  -[#008200,plain]-^  BeanPostProcessor
+@enduml

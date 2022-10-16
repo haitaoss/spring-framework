@@ -1,0 +1,46 @@
+@startuml
+
+top to bottom direction
+skinparam linetype ortho
+
+class AdviceModeImportSelector<A> {
+  + DEFAULT_ADVICE_MODE_ATTRIBUTE_NAME: String
+  + selectImports(AnnotationMetadata): String[]
+  # selectImports(AdviceMode): String[]?
+  # getAdviceModeAttributeName(): String
+}
+interface Annotation << interface >> {
+  + annotationType(): Class<Annotation>
+  + equals(Object): boolean
+  + hashCode(): int
+  + toString(): String
+}
+class AsyncConfigurationSelector {
+  - ASYNC_EXECUTION_ASPECT_CONFIGURATION_CLASS_NAME: String
+  + selectImports(AdviceMode): String[]?
+}
+class CachingConfigurationSelector {
+  - PROXY_JCACHE_CONFIGURATION_CLASS: String
+  - jcacheImplPresent: boolean
+  - CACHE_ASPECT_CONFIGURATION_CLASS_NAME: String
+  - JCACHE_ASPECT_CONFIGURATION_CLASS_NAME: String
+  - jsr107Present: boolean
+  - getAspectJImports(): String[]
+  - getProxyImports(): String[]
+  + selectImports(AdviceMode): String[]?
+}
+interface ImportSelector << interface >> {
+  + selectImports(AnnotationMetadata): String[]
+  + getExclusionFilter(): Predicate<String>?
+}
+class TransactionManagementConfigurationSelector {
+  # selectImports(AdviceMode): String[]?
+  - determineTransactionAspectClass(): String
+}
+
+Annotation <--   AdviceModeImportSelector
+ImportSelector  ^--   AdviceModeImportSelector
+AdviceModeImportSelector  ^--   AsyncConfigurationSelector
+AdviceModeImportSelector  ^--   CachingConfigurationSelector
+AdviceModeImportSelector  ^--   TransactionManagementConfigurationSelector
+@enduml

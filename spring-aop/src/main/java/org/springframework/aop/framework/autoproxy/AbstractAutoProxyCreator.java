@@ -598,6 +598,7 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport imp
          *      {@link AdvisedSupport#validateIntroductionAdvisor(IntroductionAdvisor)}
          *      {@link AdvisedSupport#validateIntroductionAdvisor(IntroductionAdvisor)}
          *          就是会拿到Advisor的接口信息{@link IntroductionInfo#getInterfaces()}设置到proxyFactory中
+         *          注意，这里是会校验 是否是接口的，防止你乱搞 {@link AdvisedSupport#addInterface(Class)}
          *
          * 实例代码 {@link cn.haitaoss.javaconfig.aop.AopTest3.AspectDemo3}
          *      ((AopTest3.MyIntroduction)(context.getBean(AopTest3.AopDemo.class))).test1();
@@ -644,14 +645,19 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport imp
          *      Enhancer enhancer = new Enhancer();
          *      enhancer.setCallbacks({@link CglibAopProxy#getCallbacks(Class)}); // 执行方法会回调callback
          *          注：会设置  `new DynamicAdvisedInterceptor(this.advised);` callback，this 就是 ObjenesisCglibAopProxy，而其{@link CglibAopProxy#advised}属性 其实就是 ProxyFactory 从而可以拿到Advisors
-         *      enhancer.setCallbackFilter(ProxyCallbackFilter); // 返回要执行的 callback 的索引
+         *      enhancer.setCallbackFilter(ProxyCallbackFilter);
+         *          返回要执行的 callback 的索引。在Cglib生成代理对象的字节码时会调CallbackFilter，来设置好每个方法的Callback是啥
+         *          设置这个属性，生成cglib生成的代理对象字节码，一看就知道了。`System.setProperty(DebuggingClassWriter.DEBUG_LOCATION_PROPERTY, "C:\\Users\\RDS\\Desktop\\1");`
          *
          *      执行代理对象的方式时会执行 {@link CglibAopProxy.ProxyCallbackFilter#accept(Method)}
          *          就是 除了 finalize、equals、hashcode 等，都会执行 DynamicAdvisedInterceptor 这个callback
          *      也就是执行 {@link CglibAopProxy.DynamicAdvisedInterceptor#intercept(Object, Method, Object[], MethodProxy)}
          *          1. exposeProxy 属性是 true，往 ThreadLocal中记录当前代理对象  `oldProxy=AopContext.setCurrentProxy(proxy)`
          *          2. 获取被代理对象 {@link TargetSource#getTarget()}。这里也是很细节，
-         *              比如：TargetSource实例是这个类型的 {@link AbstractBeanFactoryBasedTargetSource}，所以每次获取target都是从IOC容器中拿，也就是说 如果bean是多例的，每次执行都会创建出新的对象。
+         *              比如：
+         *                  - TargetSource实例是这个类型的 {@link AbstractBeanFactoryBasedTargetSource}，所以每次获取target都是从IOC容器中拿，也就是说 如果bean是多例的，每次执行都会创建出新的对象。(@Lazy就是这么实现的)
+         *  *               - 而 Spring Aop，使用的是SingletonTargetSource，特点是将容器的对象缓存了，执行 `getTarget` 才能拿到被代理对象
+         *  *
          *          3. 根据method得到对应的拦截器链 {@link AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice(Method, Class)}
          *              拦截器链是空：反射执行
          *              拦截器链不是空：将拦截器链装饰成 CglibMethodInvocation ，然后执行{@link CglibAopProxy.CglibMethodInvocation#proceed()}，其实就是执行其父类 {@link ReflectiveMethodInvocation#proceed()}

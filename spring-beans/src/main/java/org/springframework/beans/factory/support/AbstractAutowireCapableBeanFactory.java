@@ -19,6 +19,7 @@ package org.springframework.beans.factory.support;
 import org.apache.commons.logging.Log;
 import org.springframework.beans.*;
 import org.springframework.beans.factory.*;
+import org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor;
 import org.springframework.beans.factory.config.*;
 import org.springframework.core.*;
 import org.springframework.lang.Nullable;
@@ -504,10 +505,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
         try {
             /**
-             * 通过bean的后置处理器来进行后置处理生成代理对象，一般情况下在此处不会生成代理对象
-             * 为什么不能生成代理对象，不管是我们的jdk代理还是cglib代理都不会在此处进行代理，因为我们的
-             * 真实的对象没有生成，所以在这里不会生成代理对象，那么在这一步是我们ao和事务的关键，因为在这里
-             * 解析我们的aop切面信息进行缓存
+             * 实例化前后置处理器
              * */
             // Give BeanPostProcessors a chance to return a proxy instead of the target bean instance.
             Object bean = resolveBeforeInstantiation(beanName, mbdToUse);
@@ -607,7 +605,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
         // Eagerly cache singletons to be able to resolve circular references
         // even when triggered by lifecycle interfaces like BeanFactoryAware.
         boolean earlySingletonExposure = (mbd.isSingleton() && this.allowCircularReferences
-                                          && isSingletonCurrentlyInCreation(beanName));
+                && isSingletonCurrentlyInCreation(beanName));
         // 上述条件满足，允许中期暴露对象
         if (earlySingletonExposure) {
             if (logger.isTraceEnabled()) {
@@ -664,11 +662,11 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
                     if (!actualDependentBeans.isEmpty()) {
                         throw new BeanCurrentlyInCreationException(beanName,
                                 "Bean with name '" + beanName + "' has been injected into other beans ["
-                                + StringUtils.collectionToCommaDelimitedString(actualDependentBeans)
-                                + "] in its raw version as part of a circular reference, but has eventually been "
-                                + "wrapped. This means that said other beans do not use the final version of the "
-                                + "bean. This is often the result of over-eager type matching - consider using "
-                                + "'getBeanNamesForType' with the 'allowEagerInit' flag turned off, for example.");
+                                        + StringUtils.collectionToCommaDelimitedString(actualDependentBeans)
+                                        + "] in its raw version as part of a circular reference, but has eventually been "
+                                        + "wrapped. This means that said other beans do not use the final version of the "
+                                        + "bean. This is often the result of over-eager type matching - consider using "
+                                        + "'getBeanNamesForType' with the 'allowEagerInit' flag turned off, for example.");
                     }
                 }
             }
@@ -692,10 +690,14 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
         // Apply SmartInstantiationAwareBeanPostProcessors to predict the
         // eventual type after a before-instantiation shortcut.
         if (targetType != null && !mbd.isSynthetic() && hasInstantiationAwareBeanPostProcessors()) {
+            // 只匹配FactoryBean
             boolean matchingOnlyFactoryBean = typesToMatch.length == 1 && typesToMatch[0] == FactoryBean.class;
             for (SmartInstantiationAwareBeanPostProcessor bp : getBeanPostProcessorCache().smartInstantiationAware) {
+                // 调用后置处理器推断类型
                 Class<?> predicted = bp.predictBeanType(targetType, beanName);
+                // 后置处理器返回值不为空
                 if (predicted != null && (!matchingOnlyFactoryBean || FactoryBean.class.isAssignableFrom(predicted))) {
+                    // 返回后置处理器推断的结果
                     return predicted;
                 }
             }
@@ -716,7 +718,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
         Class<?> targetType = mbd.getTargetType();
         if (targetType == null) {
             targetType = (mbd.getFactoryMethodName()
-                          != null ? getTypeForFactoryMethod(beanName, mbd, typesToMatch) : resolveBeanClass(mbd, beanName, typesToMatch));
+                    != null ? getTypeForFactoryMethod(beanName, mbd, typesToMatch) : resolveBeanClass(mbd, beanName, typesToMatch));
             if (ObjectUtils.isEmpty(typesToMatch) || getTempClassLoader() == null) {
                 mbd.resolvedTargetType = targetType;
             }
@@ -778,7 +780,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
             for (Method candidate : candidates) {
                 if (Modifier.isStatic(candidate.getModifiers()) == isStatic && mbd.isFactoryMethod(candidate)
-                    && candidate.getParameterCount() >= minNrOfArgs) {
+                        && candidate.getParameterCount() >= minNrOfArgs) {
                     // Declared type variables to inspect?
                     if (candidate.getTypeParameters().length > 0) {
                         try {
@@ -836,7 +838,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
         // Common return type found: all factory methods return same type. For a non-parameterized
         // unique candidate, cache the full type declaration context of the target factory method.
         cachedReturnType = (uniqueCandidate
-                            != null ? ResolvableType.forMethodReturnType(uniqueCandidate) : ResolvableType.forClass(commonType));
+                != null ? ResolvableType.forMethodReturnType(uniqueCandidate) : ResolvableType.forClass(commonType));
         mbd.factoryMethodReturnType = cachedReturnType;
         return cachedReturnType.resolve();
     }
@@ -887,7 +889,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
                 BeanDefinition factoryBeanDefinition = getBeanDefinition(factoryBeanName);
                 Class<?> factoryBeanClass;
                 if (factoryBeanDefinition instanceof AbstractBeanDefinition
-                    && ((AbstractBeanDefinition) factoryBeanDefinition).hasBeanClass()) {
+                        && ((AbstractBeanDefinition) factoryBeanDefinition).hasBeanClass()) {
                     factoryBeanClass = ((AbstractBeanDefinition) factoryBeanDefinition).getBeanClass();
                 } else {
                     RootBeanDefinition fbmbd = getMergedBeanDefinition(factoryBeanName, factoryBeanDefinition);
@@ -1023,7 +1025,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
                 return (FactoryBean<?>) beanInstance;
             }
             if (isSingletonCurrentlyInCreation(beanName) || (mbd.getFactoryBeanName() != null
-                                                             && isSingletonCurrentlyInCreation(mbd.getFactoryBeanName()))) {
+                    && isSingletonCurrentlyInCreation(mbd.getFactoryBeanName()))) {
                 return null;
             }
 
@@ -1140,14 +1142,13 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
                 if (targetType != null) {
                     /**
                      *
-                     * TODOHAITAO 后置处理器的【第二次】调用总共有九处调用事务在这里不会被调用，aop的才会被调用
-                     * 为啥aop在这里调用了，因为在此处需要解析出对应的切面保存到缓存中
+                     * TODOHAITAO 后置处理器的【第二次】，实例化前
                      * */
                     bean = applyBeanPostProcessorsBeforeInstantiation(targetType, beanName);
                     // 说明生成了代理对象那么我们就调用
                     if (bean != null) {
                         /**
-                         * 该后置处理器若被调用的话，那么第一处的处理器肯定返回的不是 null
+                         * 返回值不会空，执行初始化后后置处理器，因为这个bean已经算是创建完了，在执行初始化后 就ok了
                          * */
                         bean = applyBeanPostProcessorsAfterInitialization(bean, beanName);
                     }
@@ -1155,6 +1156,10 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
             }
             mbd.beforeInstantiationResolved = (bean != null);
         }
+        /**
+         * 返回值不是null，说明不需要执行后面的 推断构造器、属性填充、初始化等操作。
+         * 也就是bean已经创建好了，可以直接返回了
+         * */
         return bean;
     }
 
@@ -1219,6 +1224,9 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
          * */
         Supplier<?> instanceSupplier = mbd.getInstanceSupplier();
         if (instanceSupplier != null) {
+            /**
+             * 注：会导致@Lookup和replaced-method失效
+             * */
             return obtainFromSupplier(instanceSupplier, beanName);
         }
 
@@ -1231,6 +1239,13 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
          * }
          * */
         if (mbd.getFactoryMethodName() != null) {
+            /**
+             * 就是先创建工厂bean `getBean(factoryBeanName)`
+             * 在通过实例化策略 实例化当前bean {@link InstantiationStrategy#instantiate(RootBeanDefinition, String, BeanFactory, Object, Method, Object...)}
+             * 这个策略很简单，直接反射调用 @Bean标注的方法而已。
+             *
+             * 注：会导致@Lookup和replaced-method失效
+             * */
             return instantiateUsingFactoryMethod(beanName, mbd, args);
         }
 
@@ -1266,7 +1281,13 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
                 // 通过有参的构造函数进行反射调用
                 return autowireConstructor(beanName, mbd, null, null);
             } else {
-                // 调用无参数的构造函数进行创建对象
+                /**
+                 * 会判断是否使用Cglib创建代理对象,还是反射进行实例化。
+                 * 主要是根据这个属性是否有值{@link org.springframework.beans.factory.support.AbstractBeanDefinition#methodOverrides}来判断的。
+                 * 而这个属性是在解析@Lookup注解或者replaced-method replaced-method 设置的：
+                 *  - @Lookup {@link AutowiredAnnotationBeanPostProcessor#determineCandidateConstructors(Class, String)}
+                 *  - replaced-method {@link org.springframework.beans.factory.xml.BeanDefinitionParserDelegate#parseReplacedMethodSubElements}
+                 * */
                 return instantiateBean(beanName, mbd);
             }
         }
@@ -1284,7 +1305,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
          * 则使用自定义的构造器初始化
          * */
         if (ctors != null || mbd.getResolvedAutowireMode() == AUTOWIRE_CONSTRUCTOR || mbd.hasConstructorArgumentValues()
-            || !ObjectUtils.isEmpty(args)) {
+                || !ObjectUtils.isEmpty(args)) {
             // 通过构造函数创建对象
             return autowireConstructor(beanName, mbd, ctors, args);
         }
@@ -1295,7 +1316,13 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
             return autowireConstructor(beanName, mbd, ctors, null);
         }
 
-        // 使用无参数的构造函数调用创建对象
+        /**
+         * 会判断是否使用Cglib创建代理对象,还是反射进行实例化。
+         * 主要是根据这个属性是否有值{@link org.springframework.beans.factory.support.AbstractBeanDefinition#methodOverrides}来判断的。
+         * 而这个属性是在解析@Lookup注解或者replaced-method replaced-method 设置的：
+         *  - @Lookup {@link AutowiredAnnotationBeanPostProcessor#determineCandidateConstructors(Class, String)}
+         *  - replaced-method {@link org.springframework.beans.factory.xml.BeanDefinitionParserDelegate#parseReplacedMethodSubElements}
+         * */
         // No special handling: simply use no-arg constructor.
         return instantiateBean(beanName, mbd);
     }
@@ -1378,6 +1405,8 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
     }
 
     /**
+     * 实例化Bean，会使用 InstantiationStrategy 来实例化bean
+     *
      * Instantiate the given bean using its default constructor.
      * @param beanName the name of the bean
      * @param mbd the bean definition for the bean
@@ -1501,11 +1530,19 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
             // 根据bean的属性名称注入
             // Add property values based on autowire by name if applicable.
             if (resolvedAutowireMode == AUTOWIRE_BY_NAME) {
+                /**
+                 * 这里主要是会判断 有没有 {@link BeanWrapper#getPropertyDescriptor(String)} 是要给 {@link AbstractAutowireCapableBeanFactory#ignoredDependencyInterfaces}
+                 * 的接口方法设置值的，排除掉这些 PropertyDescriptor。
+                 * */
                 autowireByName(beanName, mbd, bw, newPvs);
             }
             // 根据bean的类型进行注入
             // Add property values based on autowire by type if applicable.
             if (resolvedAutowireMode == AUTOWIRE_BY_TYPE) {
+                /**
+                 * 这里主要是会判断 有没有 {@link BeanWrapper#getPropertyDescriptor(String)} 是要给 {@link AbstractAutowireCapableBeanFactory#ignoredDependencyInterfaces}
+                 * 的接口方法设置值的，排除掉这些 PropertyDescriptor。
+                 * */
                 autowireByType(beanName, mbd, bw, newPvs);
             }
             // 把处理过的属性覆盖原来的
@@ -1530,7 +1567,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
             for (InstantiationAwareBeanPostProcessor bp : getBeanPostProcessorCache().instantiationAware) {
                 /**
                  * TODOHAITAO 后置处理器的【第六次】InstantiationAwareBeanPostProcessor#postProcessProperties
-                 * @see cn.haitaoss.javaconfig.beanpostprocessor.MyInstantiationAwareBeanPostProcessor#postProcessProperties(PropertyValues, Object, String)
+                 * 进行字段和方法的依赖注入{@link cn.haitaoss.javaconfig.beanpostprocessor.MyInstantiationAwareBeanPostProcessor#postProcessProperties(PropertyValues, Object, String)}
                  */
                 PropertyValues pvsToUse = bp.postProcessProperties(pvs, bw.getWrappedInstance(), beanName);
                 if (pvsToUse == null) {
@@ -1589,12 +1626,12 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
                 if (logger.isTraceEnabled()) {
                     logger.trace(
                             "Added autowiring by name from bean name '" + beanName + "' via property '" + propertyName
-                            + "' to bean named '" + propertyName + "'");
+                                    + "' to bean named '" + propertyName + "'");
                 }
             } else {
                 if (logger.isTraceEnabled()) {
                     logger.trace("Not autowiring property '" + propertyName + "' of bean '" + beanName
-                                 + "' by name: no matching bean found");
+                            + "' by name: no matching bean found");
                 }
             }
         }
@@ -1639,7 +1676,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
                         if (logger.isTraceEnabled()) {
                             logger.trace(
                                     "Autowiring by type from bean name '" + beanName + "' via property '" + propertyName
-                                    + "' to bean named '" + autowiredBeanName + "'");
+                                            + "' to bean named '" + autowiredBeanName + "'");
                         }
                     }
                     autowiredBeanNames.clear();
@@ -1665,8 +1702,16 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
         PropertyValues pvs = mbd.getPropertyValues();
         PropertyDescriptor[] pds = bw.getPropertyDescriptors();
         for (PropertyDescriptor pd : pds) {
+            /**
+             * isExcludedFromDependencyCheck 会使用属性 {@link AbstractAutowireCapableBeanFactory#ignoredDependencyInterfaces} 判断
+             * PropertyDescriptor 是想给忽略的依赖设置值，就不要记录，排除掉。
+             *
+             * 注：
+             *  - PropertyDescriptor 描述的是 get、set方法。比如XxxAware接口的set方法，不应该通过PropertyDescriptor设置值，而是通过ApplicationContextAwareProcessor这个后置处理器回调设置的
+             *  - 在这里设置的忽略依赖 {@link org.springframework.context.support.AbstractApplicationContext#prepareBeanFactory(ConfigurableListableBeanFactory)}
+             * */
             if (pd.getWriteMethod() != null && !isExcludedFromDependencyCheck(pd) && !pvs.contains(pd.getName())
-                && !BeanUtils.isSimpleProperty(pd.getPropertyType())) {
+                    && !BeanUtils.isSimpleProperty(pd.getPropertyType())) {
                 result.add(pd.getName());
             }
         }
@@ -1710,6 +1755,8 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
     }
 
     /**
+     * PropertyDescriptor 是 忽略依赖的，就返回true。含义就是不能通过 PropertyDescriptor 给忽略依赖设置值，
+     * 因为这个值是通过ApplicationContextAwareProcessor设置的
      * Determine whether the given bean property is excluded from dependency checks.
      * <p>This implementation excludes properties defined by CGLIB and
      * properties whose type matches an ignored dependency type or which
@@ -1742,10 +1789,10 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
             if (pd.getWriteMethod() != null && (pvs == null || !pvs.contains(pd.getName()))) {
                 boolean isSimple = BeanUtils.isSimpleProperty(pd.getPropertyType());
                 boolean unsatisfied = (dependencyCheck == AbstractBeanDefinition.DEPENDENCY_CHECK_ALL) || (isSimple &&
-                                                                                                           dependencyCheck
-                                                                                                           == AbstractBeanDefinition.DEPENDENCY_CHECK_SIMPLE)
-                                      || (!isSimple
-                                          && dependencyCheck == AbstractBeanDefinition.DEPENDENCY_CHECK_OBJECTS);
+                        dependencyCheck
+                                == AbstractBeanDefinition.DEPENDENCY_CHECK_SIMPLE)
+                        || (!isSimple
+                        && dependencyCheck == AbstractBeanDefinition.DEPENDENCY_CHECK_OBJECTS);
                 if (unsatisfied) {
                     throw new UnsatisfiedDependencyException(mbd.getResourceDescription(), beanName, pd.getName(), "Set this property value or disable dependency checking for this bean.");
                 }
@@ -1816,7 +1863,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
                 Object resolvedValue = valueResolver.resolveValueIfNecessary(pv, originalValue);
                 Object convertedValue = resolvedValue;
                 boolean convertible = bw.isWritableProperty(propertyName)
-                                      && !PropertyAccessorUtils.isNestedOrIndexedProperty(propertyName);
+                        && !PropertyAccessorUtils.isNestedOrIndexedProperty(propertyName);
                 if (convertible) {
                     convertedValue = convertForProperty(resolvedValue, propertyName, bw, converter);
                 }
@@ -1828,8 +1875,8 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
                     }
                     deepCopy.add(pv);
                 } else if (convertible && originalValue instanceof TypedStringValue
-                           && !((TypedStringValue) originalValue).isDynamic() && !(convertedValue instanceof Collection
-                                                                                   || ObjectUtils.isArray(convertedValue))) {
+                        && !((TypedStringValue) originalValue).isDynamic() && !(convertedValue instanceof Collection
+                        || ObjectUtils.isArray(convertedValue))) {
                     pv.setConvertedValue(convertedValue);
                     deepCopy.add(pv);
                 } else {
@@ -1905,7 +1952,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
             invokeInitMethods(beanName, wrappedBean, mbd);
         } catch (Throwable ex) {
             throw new BeanCreationException((mbd
-                                             != null ? mbd.getResourceDescription() : null), beanName, "Invocation of init method failed", ex);
+                    != null ? mbd.getResourceDescription() : null), beanName, "Invocation of init method failed", ex);
         }
         // 初始化后
         if (mbd == null || !mbd.isSynthetic()) {
@@ -1975,8 +2022,8 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
              */
             String initMethodName = mbd.getInitMethodName();
             if (StringUtils.hasLength(initMethodName) && !(isInitializingBean
-                                                           && "afterPropertiesSet".equals(initMethodName))
-                && !mbd.isExternallyManagedInitMethod(initMethodName)) {
+                    && "afterPropertiesSet".equals(initMethodName))
+                    && !mbd.isExternallyManagedInitMethod(initMethodName)) {
                 invokeCustomInitMethod(beanName, bean, mbd);
             }
         }
@@ -1999,12 +2046,12 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
             if (mbd.isEnforceInitMethod()) {
                 throw new BeanDefinitionValidationException(
                         "Could not find an init method named '" + initMethodName + "' on bean with name '" + beanName
-                        + "'");
+                                + "'");
             } else {
                 if (logger.isTraceEnabled()) {
                     logger.trace(
                             "No default init method named '" + initMethodName + "' found on bean with name '" + beanName
-                            + "'");
+                                    + "'");
                 }
                 // Ignore non-existent default lifecycle methods.
                 return;
@@ -2131,7 +2178,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
         private boolean isFactoryBeanMethod(Method method) {
             return (method.getName()
-                            .equals(this.factoryMethodName)
+                    .equals(this.factoryMethodName)
                     && FactoryBean.class.isAssignableFrom(method.getReturnType()));
         }
 

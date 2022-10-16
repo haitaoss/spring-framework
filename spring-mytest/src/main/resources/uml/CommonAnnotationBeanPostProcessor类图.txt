@@ -1,0 +1,39 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+interface BeanPostProcessor << interface >> {
+  + postProcessBeforeInitialization(Object, String): Object?
+}
+class CommonAnnotationBeanPostProcessor {
+  + postProcessPropertyValues(PropertyValues, PropertyDescriptor[], Object, String): PropertyValues?
+  + postProcessProperties(PropertyValues, Object, String): PropertyValues?
+  + postProcessMergedBeanDefinition(RootBeanDefinition, Class<?>, String): void
+}
+interface DestructionAwareBeanPostProcessor << interface >> {
+  + postProcessBeforeDestruction(Object, String): void
+  + requiresDestruction(Object): boolean
+}
+class InitDestroyAnnotationBeanPostProcessor {
+  + postProcessBeforeDestruction(Object, String): void
+  + requiresDestruction(Object): boolean
+  + postProcessBeforeInitialization(Object, String): Object?
+}
+interface InstantiationAwareBeanPostProcessor << interface >> {
+  + postProcessPropertyValues(PropertyValues, PropertyDescriptor[], Object, String): PropertyValues?
+  + postProcessProperties(PropertyValues, Object, String): PropertyValues?
+}
+interface MergedBeanDefinitionPostProcessor << interface >> {
+  + postProcessMergedBeanDefinition(RootBeanDefinition, Class<?>, String): void
+}
+
+CommonAnnotationBeanPostProcessor       -[#000082,plain]-^  InitDestroyAnnotationBeanPostProcessor
+CommonAnnotationBeanPostProcessor       -[#008200,dashed]-^  InstantiationAwareBeanPostProcessor
+DestructionAwareBeanPostProcessor       -[#008200,plain]-^  BeanPostProcessor
+InitDestroyAnnotationBeanPostProcessor  -[#008200,dashed]-^  DestructionAwareBeanPostProcessor
+InitDestroyAnnotationBeanPostProcessor  -[#008200,dashed]-^  MergedBeanDefinitionPostProcessor
+InstantiationAwareBeanPostProcessor     -[#008200,plain]-^  BeanPostProcessor
+MergedBeanDefinitionPostProcessor       -[#008200,plain]-^  BeanPostProcessor
+@enduml

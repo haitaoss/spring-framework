@@ -7,7 +7,11 @@ import org.springframework.aop.MethodBeforeAdvice;
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.aop.framework.adapter.DefaultAdvisorAdapterRegistry;
 import org.springframework.aop.support.DefaultPointcutAdvisor;
+import org.springframework.beans.BeanUtils;
+import org.springframework.core.GenericTypeResolver;
 
+import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Optional;
 import java.util.function.BiConsumer;
@@ -25,12 +29,50 @@ import java.util.function.Function;
 public class Demo {
     private String name;
 
+
     public static void main(String[] args) {
         Demo demo = new Demo();
         System.out.println(demo.getName());
         demo.test2();
         Optional.ofNullable(null).ifPresent(item -> {
         });
+    }
+
+    @Test
+    public void test_compoentType(){
+        Object[] objects = {};
+        System.out.println(objects.getClass().getComponentType());
+
+        String[] strings = {};
+        System.out.println(strings.getClass().getComponentType());
+
+
+        System.out.println(Array.newInstance(String.class, 0).getClass());
+    }
+
+    @Test
+    public void test构造器工具类() {
+        Constructor<Demo> primaryConstructor = BeanUtils.findPrimaryConstructor(Demo.class);
+        System.out.println("primaryConstructor = " + primaryConstructor);
+    }
+
+    interface interfaceA<T> {
+    }
+
+    @Test
+    public void test泛型接口工具() {
+        {
+            class A<T> {
+            }
+            class B extends A<String> implements interfaceA<Integer> {
+            }
+
+            Class<?> t1 = GenericTypeResolver.resolveTypeArgument(B.class, A.class);
+            System.out.println(t1);
+
+            Class<?> t2 = GenericTypeResolver.resolveTypeArgument(B.class, interfaceA.class);
+            System.out.println(t2);
+        }
     }
 
     @Test

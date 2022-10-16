@@ -312,6 +312,12 @@ final class PostProcessorRegistrationDelegate {
         sortPostProcessors(internalPostProcessors, beanFactory);
         registerBeanPostProcessors(beanFactory, internalPostProcessors);
 
+        /**
+         * 重新注册ApplicationListenerDetector, 因为在这里会注册一次 {@link AbstractApplicationContext#prepareBeanFactory(ConfigurableListableBeanFactory)}
+         *
+         * ApplicationListenerDetector 是在 初始化后后置处理阶段 将 ApplicationListener 类型的bean ，将其设置到事件关播器中
+         * `this.applicationContext.addApplicationListener((ApplicationListener<?>) bean);`
+         * */
         // Re-register post-processor for detecting inner beans as ApplicationListeners,
         // moving it to the end of the processor chain (for picking up proxies etc).
         beanFactory.addBeanPostProcessor(new ApplicationListenerDetector(applicationContext));
@@ -401,11 +407,11 @@ final class PostProcessorRegistrationDelegate {
         @Override
         public Object postProcessAfterInitialization(Object bean, String beanName) {
             if (!(bean instanceof BeanPostProcessor) && !isInfrastructureBean(beanName)
-                && this.beanFactory.getBeanPostProcessorCount() < this.beanPostProcessorTargetCount) {
+                    && this.beanFactory.getBeanPostProcessorCount() < this.beanPostProcessorTargetCount) {
                 if (logger.isInfoEnabled()) {
                     logger.info("Bean '" + beanName + "' of type [" + bean.getClass()
                             .getName() + "] is not eligible for getting processed by all BeanPostProcessors "
-                                + "(for example: not eligible for auto-proxying)");
+                            + "(for example: not eligible for auto-proxying)");
                 }
             }
             return bean;

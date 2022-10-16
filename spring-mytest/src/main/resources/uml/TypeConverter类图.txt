@@ -1,0 +1,122 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+interface ConfigurableConversionService << interface >>
+interface ConversionService << interface >> {
+  + canConvert(Class<?>?, Class<?>): boolean
+  + canConvert(TypeDescriptor?, TypeDescriptor): boolean
+  + convert(Object?, Class<T>): T?
+  + convert(Object?, TypeDescriptor?, TypeDescriptor): Object?
+}
+class CustomEditorConfigurer {
+  - propertyEditorRegistrars: PropertyEditorRegistrar[]?
+  - customEditors: Map<Class<?>, Class<PropertyEditor>>?
+  - order: int
+  + postProcessBeanFactory(ConfigurableListableBeanFactory): void
+   order: int
+   customEditors: Map<Class<?>, Class<PropertyEditor>>
+   propertyEditorRegistrars: PropertyEditorRegistrar[]
+}
+class DefaultConversionService {
+  - sharedInstance: DefaultConversionService?
+  - addScalarConverters(ConverterRegistry): void
+  + addCollectionConverters(ConverterRegistry): void
+  + addDefaultConverters(ConverterRegistry): void
+   sharedInstance: ConversionService
+}
+class GenericConversionService {
+  + toString(): String
+  - assertNotPrimitiveTargetType(TypeDescriptor?, TypeDescriptor): void
+  - handleResult(TypeDescriptor?, TypeDescriptor, Object?): Object?
+  - handleConverterNotFound(Object?, TypeDescriptor?, TypeDescriptor): Object?
+  + addConverter(GenericConverter): void
+  # getDefaultConverter(TypeDescriptor, TypeDescriptor): GenericConverter?
+  + addConverter(Class<S>, Class<T>, Converter<S, T>): void
+  + convert(Object?, Class<T>): T?
+  + addConverterFactory(ConverterFactory<?, ?>): void
+  + convert(Object?, TypeDescriptor): Object?
+  + canConvert(Class<?>?, Class<?>): boolean
+  + canBypassConvert(TypeDescriptor?, TypeDescriptor): boolean
+  # convertNullSource(TypeDescriptor?, TypeDescriptor): Object?
+  + removeConvertible(Class<?>, Class<?>): void
+  # getConverter(TypeDescriptor, TypeDescriptor): GenericConverter?
+  + canConvert(TypeDescriptor?, TypeDescriptor): boolean
+  + convert(Object?, TypeDescriptor?, TypeDescriptor): Object?
+  - invalidateCache(): void
+  + addConverter(Converter<?, ?>): void
+  - getRequiredTypeInfo(Class<?>, Class<?>): ResolvableType[]?
+}
+interface GenericConverter << interface >> {
+  + convert(Object?, TypeDescriptor, TypeDescriptor): Object?
+   convertibleTypes: Set<ConvertiblePair>?
+}
+interface PropertyEditor << interface >> {
+  + addPropertyChangeListener(PropertyChangeListener): void
+  + paintValue(Graphics, Rectangle): void
+  + removePropertyChangeListener(PropertyChangeListener): void
+  + supportsCustomEditor(): boolean
+   asText: String
+   customEditor: Component
+   javaInitializationString: String
+   value: Object
+   tags: String[]
+   paintable: boolean
+}
+interface PropertyEditorRegistrar << interface >> {
+  + registerCustomEditors(PropertyEditorRegistry): void
+}
+interface PropertyEditorRegistry << interface >> {
+  + registerCustomEditor(Class<?>, PropertyEditor): void
+  + findCustomEditor(Class<?>?, String?): PropertyEditor?
+  + registerCustomEditor(Class<?>?, String?, PropertyEditor): void
+}
+class PropertyEditorRegistrySupport {
+  - conversionService: ConversionService?
+  + hasCustomEditorForElement(Class<?>?, String?): boolean
+  + overrideDefaultEditor(Class<?>, PropertyEditor): void
+  + findCustomEditor(Class<?>?, String?): PropertyEditor?
+  # copyDefaultEditorsTo(PropertyEditorRegistrySupport): void
+  + registerCustomEditor(Class<?>?, String?, PropertyEditor): void
+  - getCustomEditor(String, Class<?>?): PropertyEditor?
+  - getCustomEditor(Class<?>?): PropertyEditor?
+  + registerCustomEditor(Class<?>, PropertyEditor): void
+  # registerDefaultEditors(): void
+  + getDefaultEditor(Class<?>): PropertyEditor?
+  - addStrippedPropertyPaths(List<String>, String, String): void
+  # copyCustomEditorsTo(PropertyEditorRegistry, String?): void
+  # guessPropertyTypeFromEditors(String): Class<?>?
+  - createDefaultEditors(): void
+  # getPropertyType(String): Class<?>?
+  + useConfigValueEditors(): void
+   conversionService: ConversionService?
+}
+class SimpleTypeConverter
+interface TypeConverter << interface >> {
+  + convertIfNecessary(Object?, Class<T>?, MethodParameter?): T?
+  + convertIfNecessary(Object?, Class<T>?, Field?): T?
+  + convertIfNecessary(Object?, Class<T>?, TypeDescriptor?): T?
+  + convertIfNecessary(Object?, Class<T>?): T?
+}
+class TypeConverterSupport {
+  + convertIfNecessary(Object?, Class<T>?): T?
+  + convertIfNecessary(Object?, Class<T>?, Field?): T?
+  + convertIfNecessary(Object?, Class<T>?, TypeDescriptor?): T?
+  + convertIfNecessary(Object?, Class<T>?, MethodParameter?): T?
+}
+
+ConfigurableConversionService  -[#008200,plain]-^  ConversionService
+CustomEditorConfigurer        "1" *-[#595959,plain]-> "propertyEditorRegistrars\n*" PropertyEditorRegistrar
+DefaultConversionService       -[#000082,plain]-^  GenericConversionService
+GenericConversionService       -[#008200,dashed]-^  ConfigurableConversionService
+GenericConversionService      "1" *-[#595959,plain]-> "converterCache\n*" GenericConverter
+PropertyEditorRegistrySupport "1" *-[#595959,plain]-> "conversionService\n1" ConversionService
+PropertyEditorRegistrySupport "1" *-[#595959,plain]-> "defaultEditors\n*" PropertyEditor
+PropertyEditorRegistrySupport  -[#008200,dashed]-^  PropertyEditorRegistry
+SimpleTypeConverter            -[#000082,plain]-^  TypeConverterSupport
+TypeConverterSupport           -[#000082,plain]-^  PropertyEditorRegistrySupport
+TypeConverterSupport           -[#008200,dashed]-^  TypeConverter
+PropertyEditorRegistrar         	o--  PropertyEditorRegistry
+@enduml

@@ -149,7 +149,8 @@ public abstract class AbstractAdvisorAutoProxyCreator extends AbstractAutoProxyC
             /**
              * 升序排序
              *
-             * 默认的排序规则 {@link AnnotationAwareOrderComparator.sort(advisors);} ，可以通过 Ordered接口、@Order、@Priority 设置排序值
+             * 默认的排序规则 {@link AnnotationAwareOrderComparator.sort(advisors);} ，可以通过 Ordered接口、@Order、@Priority 设置排序值，
+             * 对于 InstantiationModelAwarePointcutAdvisorImpl 实例拿到的排序值其实是其@Aspectbean的 值
              *
              * AnnotationAwareAspectJAutoProxyCreator 的父类 AspectJAwareAdvisorAutoProxyCreator 对 sortAdvisors 进行了重写
              *  重写的排序规则：使用 {@link AnnotationAwareOrderComparator } 得到排序值，如果compare 返回值是0，在判断是同一个 {@link AbstractAspectJAdvisorFactory#ASPECTJ_ANNOTATION_CLASSES} 注解

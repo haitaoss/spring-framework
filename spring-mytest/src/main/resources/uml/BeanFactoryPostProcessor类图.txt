@@ -1,0 +1,15 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+interface BeanDefinitionRegistryPostProcessor << interface >> {
+  + postProcessBeanDefinitionRegistry(BeanDefinitionRegistry): void
+}
+interface BeanFactoryPostProcessor << interface >> {
+  + postProcessBeanFactory(ConfigurableListableBeanFactory): void
+}
+
+BeanDefinitionRegistryPostProcessor  -[#008200,plain]-^  BeanFactoryPostProcessor
+@enduml

@@ -16,19 +16,8 @@
 
 package org.springframework.beans.factory.config;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.Serializable;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.Map;
-import java.util.Optional;
-
 import kotlin.reflect.KProperty;
 import kotlin.reflect.jvm.ReflectJvmMapping;
-
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.InjectionPoint;
@@ -40,6 +29,16 @@ import org.springframework.core.ResolvableType;
 import org.springframework.core.convert.TypeDescriptor;
 import org.springframework.lang.Nullable;
 import org.springframework.util.ObjectUtils;
+
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Descriptor for a specific dependency that is about to be injected.
@@ -67,6 +66,9 @@ public class DependencyDescriptor extends InjectionPoint implements Serializable
 
 	private final boolean required;
 
+	/**
+	 * todo 好像决定 是否要在依赖注入的时候 要做啥事情
+	 */
 	private final boolean eager;
 
 	private int nestingLevel = 1;
@@ -303,6 +305,7 @@ public class DependencyDescriptor extends InjectionPoint implements Serializable
 	}
 
 	/**
+	 * 将参数或者字段包装成 ResolvableType 返回
 	 * Build a {@link ResolvableType} object for the wrapped parameter/field.
 	 * @since 4.0
 	 */

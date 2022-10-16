@@ -16,29 +16,21 @@
 
 package org.springframework.core;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Executable;
-import java.lang.reflect.Member;
-import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.function.Predicate;
-
 import kotlin.Unit;
 import kotlin.reflect.KFunction;
 import kotlin.reflect.KParameter;
 import kotlin.reflect.jvm.ReflectJvmMapping;
-
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ObjectUtils;
+
+import java.lang.annotation.Annotation;
+import java.lang.reflect.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * Helper class that encapsulates the specification of a method parameter, i.e. a {@link Method}
@@ -63,8 +55,15 @@ public class MethodParameter {
 	private static final Annotation[] EMPTY_ANNOTATION_ARRAY = new Annotation[0];
 
 
+	/**
+	 * Method 对象的引用
+	 */
 	private final Executable executable;
 
+	/**
+	 * 方法参数列表的索引。这是必有的，因为是构造器设置的。
+	 * 意思是：方法的第几个参数
+	 */
 	private final int parameterIndex;
 
 	@Nullable

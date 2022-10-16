@@ -123,6 +123,7 @@ public class BeanFactoryAspectJAdvisorsBuilder {
                             if (amd.getAjType()
                                     .getPerClause()
                                     .getKind() == PerClauseKind.SINGLETON) {
+                                // 这个也是有用的，后面排序Advisor的时候 是根据@Aspect这个切面类来排序的
                                 MetadataAwareAspectInstanceFactory factory = new BeanFactoryAspectInstanceFactory(this.beanFactory, beanName);
 
                                 /**
@@ -145,6 +146,7 @@ public class BeanFactoryAspectJAdvisorsBuilder {
                                     throw new IllegalArgumentException("Bean with name '" + beanName
                                             + "' is a singleton, but aspect instantiation model is not singleton");
                                 }
+                                // 这个也是有用的，后面排序Advisor的时候 是根据@Aspect这个切面类来排序的
                                 MetadataAwareAspectInstanceFactory factory = new PrototypeAspectInstanceFactory(this.beanFactory, beanName);
                                 this.aspectFactoryCache.put(beanName, factory);
                                 advisors.addAll(this.advisorFactory.getAdvisors(factory));

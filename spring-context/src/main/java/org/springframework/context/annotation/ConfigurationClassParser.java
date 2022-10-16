@@ -326,7 +326,10 @@ class ConfigurationClassParser {
                     if (bdCand == null) {
                         bdCand = holder.getBeanDefinition();
                     }
-
+                    /**
+                     * 扫描到的bean，只要有 @Configuration || @Component || @ComponentScan || @Import || @ImportResource || @Bean 方法
+                     * 进进行配置类的解析
+                     * */
                     if (ConfigurationClassUtils.checkConfigurationClassCandidate(bdCand, this.metadataReaderFactory)) {
                         // 扫描的结果是配置类，就按照解析配置类的规则解析
                         parse(bdCand.getBeanClassName(), holder.getBeanName());

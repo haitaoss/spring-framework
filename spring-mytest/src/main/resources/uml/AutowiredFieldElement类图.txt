@@ -1,0 +1,17 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AutowiredFieldElement {
+  # inject(Object, String?, PropertyValues?): void
+  - resolveFieldValue(Field, Object, String?): Object?
+}
+class InjectedElement {
+  # inject(Object, String?, PropertyValues?): void
+  # checkPropertySkipping(PropertyValues?): boolean
+}
+
+AutowiredFieldElement  -[#000082,plain]-^  InjectedElement
+@enduml
