@@ -34,7 +34,7 @@ public class ConversionServiceTest {
 
         @Value("2022-08-11")
         @DateTimeFormat(pattern = "yyyy-MM-dd")
-        private Date date = new Date();
+        private Date date/* = new Date()*/;
 
         @Value("101.11")
         @NumberFormat(pattern = "#")
@@ -53,17 +53,21 @@ public class ConversionServiceTest {
     public static ConversionService conversionService() {
         // DefaultFormattingConversionService 功能强大： 类型转换 + 格式化
         DefaultFormattingConversionService defaultFormattingConversionService = new DefaultFormattingConversionService();
-        defaultFormattingConversionService.addConverter((Converter<String, A>) source -> {
-            A a = new A();
-            a.setName(source);
-            return a;
+        defaultFormattingConversionService.addConverter(new Converter<String, A>() {
+            @Override
+            public A convert(String source) {
+                A a = new A();
+                a.setName(source);
+                return a;
+            }
         });
 
         return defaultFormattingConversionService;
     }
 
     public static void main(String[] args) throws Exception {
-        new AnnotationConfigApplicationContext(ConversionServiceTest.class);
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(ConversionServiceTest.class);
+        System.out.println(context.getBean(A.class));
     }
 
 }

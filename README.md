@@ -2370,6 +2370,14 @@ public class AopTest6 {
 }
 ```
 
+## @EnableAsync
+
+## @EnableScheduling
+
+## @EnableCaching
+
+## @EnableTransactionManagement
+
 ## @Lookup 
 
 ### 有啥用？
@@ -3237,14 +3245,6 @@ public class Test {
 ## @Value
 
 ## @Autowired
-
-## @EnableAsync
-
-## @EnableScheduling
-
-## @EnableCaching
-
-## @EnableTransactionManagement
 
 ## @PropertySource
 # 待整理

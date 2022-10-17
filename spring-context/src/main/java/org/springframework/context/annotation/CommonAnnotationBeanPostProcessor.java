@@ -396,6 +396,9 @@ public class CommonAnnotationBeanPostProcessor extends InitDestroyAnnotationBean
                         if (Modifier.isStatic(method.getModifiers())) {
                             throw new IllegalStateException("@WebServiceRef annotation is not supported on static methods");
                         }
+                        /**
+                         * @Resouce 标注的方法，只允许有一个参数
+                         * */
                         if (method.getParameterCount() != 1) {
                             throw new IllegalStateException("@WebServiceRef annotation requires a single-arg method: " + method);
                         }

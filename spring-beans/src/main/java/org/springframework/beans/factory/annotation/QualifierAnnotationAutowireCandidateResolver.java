@@ -146,13 +146,18 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
         boolean match = super.isAutowireCandidate(bdHolder, descriptor);
         if (match) {
             /**
-             * 字段依赖@Qualifier校验,和方法参数@Qualifier校验
+             * 字段依赖@Qualifier校验,和方法参数依赖@Qualifier校验
+             *
+             * 对依赖的所有注解进行匹配，是@Qualifier就匹配注解的值和BeanDefinition中的值是否一致，如果不一致 或者 没有@Qualifier，会有补偿策略，
+             * 拿到注解上的注解,遍历 是@Qualifier就进行匹配
              * */
             match = checkQualifiers(bdHolder, descriptor.getAnnotations());
             if (match) {
                 /**
                  * 方法参数匹配了，在匹配其方法上的@Qualifier。
-                 * 怎么感觉是一个bug呀，既然方法参数的@Qualifier匹配了，干嘛还得看其方法的@Qualifier是否匹配
+                 * 怎么感觉是一个bug呀，既然方法参数的@Qualifier匹配了，干嘛还得看其方法的@Qualifier是否匹配。
+                 * 不是bug，因为 match 如果没有@Qualifier就是true，有@Qualifier才会判断，所以这里无法知道上一步match
+                 * 是否有匹配了@Qualifier，所以才会接着判断方法。
                  *
                  * 比如，下面这种写法是一直匹配不到的，因为 参数Qualifier 和方法Qualifier 不一致。可以修改方法返回值，为void，就不会进行方法Qualifier的匹配
                  * public class Test {
@@ -193,22 +198,49 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
         SimpleTypeConverter typeConverter = new SimpleTypeConverter();
         for (Annotation annotation : annotationsToSearch) {
             Class<? extends Annotation> type = annotation.annotationType();
+            /**
+             * 检查元数据，就是注解上面的注解。如果当前注解@Qualifier与BeanDefinition匹配了，那就不需要检查元数据咯，
+             * 默认是true
+             * */
             boolean checkMeta = true;
+            /**
+             * 应急检查，就是当前注解是@Qualifier但是匹配失败，那就应该尝试检查注解的元数据是否能匹配
+             * */
             boolean fallbackToMeta = false;
             /**
-             * 有@Qualifier 就是true,才会进一步校验
+             * 是 @Qualifier注解就是true,才会进一步校验
              * */
             if (isQualifier(type)) {
                 /**
-                 *
+                 * 就是看 BeanDefinition 记录的信息 是否和 @Qualifier 的值一致返回true
                  * */
                 if (!checkQualifier(bdHolder, annotation, typeConverter)) {
+                    // 需要应急检查
                     fallbackToMeta = true;
                 } else {
+                    /**
+                     * 已经匹配了@Qualifier，就不需要检查注解的元数据了，所以置为false
+                     * */
                     checkMeta = false;
                 }
             }
+            /**
+             * 补偿策略，就是注解没检验通过 就看看注解上有没有 @Qualifier 用来判断
+             * */
             if (checkMeta) {
+                /**
+                 * 注解上是否有 @Qualifier
+                 *
+                 * 比如
+                 * @Autowired
+                 * @base
+                 * public void x3(A xx) {}
+                 *
+                 * @Qualifier("a")
+                 * @Target({ElementType.METHOD})
+                 * @Retention(RetentionPolicy.RUNTIME)
+                 * public static @interface base {}
+                 * */
                 boolean foundMeta = false;
                 for (Annotation metaAnn : type.getAnnotations()) {
                     Class<? extends Annotation> metaType = metaAnn.annotationType();
@@ -217,7 +249,7 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
                         // Only accept fallback match if @Qualifier annotation has a value...
                         // Otherwise it is just a marker for a custom qualifier annotation.
                         if ((fallbackToMeta && ObjectUtils.isEmpty(AnnotationUtils.getValue(metaAnn))) ||
-                                !checkQualifier(bdHolder, metaAnn, typeConverter)) {
+                            !checkQualifier(bdHolder, metaAnn, typeConverter)) {
                             return false;
                         }
                     }
@@ -255,6 +287,9 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
         Class<? extends Annotation> type = annotation.annotationType();
         RootBeanDefinition bd = (RootBeanDefinition) bdHolder.getBeanDefinition();
 
+        /**
+         * 一大堆操作 其实就是从 BeanDefinition 中找到Qualifier的值
+         * */
         AutowireCandidateQualifier qualifier = bd.getQualifier(type.getName());
         if (qualifier == null) {
             qualifier = bd.getQualifier(ClassUtils.getShortName(type));
@@ -276,8 +311,10 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
                 // Look for matching annotation on the target class
                 if (getBeanFactory() != null) {
                     try {
+                        // 拿到 class
                         Class<?> beanType = getBeanFactory().getType(bdHolder.getBeanName());
                         if (beanType != null) {
+                            // 拿到Class上的 @Qualifier 注解
                             targetAnnotation = AnnotationUtils.getAnnotation(ClassUtils.getUserClass(beanType), type);
                         }
                     } catch (NoSuchBeanDefinitionException ex) {
@@ -285,6 +322,7 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
                     }
                 }
                 if (targetAnnotation == null && bd.hasBeanClass()) {
+                    // 拿到Class上的 @Qualifier 注解
                     targetAnnotation = AnnotationUtils.getAnnotation(ClassUtils.getUserClass(bd.getBeanClass()), type);
                 }
             }
@@ -310,8 +348,12 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
                 // Fall back on bean definition attribute
                 actualValue = bd.getAttribute(attributeName);
             }
+            /**
+             *  bdHolder.matchesName((String) expectedValue) 就是匹配 beanName 和 @Qualifier("x")
+             * */
             if (actualValue == null && attributeName.equals(AutowireCandidateQualifier.VALUE_KEY) &&
-                    expectedValue instanceof String && bdHolder.matchesName((String) expectedValue)) {
+                expectedValue instanceof String &&
+                bdHolder.matchesName((String) expectedValue)) {
                 // Fall back on bean name (or alias) match
                 continue;
             }
