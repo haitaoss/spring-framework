@@ -1,12 +1,17 @@
 package cn.haitaoss.javaconfig.EnableAsync;
 
+import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
+import org.springframework.aop.interceptor.SimpleAsyncUncaughtExceptionHandler;
+import org.springframework.context.annotation.AdviceMode;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.Async;
-import org.springframework.scheduling.annotation.AsyncConfigurationSelector;
+import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.stereotype.Component;
 
-import java.util.Arrays;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -15,36 +20,58 @@ import java.util.concurrent.TimeUnit;
  * date 2022-10-06 17:33
  *
  */
-@EnableAsync
+@EnableAsync(mode = AdviceMode.PROXY)
 @Component
 public class EnableAsyncTest {
-    /**
-     * 使用`@EnableAsync`会发生什么?
-     *      会导入`@Import(AsyncConfigurationSelector.class)`
-     *
-     * {@link AsyncConfigurationSelector}
-     *
-     * */
+    @Async
+    public void asyncTask() {
+        System.out.println("EnableAsyncTest.asyncTask--->" + Thread.currentThread().getName());
+    }
+
+    @Async("executor")
+    public void asyncTask2() {
+        System.out.println("EnableAsyncTest.asyncTask2--->" + Thread.currentThread().getName());
+    }
+
+    @Component
+    public static class Config {
+        @Bean
+        public Executor executor() {
+            return Executors.newFixedThreadPool(1, r -> {
+                Thread thread = new Thread(r);
+                thread.setName("executor-" + Math.random());
+                return thread;
+            });
+        }
+
+        // @Bean
+        public AsyncConfigurer asyncConfigurer() {
+            return new AsyncConfigurer() {
+                @Override
+                public Executor getAsyncExecutor() {
+                    return Executors.newFixedThreadPool(1, r -> {
+                        Thread thread = new Thread(r);
+                        thread.setName("asyncConfigurer-" + Math.random());
+                        return thread;
+                    });
+                }
+
+                @Override
+                public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
+                    return new SimpleAsyncUncaughtExceptionHandler();
+                }
+            };
+        }
+    }
+
+
     public static void main(String[] args) throws Exception {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(EnableAsyncTest.class);
-        System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
         EnableAsyncTest bean = context.getBean(EnableAsyncTest.class);
-        for (int i = 0; i < 10; i++) {
-            bean.asyncTask();
-        }
-        System.out.println("任务发起完了");
-
+        bean.asyncTask();
+        bean.asyncTask2();
         TimeUnit.SECONDS.sleep(1000);
     }
 
 
-    @Async
-    public void asyncTask() {
-        try {
-            TimeUnit.SECONDS.sleep(1);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-        System.out.println("EnableAsyncTest.asyncTask--->");
-    }
 }

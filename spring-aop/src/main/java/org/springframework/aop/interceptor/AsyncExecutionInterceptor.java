@@ -16,15 +16,8 @@
 
 package org.springframework.aop.interceptor;
 
-import java.lang.reflect.Method;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Future;
-
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
-
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.core.BridgeMethodResolver;
@@ -33,6 +26,13 @@ import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.lang.Nullable;
 import org.springframework.util.ClassUtils;
+
+import java.lang.reflect.Method;
+import java.util.Collection;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Future;
 
 /**
  * AOP Alliance {@code MethodInterceptor} that processes method invocations
@@ -68,99 +68,120 @@ import org.springframework.util.ClassUtils;
  */
 public class AsyncExecutionInterceptor extends AsyncExecutionAspectSupport implements MethodInterceptor, Ordered {
 
-	/**
-	 * Create a new instance with a default {@link AsyncUncaughtExceptionHandler}.
-	 * @param defaultExecutor the {@link Executor} (typically a Spring {@link AsyncTaskExecutor}
-	 * or {@link java.util.concurrent.ExecutorService}) to delegate to;
-	 * as of 4.2.6, a local executor for this interceptor will be built otherwise
-	 */
-	public AsyncExecutionInterceptor(@Nullable Executor defaultExecutor) {
-		super(defaultExecutor);
-	}
+    /**
+     * Create a new instance with a default {@link AsyncUncaughtExceptionHandler}.
+     * @param defaultExecutor the {@link Executor} (typically a Spring {@link AsyncTaskExecutor}
+     * or {@link java.util.concurrent.ExecutorService}) to delegate to;
+     * as of 4.2.6, a local executor for this interceptor will be built otherwise
+     */
+    public AsyncExecutionInterceptor(@Nullable Executor defaultExecutor) {
+        super(defaultExecutor);
+    }
 
-	/**
-	 * Create a new {@code AsyncExecutionInterceptor}.
-	 * @param defaultExecutor the {@link Executor} (typically a Spring {@link AsyncTaskExecutor}
-	 * or {@link java.util.concurrent.ExecutorService}) to delegate to;
-	 * as of 4.2.6, a local executor for this interceptor will be built otherwise
-	 * @param exceptionHandler the {@link AsyncUncaughtExceptionHandler} to use
-	 */
-	public AsyncExecutionInterceptor(@Nullable Executor defaultExecutor, AsyncUncaughtExceptionHandler exceptionHandler) {
-		super(defaultExecutor, exceptionHandler);
-	}
+    /**
+     * Create a new {@code AsyncExecutionInterceptor}.
+     * @param defaultExecutor the {@link Executor} (typically a Spring {@link AsyncTaskExecutor}
+     * or {@link java.util.concurrent.ExecutorService}) to delegate to;
+     * as of 4.2.6, a local executor for this interceptor will be built otherwise
+     * @param exceptionHandler the {@link AsyncUncaughtExceptionHandler} to use
+     */
+    public AsyncExecutionInterceptor(@Nullable Executor defaultExecutor, AsyncUncaughtExceptionHandler exceptionHandler) {
+        super(defaultExecutor, exceptionHandler);
+    }
 
 
-	/**
-	 * Intercept the given method invocation, submit the actual calling of the method to
-	 * the correct task executor and return immediately to the caller.
-	 * @param invocation the method to intercept and make asynchronous
-	 * @return {@link Future} if the original method returns {@code Future}; {@code null}
-	 * otherwise.
-	 */
-	@Override
-	@Nullable
-	public Object invoke(final MethodInvocation invocation) throws Throwable {
-		Class<?> targetClass = (invocation.getThis() != null ? AopUtils.getTargetClass(invocation.getThis()) : null);
-		Method specificMethod = ClassUtils.getMostSpecificMethod(invocation.getMethod(), targetClass);
-		final Method userDeclaredMethod = BridgeMethodResolver.findBridgedMethod(specificMethod);
+    /**
+     * Intercept the given method invocation, submit the actual calling of the method to
+     * the correct task executor and return immediately to the caller.
+     * @param invocation the method to intercept and make asynchronous
+     * @return {@link Future} if the original method returns {@code Future}; {@code null}
+     * otherwise.
+     */
+    @Override
+    @Nullable
+    public Object invoke(final MethodInvocation invocation) throws Throwable {
+        Class<?> targetClass = (invocation.getThis() != null ? AopUtils.getTargetClass(invocation.getThis()) : null);
+        Method specificMethod = ClassUtils.getMostSpecificMethod(invocation.getMethod(), targetClass);
+        final Method userDeclaredMethod = BridgeMethodResolver.findBridgedMethod(specificMethod);
+        /**
+         * 拿到方法对应的Executor。
+         *
+         * 如果方法有注解@Async("beanName")，就通过beanName从容器中获取Executor，拿不到直接报错
+         * `@Async` 没有指定beanName，就使用默认的Executor {@link AsyncExecutionAspectSupport#defaultExecutor}，会在构造器设置这个属性
+         *
+         * 构造器 {@link AsyncExecutionAspectSupport#AsyncExecutionAspectSupport(Executor)}
+         *     defaultExecutor 是 {@link org.springframework.scheduling.annotation.AbstractAsyncConfiguration#setConfigurers(Collection)} 设置的
+         *    `this.defaultExecutor = new SingletonSupplier<>(defaultExecutor, () -> getDefaultExecutor(this.beanFactory));`
+         *          没有 defaultExecutor 也会执行{@link AsyncExecutionInterceptor#getDefaultExecutor(BeanFactory)} 拿到一个
+         *          从BeanFactory中找 先找TaskExecutor，没有在找Executor 类型的bean
+         *          找不到就 `new SimpleAsyncTaskExecutor()`
+         *
+         * Tips：方法的Executor，可以通过 @Async("beanName") 注解的值拿到，在BeanFactory中找，找不到就报错。没有设置注解值，就找默认的，
+         *      默认查找顺序：AsyncConfigurer -> TaskExecutor -> Executor -> `new SimpleAsyncTaskExecutor()`
+         * */
+        AsyncTaskExecutor executor = determineAsyncExecutor(userDeclaredMethod);
+        // 没得 Executor 就直接报错咯
+        if (executor == null) {
+            throw new IllegalStateException(
+                    "No executor specified and no default executor set on AsyncExecutionInterceptor either");
+        }
 
-		AsyncTaskExecutor executor = determineAsyncExecutor(userDeclaredMethod);
-		if (executor == null) {
-			throw new IllegalStateException(
-					"No executor specified and no default executor set on AsyncExecutionInterceptor either");
-		}
+        Callable<Object> task = () -> {
+            try {
+                // 执行方法
+                Object result = invocation.proceed();
+                if (result instanceof Future) {
+                    return ((Future<?>) result).get();
+                }
+            } catch (ExecutionException ex) {
+                // 异常处理
+                handleError(ex.getCause(), userDeclaredMethod, invocation.getArguments());
+            } catch (Throwable ex) {
+                // 异常处理
+                handleError(ex, userDeclaredMethod, invocation.getArguments());
+            }
+            return null;
+        };
 
-		Callable<Object> task = () -> {
-			try {
-				Object result = invocation.proceed();
-				if (result instanceof Future) {
-					return ((Future<?>) result).get();
-				}
-			}
-			catch (ExecutionException ex) {
-				handleError(ex.getCause(), userDeclaredMethod, invocation.getArguments());
-			}
-			catch (Throwable ex) {
-				handleError(ex, userDeclaredMethod, invocation.getArguments());
-			}
-			return null;
-		};
+        /**
+         * 提交异步任务，就是使用Executor执行任务
+         * 支持三种特殊的返回值类型 CompletableFuture、ListenableFuture、Future 会有返回值，其他的返回null
+         * */
+        return doSubmit(task, executor, invocation.getMethod().getReturnType());
+    }
 
-		return doSubmit(task, executor, invocation.getMethod().getReturnType());
-	}
+    /**
+     * This implementation is a no-op for compatibility in Spring 3.1.2.
+     * Subclasses may override to provide support for extracting qualifier information,
+     * e.g. via an annotation on the given method.
+     * @return always {@code null}
+     * @since 3.1.2
+     * @see #determineAsyncExecutor(Method)
+     */
+    @Override
+    @Nullable
+    protected String getExecutorQualifier(Method method) {
+        return null;
+    }
 
-	/**
-	 * This implementation is a no-op for compatibility in Spring 3.1.2.
-	 * Subclasses may override to provide support for extracting qualifier information,
-	 * e.g. via an annotation on the given method.
-	 * @return always {@code null}
-	 * @since 3.1.2
-	 * @see #determineAsyncExecutor(Method)
-	 */
-	@Override
-	@Nullable
-	protected String getExecutorQualifier(Method method) {
-		return null;
-	}
+    /**
+     * This implementation searches for a unique {@link org.springframework.core.task.TaskExecutor}
+     * bean in the context, or for an {@link Executor} bean named "taskExecutor" otherwise.
+     * If neither of the two is resolvable (e.g. if no {@code BeanFactory} was configured at all),
+     * this implementation falls back to a newly created {@link SimpleAsyncTaskExecutor} instance
+     * for local use if no default could be found.
+     * @see #DEFAULT_TASK_EXECUTOR_BEAN_NAME
+     */
+    @Override
+    @Nullable
+    protected Executor getDefaultExecutor(@Nullable BeanFactory beanFactory) {
+        Executor defaultExecutor = super.getDefaultExecutor(beanFactory);
+        return (defaultExecutor != null ? defaultExecutor : new SimpleAsyncTaskExecutor());
+    }
 
-	/**
-	 * This implementation searches for a unique {@link org.springframework.core.task.TaskExecutor}
-	 * bean in the context, or for an {@link Executor} bean named "taskExecutor" otherwise.
-	 * If neither of the two is resolvable (e.g. if no {@code BeanFactory} was configured at all),
-	 * this implementation falls back to a newly created {@link SimpleAsyncTaskExecutor} instance
-	 * for local use if no default could be found.
-	 * @see #DEFAULT_TASK_EXECUTOR_BEAN_NAME
-	 */
-	@Override
-	@Nullable
-	protected Executor getDefaultExecutor(@Nullable BeanFactory beanFactory) {
-		Executor defaultExecutor = super.getDefaultExecutor(beanFactory);
-		return (defaultExecutor != null ? defaultExecutor : new SimpleAsyncTaskExecutor());
-	}
-
-	@Override
-	public int getOrder() {
-		return Ordered.HIGHEST_PRECEDENCE;
-	}
+    @Override
+    public int getOrder() {
+        return Ordered.HIGHEST_PRECEDENCE;
+    }
 
 }

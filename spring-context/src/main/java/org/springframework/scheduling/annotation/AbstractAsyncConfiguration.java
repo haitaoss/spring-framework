@@ -42,6 +42,9 @@ import java.util.function.Supplier;
 @Configuration(proxyBeanMethods = false)
 public abstract class AbstractAsyncConfiguration implements ImportAware {
 
+    /**
+     * 通过 ImportAware 接口，记录注解 @EnableAsync 的元数据
+     */
     @Nullable
     protected AnnotationAttributes enableAsync;
 
@@ -70,6 +73,7 @@ public abstract class AbstractAsyncConfiguration implements ImportAware {
         if (CollectionUtils.isEmpty(configurers)) {
             return;
         }
+        // 至多只能有一个
         if (configurers.size() > 1) {
             throw new IllegalStateException("Only one AsyncConfigurer may exist");
         }

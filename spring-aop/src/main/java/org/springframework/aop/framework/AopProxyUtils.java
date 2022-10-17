@@ -114,7 +114,7 @@ public abstract class AopProxyUtils {
     }
 
     /**
-     * 补全代理接口。<br/>
+     * 补全代理接口。目的是统一代理对象的类型，这些类型是有特殊作用的，比如@EnableAsync会做判断 <br/>
      * 如果接口里面没有 SpringProxy、Advised、DecoratingProxy 的子类，就添加<br/>
      * Determine the complete set of interfaces to proxy for the given AOP configuration.
      * <p>This will always add the {@link Advised} interface unless the AdvisedSupport's

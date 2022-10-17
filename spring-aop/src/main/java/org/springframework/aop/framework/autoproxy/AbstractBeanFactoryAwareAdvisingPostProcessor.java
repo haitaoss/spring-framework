@@ -38,36 +38,36 @@ import org.springframework.lang.Nullable;
  */
 @SuppressWarnings("serial")
 public abstract class AbstractBeanFactoryAwareAdvisingPostProcessor extends AbstractAdvisingBeanPostProcessor
-		implements BeanFactoryAware {
+        implements BeanFactoryAware {
 
-	@Nullable
-	private ConfigurableListableBeanFactory beanFactory;
+    @Nullable
+    private ConfigurableListableBeanFactory beanFactory;
 
 
-	@Override
-	public void setBeanFactory(BeanFactory beanFactory) {
-		this.beanFactory = (beanFactory instanceof ConfigurableListableBeanFactory ?
-				(ConfigurableListableBeanFactory) beanFactory : null);
-	}
+    @Override
+    public void setBeanFactory(BeanFactory beanFactory) {
+        this.beanFactory = (beanFactory instanceof ConfigurableListableBeanFactory ?
+                (ConfigurableListableBeanFactory) beanFactory : null);
+    }
 
-	@Override
-	protected ProxyFactory prepareProxyFactory(Object bean, String beanName) {
-		if (this.beanFactory != null) {
-			AutoProxyUtils.exposeTargetClass(this.beanFactory, beanName, bean.getClass());
-		}
+    @Override
+    protected ProxyFactory prepareProxyFactory(Object bean, String beanName) {
+        if (this.beanFactory != null) {
+            AutoProxyUtils.exposeTargetClass(this.beanFactory, beanName, bean.getClass());
+        }
 
-		ProxyFactory proxyFactory = super.prepareProxyFactory(bean, beanName);
-		if (!proxyFactory.isProxyTargetClass() && this.beanFactory != null &&
-				AutoProxyUtils.shouldProxyTargetClass(this.beanFactory, beanName)) {
-			proxyFactory.setProxyTargetClass(true);
-		}
-		return proxyFactory;
-	}
+        ProxyFactory proxyFactory = super.prepareProxyFactory(bean, beanName);
+        if (!proxyFactory.isProxyTargetClass() && this.beanFactory != null &&
+                AutoProxyUtils.shouldProxyTargetClass(this.beanFactory, beanName)) {
+            proxyFactory.setProxyTargetClass(true);
+        }
+        return proxyFactory;
+    }
 
-	@Override
-	protected boolean isEligible(Object bean, String beanName) {
-		return (!AutoProxyUtils.isOriginalInstance(beanName, bean.getClass()) &&
-				super.isEligible(bean, beanName));
-	}
+    @Override
+    protected boolean isEligible(Object bean, String beanName) {
+        return (!AutoProxyUtils.isOriginalInstance(beanName, bean.getClass()) &&
+                super.isEligible(bean, beanName));
+    }
 
 }

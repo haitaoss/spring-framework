@@ -21,6 +21,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Role;
 import org.springframework.core.annotation.AnnotationUtils;
+import org.springframework.core.type.AnnotationMetadata;
 import org.springframework.scheduling.config.TaskManagementConfigUtils;
 import org.springframework.util.Assert;
 
@@ -45,6 +46,19 @@ public class ProxyAsyncConfiguration extends AbstractAsyncConfiguration {
     @Bean(name = TaskManagementConfigUtils.ASYNC_ANNOTATION_PROCESSOR_BEAN_NAME)
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
     public AsyncAnnotationBeanPostProcessor asyncAdvisor() {
+        /**
+         * enableAsync 这个属性肯定，不是null，因为是 @Bean 所以创建之前会先创建其配置类，也就是创建 ProxyAsyncConfiguration
+         *
+         * 初始化ProxyAsyncConfiguration时，会进行依赖注入也就是会执行 {@link AbstractAsyncConfiguration#setConfigurers(Collection)}
+         *  会从容器中拿到 AsyncConfigurer 类型的bean，给这两个属性赋值
+         *      {@link AbstractAsyncConfiguration#exceptionHandler}
+         *      {@link AbstractAsyncConfiguration#executor}
+         *
+         * 又因为 ProxyAsyncConfiguration 实现了 ImportAware 接口，所以 ImportAwareBeanPostProcessor 后置处理器
+         * 会回调 {@link AbstractAsyncConfiguration#setImportMetadata(AnnotationMetadata)} ，给 enableAsync 这个字段赋值。
+         *
+         * enableAsync 就是 @EnableAsync 注解的元数据信息
+         * */
         Assert.notNull(this.enableAsync, "@EnableAsync annotation metadata was not injected");
         AsyncAnnotationBeanPostProcessor bpp = new AsyncAnnotationBeanPostProcessor();
         /**

@@ -30,9 +30,9 @@ import org.springframework.core.type.AnnotationMetadata;
  */
 public interface ImportAware extends Aware {
 
-	/**
-	 * Set the annotation metadata of the importing @{@code Configuration} class.
-	 */
-	void setImportMetadata(AnnotationMetadata importMetadata);
+    /**
+     * Set the annotation metadata of the importing @{@code Configuration} class.
+     */
+    void setImportMetadata(AnnotationMetadata importMetadata);
 
 }

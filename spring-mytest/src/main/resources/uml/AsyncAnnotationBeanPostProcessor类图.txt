@@ -1,0 +1,104 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AbstractAdvisingBeanPostProcessor {
+  # isEligible(Object, String): boolean
+  # isEligible(Class<?>): boolean
+  + postProcessBeforeInitialization(Object, String): Object?
+  # prepareProxyFactory(Object, String): ProxyFactory
+  # customizeProxyFactory(ProxyFactory): void
+  + setBeforeExistingAdvisors(boolean): void
+  + postProcessAfterInitialization(Object, String): Object?
+}
+class AbstractAsyncConfiguration {
+  + setImportMetadata(AnnotationMetadata): void
+  ~ setConfigurers(Collection<AsyncConfigurer>): void
+}
+class AbstractBeanFactoryAwareAdvisingPostProcessor {
+  # prepareProxyFactory(Object, String): ProxyFactory
+  # isEligible(Object, String): boolean
+  + setBeanFactory(BeanFactory): void
+}
+class AnnotationAsyncExecutionInterceptor {
+  # getExecutorQualifier(Method): String?
+}
+class AnnotationMatchingPointcut {
+  + forClassAnnotation(Class<Annotation>): AnnotationMatchingPointcut
+  + forMethodAnnotation(Class<Annotation>): AnnotationMatchingPointcut
+  + getClassFilter(): ClassFilter
+  + equals(Object?): boolean
+  + hashCode(): int
+  + getMethodMatcher(): MethodMatcher
+  + toString(): String
+}
+class AsyncAnnotationAdvisor {
+  # buildAdvice(Supplier<Executor>?, Supplier<AsyncUncaughtExceptionHandler>?): Advice
+  # buildPointcut(Set<Class<Annotation>>): Pointcut
+  + setAsyncAnnotationType(Class<Annotation>): void
+  + setBeanFactory(BeanFactory): void
+  + getAdvice(): Advice
+  + getPointcut(): Pointcut
+}
+class AsyncAnnotationBeanPostProcessor {
+  + setExceptionHandler(AsyncUncaughtExceptionHandler): void
+  + configure(Supplier<Executor>?, Supplier<AsyncUncaughtExceptionHandler>?): void
+  + setBeanFactory(BeanFactory): void
+  + setExecutor(Executor): void
+  + setAsyncAnnotationType(Class<Annotation>): void
+}
+class AsyncConfigurationSelector {
+  + selectImports(AdviceMode): String[]?
+}
+interface AsyncConfigurer << interface >> {
+  + getAsyncUncaughtExceptionHandler(): AsyncUncaughtExceptionHandler?
+  + getAsyncExecutor(): Executor?
+}
+interface BeanFactoryAware << interface >> {
+  + setBeanFactory(BeanFactory): void
+}
+interface BeanPostProcessor << interface >> {
+  + postProcessBeforeInitialization(Object, String): Object?
+  + postProcessAfterInitialization(Object, String): Object?
+}
+interface ImportAware << interface >> {
+  + setImportMetadata(AnnotationMetadata): void
+}
+interface ImportSelector << interface >> {
+  + selectImports(AnnotationMetadata): String[]
+  + getExclusionFilter(): Predicate<String>?
+}
+class ProxyAsyncConfiguration {
+  + asyncAdvisor(): AsyncAnnotationBeanPostProcessor
+}
+
+class AdviceModeImportSelector<A> {
+  + selectImports(AnnotationMetadata): String[]
+  # getAdviceModeAttributeName(): String
+  # selectImports(AdviceMode): String[]?
+}
+
+
+AdviceModeImportSelector  -[#008200,dashed]-^  ImportSelector
+AbstractAdvisingBeanPostProcessor              -[#008200,dashed]-^  BeanPostProcessor
+AbstractAsyncConfiguration                     -[#008200,dashed]-^  ImportAware
+AbstractBeanFactoryAwareAdvisingPostProcessor  -[#000082,plain]-^  AbstractAdvisingBeanPostProcessor
+AbstractBeanFactoryAwareAdvisingPostProcessor  -[#008200,dashed]-^  BeanFactoryAware
+AnnotationAsyncExecutionInterceptor            -[#008200,dashed]-^  BeanFactoryAware
+AsyncAnnotationAdvisor                         -[#595959,dashed]->  AnnotationAsyncExecutionInterceptor           : "«create»"
+AsyncAnnotationAdvisor                         -[#595959,dashed]->  AnnotationMatchingPointcut                    : "«create»"
+AsyncAnnotationAdvisor                         -[#008200,dashed]-^  BeanFactoryAware
+AsyncAnnotationBeanPostProcessor               -[#000082,plain]-^  AbstractBeanFactoryAwareAdvisingPostProcessor
+AsyncAnnotationBeanPostProcessor               -[#595959,dashed]->  AsyncAnnotationAdvisor                        : "«create»"
+ProxyAsyncConfiguration                        -[#000082,plain]-^  AbstractAsyncConfiguration
+ProxyAsyncConfiguration                        -[#595959,dashed]->  AsyncAnnotationBeanPostProcessor              : "«create»"
+AsyncConfigurationSelector --^ ImportSelector
+AbstractAsyncConfiguration  *-- AsyncConfigurer
+AsyncConfigurationSelector -->  ProxyAsyncConfiguration                                           : "«create»"
+@enduml
+
+
+
+

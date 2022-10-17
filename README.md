@@ -2372,12 +2372,165 @@ public class AopTest6 {
 
 ## @EnableAsync
 
-## @EnableScheduling
+### 示例代码
+```java
+@EnableAsync(mode = AdviceMode.PROXY)
+@Component
+public class EnableAsyncTest {
+    @Async
+    public void asyncTask() {
+        System.out.println("EnableAsyncTest.asyncTask--->" + Thread.currentThread().getName());
+    }
 
-## @EnableCaching
+    @Async("executor")
+    public void asyncTask2() {
+        System.out.println("EnableAsyncTest.asyncTask2--->" + Thread.currentThread().getName());
+    }
+
+    @Component
+    public static class Config {
+        @Bean
+        public Executor executor() {
+            return Executors.newFixedThreadPool(1, r -> {
+                Thread thread = new Thread(r);
+                thread.setName("executor-" + Math.random());
+                return thread;
+            });
+        }
+
+        // @Bean
+        public AsyncConfigurer asyncConfigurer() {
+            return new AsyncConfigurer() {
+                @Override
+                public Executor getAsyncExecutor() {
+                    return Executors.newFixedThreadPool(1, r -> {
+                        Thread thread = new Thread(r);
+                        thread.setName("asyncConfigurer-" + Math.random());
+                        return thread;
+                    });
+                }
+
+                @Override
+                public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
+                    return new SimpleAsyncUncaughtExceptionHandler();
+                }
+            };
+        }
+    }
+
+
+    public static void main(String[] args) throws Exception {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(EnableAsyncTest.class);
+        EnableAsyncTest bean = context.getBean(EnableAsyncTest.class);
+        bean.asyncTask();
+        bean.asyncTask2();
+        TimeUnit.SECONDS.sleep(1000);
+    }
+}
+```
+### 原理
+> [ProxyFacoty#getProxy原理](#`ProxyFactory#getProxy`)
+
+![AsyncAnnotationBeanPostProcessor类图](.README_imgs/AsyncAnnotationBeanPostProcessor类图.png)
+
+### `@EnableAsync会发生什么`
+```java
+/**
+ * 使用`@EnableAsync` 会导入`@Import(AsyncConfigurationSelector.class)`
+ *
+ * 解析配置类在解析@Import的时候，因为 {@link AsyncConfigurationSelector} 的父类 AdviceModeImportSelector 实现了 {@link ImportSelector}
+ *     所以会回调这个方法 {@link AdviceModeImportSelector#selectImports(AnnotationMetadata)}
+ *      - 拿到注解 `@EnableAsync(mode = AdviceMode.PROXY)` 的mode属性值，回调子类方法 {@link AsyncConfigurationSelector#selectImports(AdviceMode)}
+ *
+ * 执行 {@link AsyncConfigurationSelector#selectImports(AdviceMode)}
+ *      该方法返回这个类 ProxyAsyncConfiguration, 也就是会将其添加到 BeanDefinitionMap中。
+ *
+ * {@link ProxyAsyncConfiguration}
+ *      其父类 AbstractAsyncConfiguration 使用 `@Autowired(required = false)` 注入 AsyncConfigurer 类型的bean，作为其属性
+ *      {@link AbstractAsyncConfiguration#executor}
+ *      {@link AbstractAsyncConfiguration#exceptionHandler}
+ *
+ *      而 ProxyAsyncConfiguration 通过@Bean的方式注册 AsyncAnnotationBeanPostProcessor 到BeanDefinitionMap中，并将上面两个属性设置到
+ *      AsyncAnnotationBeanPostProcessor 中
+ *
+ * {@link AsyncAnnotationBeanPostProcessor}
+ *      该类继承 AbstractBeanFactoryAwareAdvisingPostProcessor ，而 AbstractBeanFactoryAwareAdvisingPostProcessor 实现 BeanFactoryAware、BeanPostProcessor
+ *
+ *      {@link AsyncAnnotationBeanPostProcessor#setBeanFactory(BeanFactory)}
+ *         实例化属性 `AsyncAnnotationAdvisor advisor = new AsyncAnnotationAdvisor(this.executor, this.exceptionHandler);` 该属性
+ *         就是增强器咯，具体的切面规则+增强逻辑都在这里面
+ *
+ *      {@link AbstractAdvisingBeanPostProcessor#postProcessAfterInitialization(Object, String)}
+ *          看看处理的bean 是否满足 advisor 切面规则，满足就设置 advisor 创建出代理对象
+ **/
+```
+### `new AsyncAnnotationAdvisor`
+```java
+/**
+ *
+ * `new AsyncAnnotationAdvisor`
+ *      构造器{@link AsyncAnnotationAdvisor#AsyncAnnotationAdvisor(Supplier, Supplier)}，主要是设置了两个属性
+ *      this.advice = buildAdvice(executor, exceptionHandler); // 具体@Async的增强逻辑
+ *      this.pointcut = buildPointcut(asyncAnnotationTypes); // 切入点表达式，用来判断是否满足@Async的切面逻辑
+ *
+ * 构建Advice {@link AsyncAnnotationAdvisor#buildAdvice(Supplier, Supplier)}
+ *      AnnotationAsyncExecutionInterceptor interceptor = new AnnotationAsyncExecutionInterceptor(null); // 实例化 MethodInterceptor
+ *      interceptor.configure(executor, exceptionHandler); // 将 AsyncAnnotationBeanPostProcessor 的两个属性设置给 interceptor
+ *      注：增强逻辑看其父类 {@link AsyncExecutionInterceptor#invoke(MethodInvocation)}
+ *
+ * 构建Pointcut {@link AsyncAnnotationAdvisor#buildPointcut(Set)}
+ *      创建两个 AnnotationMatchingPointcut，然后使用 {@link ComposablePointcut} 合并Pointcut，该类的特点是将Pointcut的 MethodMatcher、ClassFilter 合成 UnionMethodMatcher、UnionClassFilter。
+ *      UnionMethodMatcher、UnionClassFilter 的 matches 是判断其中一个满足就是ture。
+ *      {@link ClassFilters.UnionClassFilter#matches(Class)}
+ *      {@link MethodMatchers.UnionMethodMatcher#matches(Method, Class)}}
+ *
+ *      注：两个 AnnotationMatchingPointcut 一个是匹配类有@Async就是true，另一个是方法有@Async就是true。也就是说
+ *      `@Async` 的Pointcut逻辑，就是类或者方法有`@Async`就创建代理对象
+ **/
+```
+### `AbstractAdvisingBeanPostProcessor#postProcessAfterInitialization`
+```java
+/**
+ *
+ * {@link AbstractAdvisingBeanPostProcessor#postProcessAfterInitialization(Object, String)}
+ *
+ * 是 bean instanceof AopInfrastructureBean
+ *      直接return bean，这种类型不需要代理
+ *
+ * 是 bean instanceof Advised
+ * 			因为Spring使用Cglib、JDK 创建的代理对象都会添加 Advised 接口，所以这里的目的是 看看被代理类是否符合Pointcut的规则
+ *      满足 `!advised.isFrozen() ` && isEligible(AopUtils.getTargetClass(bean)
+ *          将 @Async 的增强逻辑，添加到 被代理类中，也就是扩展被代理类的Advisor
+ *          `advised.addAdvisor(this.advisor);`
+ *      Tips：
+ *          - `!advised.isFrozen()` 不是冻结的，表示还可以扩展 Advisor，因为如果是冻结的会在创建代理Cglib代理对象的时候就解析Advisor设置CallBack
+ *          - isEligible 是符合条件的，就是 类有@Async 或者 方法有@Async 才会是true
+ *
+ * 兜底操作
+ *      是符合条件的 {@link AbstractBeanFactoryAwareAdvisingPostProcessor#isEligible(Object, String)},就是 类有@Async 或者 方法有@Async 才会是true，创建代理对象
+ *      proxyFactory.addAdvisor(this.advisor); // 这个类型 AsyncAnnotationAdvisor
+ *      proxyFactory.getProxy(classLoader);
+ **/
+```
+### `AsyncExecutionInterceptor#invoke`
+[为啥执行该方法，看Spring代理对象的执行](#细说`ReflectiveMethodInvocation#proceed()`)
+```java
+/**
+ * {@link AsyncExecutionInterceptor#invoke(MethodInvocation)}
+ *      拿到方法对应的Executor。
+ *          可以通过 @Async("beanName") 注解的值拿到，在BeanFactory中找，找不到就报错。没有设置注解值，就找默认的，
+ *          默认查找顺序：AsyncConfigurer(bean对象)-> TaskExecutor(bean对象) -> Executor(bean对象) -> `new SimpleAsyncTaskExecutor()`
+ *
+ *      装饰成Callable `Callable<Object> task = () -> { Object result = invocation.proceed() }`
+ *
+ *      使用Executor执行Callable {@link AsyncExecutionAspectSupport#doSubmit(Callable, AsyncTaskExecutor, Class)}
+ *          支持三种特殊的返回值类型 CompletableFuture、ListenableFuture、Future 会有返回值，其他的返回null
+ * */
+```
 
 ## @EnableTransactionManagement
-
+## @EnableScheduling
+## @EnableCaching
 ## @Lookup 
 
 ### 有啥用？

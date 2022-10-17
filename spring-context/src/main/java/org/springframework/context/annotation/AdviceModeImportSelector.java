@@ -66,14 +66,15 @@ public abstract class AdviceModeImportSelector<A extends Annotation> implements 
      */
     @Override
     public final String[] selectImports(AnnotationMetadata importingClassMetadata) {
-        // 拿到 AdviceModeImportSelector 的泛型参数类型
         /**
          * 查找当前类的 AdviceModeImportSelector 的泛型参数
          * */
         Class<?> annType = GenericTypeResolver.resolveTypeArgument(getClass(), AdviceModeImportSelector.class);
         Assert.state(annType != null, "Unresolvable type argument for AdviceModeImportSelector");
 
-        // 拿到类上注解的元数据
+        /**
+         * 从 importingClassMetadata 拿到 annType 的注解信息
+         * */
         AnnotationAttributes attributes = AnnotationConfigUtils.attributesFor(importingClassMetadata, annType);
         if (attributes == null) {
             throw new IllegalArgumentException(String.format(
@@ -81,7 +82,6 @@ public abstract class AdviceModeImportSelector<A extends Annotation> implements 
                     annType.getSimpleName(), importingClassMetadata.getClassName()));
         }
 
-        //
         /**
          * 获取注解的属性值,根据默认名字`mode`
          * */
@@ -98,6 +98,7 @@ public abstract class AdviceModeImportSelector<A extends Annotation> implements 
         if (imports == null) {
             throw new IllegalArgumentException("Unknown AdviceMode: " + adviceMode);
         }
+        // 返回的类全名数据，就注册到BeanDefinitionMap
         return imports;
     }
 
