@@ -8,6 +8,7 @@ import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.aop.framework.adapter.DefaultAdvisorAdapterRegistry;
 import org.springframework.aop.support.DefaultPointcutAdvisor;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.core.GenericTypeResolver;
 import org.springframework.expression.*;
 import org.springframework.expression.common.TemplateParserContext;
@@ -33,7 +34,40 @@ import java.util.function.Function;
  */
 @Data
 public class Demo {
+
+
+
     private String name;
+
+    public static void x() {
+        System.out.println("execute x...");
+    }
+
+    @Test
+    public void test1_reflection() throws NoSuchMethodException {
+        System.out.println(Demo.class.getMethod("a").getReturnType().isAssignableFrom(BeanPostProcessor.class));
+    }
+
+    public BeanPostProcessor a() {
+        return null;
+    }
+
+    @Test
+    public void test_reflection() throws Exception {
+
+        /*for (Method method : Demo.class.getMethods()) {
+            System.out.println(method.getName());
+        }*/
+        Method x = Demo.class.getMethod("x");
+        x.invoke(null);
+        x.invoke(Demo.class);
+        x.invoke(new Demo());
+    }
+
+    @Test
+    public void test_util() {
+        //        Method specificMethod = AopUtils.getMostSpecificMethod(method, targetClass);
+    }
 
     @Test
     public void test_spel() {

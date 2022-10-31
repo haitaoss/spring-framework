@@ -48,7 +48,7 @@ class MyBeanPostProcessor implements SmartInstantiationAwareBeanPostProcessor {
 
     /*@Override
     public Object getEarlyBeanReference(Object bean, String beanName) throws BeansException {
-        // TODOHAITAO: 2022/9/4 解决方式一
+        // 解决方式一
         return getObject(bean);
     }*/
 
@@ -74,11 +74,11 @@ class AService {
 class BService {
     @Autowired
     @Lazy
-    // TODOHAITAO: 2022/9/4 解决方式二
+    // 解决方式二
     AService aService;
 
     @Lookup
-    // TODOHAITAO: 2022/9/4 解决方式三
+    // 解决方式三
     public AService aService() {
         return null;
     }

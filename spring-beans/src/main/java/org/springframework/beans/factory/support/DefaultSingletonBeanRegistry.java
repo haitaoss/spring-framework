@@ -203,7 +203,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
     }
 
     /**
-     * TODOHAITAO 解决循环依赖问题的关键代码
+     * 解决循环依赖问题的关键代码
      * 在网上很多很多写源码的大佬或者是<spring源码深度解析>一书上，也没有说清楚为啥要使用三级缓存（二级缓存可不可以能够
      * 解决）答案是：可以，但是没有很好的扩展性为啥这么说
      *
@@ -280,7 +280,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
     }
 
     /**
-     * TODOHAITAO 单例bean 的创建过程
+     * 单例bean 的创建过程
      * Return the (raw) singleton object registered under the given name,
      * creating and registering a new one if none registered yet.
      *
@@ -305,7 +305,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
                     logger.debug("Creating shared instance of singleton bean '" + beanName + "'");
                 }
                 /**
-                 * TODOHAITAO 标记当前的bean马上就要被创建了
+                 * 标记当前的bean马上就要被创建了
                  * singletonsCurrentlyInCreation 在这里会把 beanName 加入进来，若第二次循环依赖（构造器注入会抛出异常）
                  * @see cn.haitaoss.javaconfig.create.A
                  * */
@@ -448,7 +448,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
      */
     protected void beforeSingletonCreation(String beanName) {
         /**
-         * TODOHAITAO  若 singletonsCurrentlyInCreation没添加成功 就报错（含义就是 正在创建了）
+         * 若 singletonsCurrentlyInCreation没添加成功 就报错（含义就是 正在创建了）
          * @see cn.haitaoss.javaconfig.create.A
          */
         if (!this.inCreationCheckExclusions.contains(beanName) && !this.singletonsCurrentlyInCreation.add(beanName)) {

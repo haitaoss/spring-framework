@@ -1,0 +1,185 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class TransactionManagementConfigurationSelector {
+  # selectImports(AdviceMode): String[]?
+  - determineTransactionAspectClass(): String
+}
+class AbstractPlatformTransactionManager {
+  + getTransaction(TransactionDefinition?): TransactionStatus
+  - startTransaction(TransactionDefinition, Object, boolean, SuspendedResourcesHolder?): TransactionStatus
+  # doGetTransaction(): Object
+  # doBegin(Object, TransactionDefinition): void
+  # isExistingTransaction(Object): boolean
+  + rollback(TransactionStatus): void
+  # newTransactionStatus(TransactionDefinition, Object?, boolean, boolean, boolean, Object?): DefaultTransactionStatus
+  # prepareSynchronization(DefaultTransactionStatus, TransactionDefinition): void
+  + commit(TransactionStatus): void
+  # doCommit(DefaultTransactionStatus): void
+  # doRollback(DefaultTransactionStatus): void
+  # useSavepointForNestedTransaction(): boolean
+  + getTransactionSynchronization(): int
+  - cleanupAfterCompletion(DefaultTransactionStatus): void
+}
+class AbstractRoutingDataSource {
+  + setDataSourceLookup(DataSourceLookup?): void
+  + unwrap(Class<T>): T
+  + isWrapperFor(Class<?>): boolean
+  # determineCurrentLookupKey(): Object?
+  # resolveSpecifiedLookupKey(Object): Object
+  + getResolvedDataSources(): Map<Object, DataSource>
+  # determineTargetDataSource(): DataSource
+  + getResolvedDefaultDataSource(): DataSource?
+  + afterPropertiesSet(): void
+  + setLenientFallback(boolean): void
+  + getConnection(String, String): Connection
+  + getConnection(): Connection
+  + setDefaultTargetDataSource(Object): void
+  # resolveSpecifiedDataSource(Object): DataSource
+  + setTargetDataSources(Map<Object, Object>): void
+}
+class AbstractTransactionManagementConfiguration {
+  + setImportMetadata(AnnotationMetadata): void
+  ~ setConfigurers(Collection<TransactionManagementConfigurer>): void
+  + transactionalEventListenerFactory(): TransactionalEventListenerFactory
+}
+class AdviceModeImportSelector<A> {
+  # getAdviceModeAttributeName(): String
+  + selectImports(AnnotationMetadata): String[]
+  # selectImports(AdviceMode): String[]?
+}
+class AnnotationTransactionAttributeSource {
+  # allowPublicMethodsOnly(): boolean
+  # findTransactionAttribute(Class<?>): TransactionAttribute?
+  + isCandidateClass(Class<?>): boolean
+  + equals(Object?): boolean
+  # findTransactionAttribute(Method): TransactionAttribute?
+  # determineTransactionAttribute(AnnotatedElement): TransactionAttribute?
+  + hashCode(): int
+}
+class BeanFactoryTransactionAttributeSourceAdvisor {
+  + getPointcut(): Pointcut
+  + setTransactionAttributeSource(TransactionAttributeSource): void
+  + setClassFilter(ClassFilter): void
+}
+interface DataSource << interface >> {
+  + setLogWriter(PrintWriter): void
+  + getConnection(String, String): Connection
+  + createConnectionBuilder(): ConnectionBuilder
+  + getConnection(): Connection
+  + setLoginTimeout(int): void
+  + getLogWriter(): PrintWriter
+  + getLoginTimeout(): int
+}
+class DataSourceTransactionManager {
+  # doCleanupAfterCompletion(Object): void
+  # prepareTransactionalConnection(Connection, TransactionDefinition): void
+  # doResume(Object?, Object): void
+  + isEnforceReadOnly(): boolean
+  # doBegin(Object, TransactionDefinition): void
+  + getDataSource(): DataSource?
+  + getResourceFactory(): Object
+  # doRollback(DefaultTransactionStatus): void
+  # doCommit(DefaultTransactionStatus): void
+  + setDataSource(DataSource?): void
+  # obtainDataSource(): DataSource
+  # doGetTransaction(): Object
+  + setEnforceReadOnly(boolean): void
+  # isExistingTransaction(Object): boolean
+  # doSuspend(Object): Object
+  + afterPropertiesSet(): void
+  # doSetRollbackOnly(DefaultTransactionStatus): void
+  # translateException(String, SQLException): RuntimeException
+}
+interface ImportSelector << interface >> {
+  + getExclusionFilter(): Predicate<String>?
+  + selectImports(AnnotationMetadata): String[]
+}
+class InfrastructureAdvisorAutoProxyCreator {
+  # initBeanFactory(ConfigurableListableBeanFactory): void
+  # isEligibleAdvisorBean(String): boolean
+}
+interface PlatformTransactionManager << interface >> {
+  + rollback(TransactionStatus): void
+  + getTransaction(TransactionDefinition?): TransactionStatus
+  + commit(TransactionStatus): void
+}
+class ProxyTransactionManagementConfiguration {
+  + transactionAdvisor(TransactionAttributeSource, TransactionInterceptor): BeanFactoryTransactionAttributeSourceAdvisor
+  + transactionAttributeSource(): TransactionAttributeSource
+  + transactionInterceptor(TransactionAttributeSource): TransactionInterceptor
+}
+class TransactionAspectSupport {
+  # currentTransactionInfo(): TransactionInfo?
+  + setBeanFactory(BeanFactory?): void
+  # invokeWithinTransaction(Method, Class<?>?, InvocationCallback): Object?
+  # determineTransactionManager(TransactionAttribute?): TransactionManager?
+  # createTransactionIfNecessary(PlatformTransactionManager?, TransactionAttribute?, String): TransactionInfo
+  # completeTransactionAfterThrowing(TransactionInfo?, Throwable): void
+  # cleanupTransactionInfo(TransactionInfo?): void
+  # commitTransactionAfterReturning(TransactionInfo?): void
+  + getTransactionAttributeSource(): TransactionAttributeSource?
+  # getBeanFactory(): BeanFactory?
+  + getTransactionManager(): TransactionManager?
+  + afterPropertiesSet(): void
+}
+class TransactionInterceptor {
+  - writeObject(ObjectOutputStream): void
+  + invoke(MethodInvocation): Object?
+  - readObject(ObjectInputStream): void
+}
+interface TransactionManagementConfigurer << interface >> {
+  + annotationDrivenTransactionManager(): TransactionManager
+}
+interface TransactionManager << interface >>
+class TransactionSynchronizationManager {
+  + unbindResourceIfPossible(Object): Object?
+  + registerSynchronization(TransactionSynchronization): void
+  + setActualTransactionActive(boolean): void
+  + getResourceMap(): Map<Object, Object>
+  + bindResource(Object, Object): void
+  + getCurrentTransactionName(): String?
+  + isSynchronizationActive(): boolean
+  + clearSynchronization(): void
+  + getResource(Object): Object?
+  + hasResource(Object): boolean
+  + getCurrentTransactionIsolationLevel(): Integer?
+  + setCurrentTransactionReadOnly(boolean): void
+  + getSynchronizations(): List<TransactionSynchronization>
+  + unbindResource(Object): Object
+  + setCurrentTransactionIsolationLevel(Integer?): void
+  + isActualTransactionActive(): boolean
+  + initSynchronization(): void
+  + setCurrentTransactionName(String?): void
+  + clear(): void
+  - doUnbindResource(Object): Object?
+  + isCurrentTransactionReadOnly(): boolean
+  - doGetResource(Object): Object?
+}
+ProxyTransactionManagementConfiguration --* TransactionManagementConfigurationSelector
+InfrastructureAdvisorAutoProxyCreator --* TransactionManagementConfigurationSelector
+TransactionSynchronizationManager --* DataSourceTransactionManager
+TransactionManagementConfigurer --* AbstractTransactionManagementConfiguration
+TransactionManager --* TransactionManagementConfigurer
+AbstractPlatformTransactionManager            -[#008200,dashed]-^  PlatformTransactionManager
+AbstractRoutingDataSource                    "1" *-[#595959,plain]-> "resolvedDataSources\n*" DataSource
+AbstractRoutingDataSource                     -[#008200,dashed]-^  DataSource
+AbstractTransactionManagementConfiguration   "1" *-[#595959,plain]-> "txManager\n1" TransactionManager
+AdviceModeImportSelector                      -[#008200,dashed]-^  ImportSelector
+DataSourceTransactionManager                  -[#000082,plain]-^  AbstractPlatformTransactionManager
+DataSourceTransactionManager                 "1" *-[#595959,plain]-> "dataSource\n1" DataSource
+DataSourceTransactionManager                  -[#008200,dashed]-^  PlatformTransactionManager
+PlatformTransactionManager                    -[#008200,plain]-^  TransactionManager
+ProxyTransactionManagementConfiguration       -[#000082,plain]-^  AbstractTransactionManagementConfiguration
+ProxyTransactionManagementConfiguration       -[#595959,dashed]->  AnnotationTransactionAttributeSource         : "«create»"
+ProxyTransactionManagementConfiguration       -[#595959,dashed]->  BeanFactoryTransactionAttributeSourceAdvisor : "«create»"
+ProxyTransactionManagementConfiguration       -[#595959,dashed]->  TransactionInterceptor                       : "«create»"
+TransactionAspectSupport                     "1" *-[#595959,plain]-> "transactionManagerCache\n*" TransactionManager
+TransactionInterceptor                        -[#000082,plain]-^  TransactionAspectSupport
+TransactionManagementConfigurationSelector    -[#000082,plain]-^  AdviceModeImportSelector
+
+
+@enduml

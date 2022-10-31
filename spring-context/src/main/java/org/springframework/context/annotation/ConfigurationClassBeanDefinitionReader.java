@@ -219,7 +219,7 @@ class ConfigurationClassBeanDefinitionReader {
             if (beanName.equals(beanMethod.getConfigurationClass().getBeanName())) {
                 throw new BeanDefinitionStoreException(beanMethod.getConfigurationClass().getResource().getDescription(),
                         beanName, "Bean name derived from @Bean method '" + beanMethod.getMetadata().getMethodName() +
-                        "' clashes with bean name for containing configuration class; please make those names unique!");
+                                  "' clashes with bean name for containing configuration class; please make those names unique!");
             }
             return;
         }
@@ -240,10 +240,13 @@ class ConfigurationClassBeanDefinitionReader {
              * 如果是实例的@Bean 方法，要记录一下配置类为 该@Bean 的 FactoryBean。
              * 	但创建 @Bean实例时，必须要先创建他的  FactoryBean。
              * 	因此最好不要通过@Bean 来注册 BeanFactoryPostProcessor 和 BeanPostProcessor。因为会打破bean工厂和bean的生命周期
-             *        @see // TODOHAITAO: 2022/9/10 这里demo测试一下
              * */
             // instance @Bean method。
             beanDef.setFactoryBeanName(configClass.getBeanName());
+            /**
+             * 设置工厂方法名字，在实例化bean的时候，如果BeanDefinition有这个值 会先会实例化其Factory
+             * {@link AbstractAutowireCapableBeanFactory#createBeanInstance(String, RootBeanDefinition, Object[])}
+             * */
             beanDef.setUniqueFactoryMethodName(methodName);
         }
 
@@ -341,13 +344,13 @@ class ConfigurationClassBeanDefinitionReader {
         // At this point, it's a top-level override (probably XML), just having been parsed
         // before configuration class processing kicks in...
         if (this.registry instanceof DefaultListableBeanFactory &&
-                !((DefaultListableBeanFactory) this.registry).isAllowBeanDefinitionOverriding()) {
+            !((DefaultListableBeanFactory) this.registry).isAllowBeanDefinitionOverriding()) {
             throw new BeanDefinitionStoreException(beanMethod.getConfigurationClass().getResource().getDescription(),
                     beanName, "@Bean definition illegally overridden by existing bean definition: " + existingBeanDef);
         }
         if (logger.isDebugEnabled()) {
             logger.debug(String.format("Skipping bean definition for %s: a definition for bean '%s' " +
-                            "already exists. This top-level bean definition is considered as an override.",
+                                       "already exists. This top-level bean definition is considered as an override.",
                     beanMethod, beanName));
         }
         return true;

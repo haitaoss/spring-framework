@@ -556,7 +556,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
          * 在完成 BeanFactory 阶段会设置 isConfigurationFrozen 该属性为 true
          * {@link org.springframework.context.support.AbstractApplicationContext#finishBeanFactoryInitialization(ConfigurableListableBeanFactory)}
          *
-         * allowEagerInit 就是这个 {@link DependencyDescriptor#eager} 在屡屡有啥用
+         * allowEagerInit 就是这个 {@link DependencyDescriptor#eager} ,是否初始化FactoryBean使用 {@link FactoryBean#getObjectType()} 来进行类型匹配
          * */
         if (!isConfigurationFrozen() || type == null || !allowEagerInit) {
             //  allowEagerInit 为 false 会发生啥呀
@@ -985,7 +985,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
         // 循环我们所有的bean定义名称
         // Trigger initialization of all non-lazy singleton beans...
         for (String beanName : beanNames) {
-            // // TODOHAITAO 合并我们的bean定义: 合并父子类的beanDefinition
+            // 合并我们的bean定义: 合并父子类的beanDefinition
             RootBeanDefinition bd = getMergedLocalBeanDefinition(beanName);
 
             /**
@@ -995,7 +995,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
                 // 是不是工厂bean
                 if (isFactoryBean(beanName)) {
                     /**
-                     * TODOHAITAO FactoryBean ：
+                     * FactoryBean ：
                      *  1. 会创建两个bean。FactoryBean本身 和 getObject() 返回的值。
                      *  2. getObject() 返回的bean，不是在单例bean创建的时候创建的，是在获取的时候才会生成 context.getBean("myFactoryBean")
                      *
@@ -1036,7 +1036,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
             }
         }
 
-        // TODOHAITAO 到这里所有的单实例的bean已经加载到 单例池(singletonObjects)中了
+        // 到这里所有的单实例的bean已经加载到单例池(singletonObjects)中了
 
         // 遍历bean的名字，回调满足条件的单例bean
         // Trigger post-initialization callback for all applicable beans...
@@ -1327,8 +1327,10 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
                     candidates.put(beanName, getType(beanName));
                 }
             }
+            // 通过@Primary找
             String candidateName = determinePrimaryCandidate(candidates, requiredType.toClass());
             if (candidateName == null) {
+                // 通过 @Priority(1) 找到属性值最小的
                 candidateName = determineHighestPriorityCandidate(candidates, requiredType.toClass());
             }
             if (candidateName != null) {
@@ -1337,11 +1339,13 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
                     return null;
                 }
                 if (beanInstance instanceof Class) {
+                    // 是 Class 说明，还没有实例化，在这里进行 getBean
                     return resolveNamedBean(candidateName, requiredType, args);
                 }
                 return new NamedBeanHolder<>(candidateName, (T) beanInstance);
             }
             if (!nonUniqueAsNull) {
+                // 无法确定唯一一个，所以只能爆出了
                 throw new NoUniqueBeanDefinitionException(requiredType, candidates.keySet());
             }
         }

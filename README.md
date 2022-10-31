@@ -239,7 +239,7 @@ public AnnotationConfigApplicationContext() {
 ```
 ## BeanFactoryPostProcessor
 
-![BeanFactoryPostProcessor类图](../BeanFactoryPostProcessor类图.png)
+![BeanFactoryPostProcessor类图](.README_imgs/BeanFactoryPostProcessor类图.png)
 
 特点：只会在 IOC 生命周期中 执行一次。就是一个bean工厂执行一次
 
@@ -255,6 +255,209 @@ public AnnotationConfigApplicationContext() {
  *     - 此时的参数就是beanFactory，可以注册BeanDefinition、创建Bean
  *     - 可以在这里创建bean 来实现提前创建的目的，但是会破坏bean的生命周期，因为此时容器中还没有创建出BeanPostProcessor
  *     - 在这里注册 BeanDefinitionRegistryPostProcessor、BeanFactoryPostProcessor 是没有用的，不会作为BeanFactory 来执行回调方法
+ * */
+```
+## ConfigurationClassPostProcessor
+
+> Spring注解开发就是靠这个类来实现的
+
+### 示例代码
+
+```java
+@Configuration
+@Lazy
+public class FullConfigClassTest {
+    public static class A {
+    }
+
+    public void test() {
+        System.out.println("a2()--->" + a2());
+        System.out.println("a2()--->" + a2());
+
+        System.out.println("a3()--->" + a3());
+        System.out.println("a3()--->" + a3());
+
+        System.out.println("a4()--->" + a4());
+        System.out.println("a4()--->" + a4());
+    }
+
+    public static void main(String[] args) {
+        System.setProperty(org.springframework.cglib.core.DebuggingClassWriter.DEBUG_LOCATION_PROPERTY, "/Users/haitao/Desktop/xx");
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(FullConfigClassTest.class);
+        //        context.getBean(FullConfigClassTest.class).test();
+        System.out.println("====");
+        context.getBean("a");
+    }
+
+    @Bean
+    public A a() {
+        System.out.print("a1()--->");
+        printHitIntercept();
+
+        System.out.print("a2()--->");
+        this.a2();
+        System.out.print("a22()--->");
+        this.a2();
+
+        System.out.print("a3()--->");
+        a3();
+        System.out.print("a4()--->");
+        a4();
+        return new A();
+    }
+
+    @Bean
+    //    @Scope("prototype")
+    public A a2() {
+        printHitIntercept();
+        return new A();
+    }
+
+    public A a3() {
+        printHitIntercept();
+        return new A();
+    }
+
+    @Bean
+    public static A a4() {
+        printHitIntercept();
+        return new A();
+    }
+
+    private static void printHitIntercept() {
+        System.out.println(Arrays.stream(Thread.currentThread().getStackTrace())
+                .map(StackTraceElement::getMethodName)
+                .filter(item -> item.contains("intercept"))
+                .collect(Collectors.toList()));
+    }
+
+
+}
+```
+
+### 类图
+
+```java
+/**
+ * ConfigurationClassPostProcessor
+ *
+ * BeanFactory执行阶段：修改、注册BeanDefinition阶段 -> 处理BeanFactory阶段
+ *
+ * 修改、注册BeanDefinition阶段 {@link ConfigurationClassPostProcessor#postProcessBeanDefinitionRegistry(BeanDefinitionRegistry)}
+ *      解析JavaConfig注册解析出来的BeanDefinition 到 BeanDefinitionMap中
+ *
+ *
+ * 处理BeanFactory阶段 {@link ConfigurationClassPostProcessor#postProcessBeanFactory(ConfigurableListableBeanFactory)}
+ *      - 增强配置类class {@link ConfigurationClassPostProcessor#enhanceConfigurationClasses(ConfigurableListableBeanFactory)}
+ *      - 注册 ImportAwareBeanPostProcessor 到BeanFactory中
+ * */
+```
+
+在`postProcessBeanFactory`阶段会注册[ImportAwareBeanPostProcessor](#ImportAwareBeanPostProcessor)到容器中
+
+![ConfigurationClassPostProcessor类图](.README_imgs/ConfigurationClassPostProcessor类图.png)
+
+### 细说`ConfigurationClassPostProcessor#postProcessBeanDefinitionRegistry`
+> 这就是配置类解析原理咯
+>
+> 配置类是通过 [ClassPathBeanDefinitionScanner](#ClassPathBeanDefinitionScanner) 解析、注册到BeanDefinitionMap中的，
+>
+> 而`ConfigurationClassPostProcessor`是在实例化`AnnotationConfigApplicationContext`的时候设置到BeanFactory中的
+>
+> 因为`ConfigurationClassPostProcessor`实现了`BeanDefinitionRegistryPostProcessor`接口，所以万恶之源应该从`postProcessBeanDefinitionRegistry`方法开始看
+
+```java
+/**
+ * 1. BeanDefinitionRegistryPostProcessor 回调
+ * {@link org.springframework.context.annotation.ConfigurationClassPostProcessor#postProcessBeanDefinitionRegistry(BeanDefinitionRegistry)}
+ *
+ * 2. 处理方法
+ * {@link org.springframework.context.annotation.ConfigurationClassPostProcessor#processConfigBeanDefinitions(BeanDefinitionRegistry)}
+ *
+ * 3. 校验 ApplicationContext 入参传入的Class 是否是配置类
+ *       什么才是配置类？{@link org.springframework.context.annotation.ConfigurationClassUtils#checkConfigurationClassCandidate(BeanDefinition, MetadataReaderFactory)}
+ *       有 @Configuration(proxyBeanMethods=true) full配置类
+ *       有 @Configuration(proxyBeanMethods=false) lite配置类
+ *       无 @Configuration 但是有  (@Component || @ComponentScan || @Import || @ImportResource || @Bean ) lite配置类
+ *       都不满足就不是配置类
+ *
+ *       将配置类添加到集合中 --> configCandidates
+ *
+ * 4. 对 configCandidates 进行升序排序。可通过 @Order 实现排序
+ *
+ * 5. 创建解析器
+ * {@link org.springframework.context.annotation.ConfigurationClassParser#ConfigurationClassParser(org.springframework.core.type.classreading.MetadataReaderFactory, org.springframework.beans.factory.parsing.ProblemReporter, org.springframework.core.env.Environment, org.springframework.core.io.ResourceLoader, org.springframework.beans.factory.support.BeanNameGenerator, org.springframework.beans.factory.support.BeanDefinitionRegistry)}
+ *
+ * 6. 使用解析器解析 configCandidates。{@link org.springframework.context.annotation.ConfigurationClassParser#parse(java.util.Set)}
+ *      注：解析是有序的。先解析完非 @Import(DeferredImportSelector.class) 的配置类，在解析 @Import(DeferredImportSelector.class)
+ *
+ *      1. 先解析的内容 @Component、@ComponentScans、@ComponentScan、@Bean、@ImportResource、@Import(非实现DeferredImportSelector.class)
+ *          {@link org.springframework.context.annotation.ConfigurationClassParser#processConfigurationClass(org.springframework.context.annotation.ConfigurationClass, java.util.function.Predicate)}
+ *          为了处理配置类的父类是配置类的情况，采用 do...while 递归解析 保证所有的内容都能解析完
+ *              {@link org.springframework.context.annotation.ConfigurationClassParser#doProcessConfigurationClass(org.springframework.context.annotation.ConfigurationClass, org.springframework.context.annotation.ConfigurationClassParser.SourceClass, java.util.function.Predicate)}
+ *                  1. 有@Component 注解，解析成员内部类信息 {@link org.springframework.context.annotation.ConfigurationClassParser#processMemberClasses(org.springframework.context.annotation.ConfigurationClass, org.springframework.context.annotation.ConfigurationClassParser.SourceClass, java.util.function.Predicate)}
+ *                  2. 解析 @PropertySource
+ *                  3. 对 @ComponentScans、@ComponentScan 解析。
+ *                      实例化 Scanner，默认会添加对@Component 解析的 includeFilter {@link ClassPathBeanDefinitionScanner#ClassPathBeanDefinitionScanner(BeanDefinitionRegistry, boolean, Environment, ResourceLoader)}
+ *                      {@link org.springframework.context.annotation.ComponentScanAnnotationParser#parse(org.springframework.core.annotation.AnnotationAttributes, java.lang.String)}
+ *                      {@link org.springframework.context.annotation.ClassPathBeanDefinitionScanner#doScan(java.lang.String...)}
+ *                      3.1 excludeFilter + includeFilter + @Conditional 的校验 {@link org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#isCandidateComponent(org.springframework.core.type.classreading.MetadataReader)}
+ *                          注：
+ *                      3.2 设置BeanDefinition信息：beanName、@Autowired、@Lazy、@Primary、@DependsOn、@Role、@Description
+ *                      3.3 校验是否可以注册到BeanDefinitionMap中 {@link org.springframework.context.annotation.ClassPathBeanDefinitionScanner#checkCandidate(java.lang.String, org.springframework.beans.factory.config.BeanDefinition)}
+ *                      3.4 注册 BeanDefinition 到 IOC 容器中{@link ClassPathBeanDefinitionScanner#registerBeanDefinition(BeanDefinitionHolder, BeanDefinitionRegistry)}
+ *                      
+ *      2. 后解析的内容 @Import(DeferredImportSelector.class)
+ *          {@link org.springframework.context.annotation.ConfigurationClassParser.DeferredImportSelectorHandler#process()}
+ *              最终还是调用该方法解析配置类 {@link org.springframework.context.annotation.ConfigurationClassParser#processConfigurationClass(org.springframework.context.annotation.ConfigurationClass, java.util.function.Predicate)}
+ *
+ *      解析完的结果就是 Map<ConfigurationClass, ConfigurationClass> configurationClasses
+ *
+ * 7. 遍历 configurationClasses，将解析完的配置内容 定义成 BeanDefinition 注册到 BeanDefinitionMap中
+ *      {@link org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader#loadBeanDefinitions(java.util.Set)}
+ *      {@link org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsForConfigurationClass(org.springframework.context.annotation.ConfigurationClass, org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader.TrackedConditionEvaluator)}
+ *          1. 注册 @Import(非BeanDefinitionRegistry.class) 导入的类 {@link ConfigurationClassBeanDefinitionReader#registerBeanDefinitionForImportedConfigurationClass(ConfigurationClass)}
+ *          2. 注册 @Bean {@link ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsForBeanMethod(BeanMethod)}
+ *          3. 注册 @ImportResource {@link ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsFromImportedResources(Map)}
+ *          4. 注册 @Import(BeanDefinitionRegistry.class) {@link ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsFromRegistrars(Map)}
+ * */
+```
+### 细说`ConfigurationClassPostProcessor#enhanceConfigurationClasses`
+> 这里就是区别 full配置类 和 lite配置类的地方了。如果是full配置类会使用Cglib生成代理类，然后将代理类覆盖掉原来BeanDefinition记录的beanClass
+```java
+/**
+ * 强配置类class {@link ConfigurationClassPostProcessor#enhanceConfigurationClasses(ConfigurableListableBeanFactory)}
+ *      1. 遍历所有的 full配置类，使用cglib生成代理类的class
+ *      2. 使用cglib生成代理类 `Class<?> enhancedClass = enhancer.enhance(configClass, this.beanClassLoader);`
+ *          CallbackFilter是ConditionalCallbackFilter
+ *              逻辑很简单
+ *                  - 是@Bean标注的方法，生成的字节码使用的callback是 BeanMethodInterceptor
+ *                  - 方法是 setBeanFactory，生成的字节码使用的callback是 BeanFactoryAwareMethodInterceptor
+ *
+ *          Callback是 {@link ConfigurationClassEnhancer#CALLBACKS}
+ *               BeanMethodInterceptor
+ *               BeanFactoryAwareMethodInterceptor
+ *          Tips：所以要想知道full配置类中的@Bean的方法，是如果实现的得看 {@link ConfigurationClassEnhancer.BeanMethodInterceptor#intercept(Object, Method, Object[], MethodProxy)}
+ *
+ *      3. 将cglib生成的class 设置到BeanDefinition中 `beanDef.setBeanClass(enhancedClass);`
+ * */
+```
+### 细说`BeanMethodInterceptor#intercept`
+```java
+/**
+ * {@link ConfigurationClassEnhancer.BeanMethodInterceptor#intercept(Object, Method, Object[], MethodProxy)}
+ *      1. 推断出@Bean方法的beanName的值：有@Bean就返回其属性值，是数组只会返回第一个  ->  方法名
+ *      2. 是 BeanFactory 类型的bean，就创建代理类，只代理 getObject方法
+ *          Tips：是使用JDk代理，拦截{@link FactoryBean#getObject()}方法
+ *      3. isCurrentlyInvokedFactoryMethod，是true就直接`super.method`,也就是执行被代理类的方法
+ *          是通过ThreadLocal来记录当前调用的方法，当循环调用@Bean 方法时，第一次是代理对象方法，再调第二次就是执行的父类方法(也就是被代理类的方法)
+ *          return bean;
+ *          
+ *      4. 不满足 isCurrentlyInvokedFactoryMethod ，解析bean引用
+ *          说白了就是从BeanFactory找Bean，找不到就会实例化bean，实例化的时候就会往ThreadLocal记录一下，
+ *          然后再执行代理对象的方法进行实例化，也就是会回调到当前方法 {@link BeanMethodInterceptor#intercept(Object, Method, Object[], MethodProxy)}
+ *          因为实例化的时候记录了当前方法，所以回调当前方法就会满足 isCurrentlyInvokedFactoryMethod 条件，所以就是 super.method 进行实例化
+ *          return bean;
  * */
 ```
 ## BeanPostProcessor
@@ -362,6 +565,32 @@ public AnnotationConfigApplicationContext() {
  *
  * 销毁阶段 {@link ApplicationListenerDetector#postProcessBeforeDestruction(Object, String)}
  *      销毁的bean是 ApplicationListener 类型，就从事件广播器中移除
+ * */
+```
+### ImportAwareBeanPostProcessor
+![ImportAwareBeanPostProcessor类图](.README_imgs/ImportAwareBeanPostProcessor类图.png)
+```java
+/**
+ * ImportAwareBeanPostProcessor
+ *
+ * BeanPostProcessor执行过程：实例化前后置->推断构造器后置->实例化bean->合并BeanDefinition后置->实例化后后置->属性注入后置(hit)->初始化前后置(hit)->初始化后后置->销毁前后置
+ *
+ * 属性注入后置 {@link ConfigurationClassPostProcessor.ImportAwareBeanPostProcessor#postProcessProperties(PropertyValues, Object, String)}
+ *      给 EnhancedConfiguration 类型的bean注入 beanFactory 属性值
+ *      注：full配置类生成的代理类 就是实现了 EnhancedConfiguration 接口，所以这里的目的是为了给full配置类的代理类设置属性
+ *
+ * 初始化前后置 {@link ConfigurationClassPostProcessor.ImportAwareBeanPostProcessor#postProcessBeforeInitialization(Object, String)}
+ *      给 ImportAware 类型的bean注入注解元数据。
+ *
+ *      Tips：注意只有当前bean是通过@Import导入的才会有元数据，比如下面的代码 bean是A，然后其元数据其实是Config这个类的元数据,
+ *      因为解析@Import是会递归判断配置类的注解上是否有@Import，找到就记录配置类作为@Import的元数据
+ *
+ *      @Import(A.class)
+ *      @interface MyAnnotation{}
+ *
+ *      @Component
+ *      @MyAnnotation
+ *      class Config{}
  * */
 ```
 ## bean 创建的生命周期
@@ -777,6 +1006,13 @@ public void 测试ProxyFactory() {
 
 ```java
 /**
+ * JDK      {@link JdkDynamicAopProxy#invoke(Object, Method, Object[])}
+ * Cglib    {@link CglibAopProxy.DynamicAdvisedInterceptor#intercept(Object, Method, Object[], MethodProxy)}
+ * 
+ * 需要代理的方法都是执行 ReflectiveMethodInvocation#proceed
+ * */
+
+/**
  * {@link ReflectiveMethodInvocation#proceed()}
  *      注：属性{@link ReflectiveMethodInvocation#interceptorsAndDynamicMethodMatchers}(拦截器集合) 是通过这个方法得到的{@link DefaultAdvisorChainFactory#getInterceptorsAndDynamicInterceptionAdvice(Advised, Method, Class)}
  *
@@ -798,72 +1034,6 @@ public void 测试ProxyFactory() {
  *      执行时会判断当前方法是否匹配，匹配才执行其拦截方法
  * */
 ```
-
-## 配置类解析原理
-
-> 配置类是通过`ConfigurationClassPostProcessor`解析、注册到BeanDefinitionMap中的，
->
-> 而`ConfigurationClassPostProcessor`是在实例化`AnnotationConfigApplicationContext`的时候设置到BeanFactory中的
->
-> 因为`ConfigurationClassPostProcessor`实现了`BeanDefinitionRegistryPostProcessor`接口，所以万恶之源应该从`postProcessBeanDefinitionRegistry`方法开始看
-
-```java
-/**
- * 1. BeanDefinitionRegistryPostProcessor 回调
- * {@link org.springframework.context.annotation.ConfigurationClassPostProcessor#postProcessBeanDefinitionRegistry(BeanDefinitionRegistry)}
- *
- * 2. 处理方法
- * {@link org.springframework.context.annotation.ConfigurationClassPostProcessor#processConfigBeanDefinitions(BeanDefinitionRegistry)}
- *
- * 3. 校验 ApplicationContext 入参传入的Class 是否是配置类
- *       什么才是配置类？{@link org.springframework.context.annotation.ConfigurationClassUtils#checkConfigurationClassCandidate(BeanDefinition, MetadataReaderFactory)}
- *       有 @Configuration(proxyBeanMethods=true) full配置类
- *       有 @Configuration(proxyBeanMethods=false) lite配置类
- *       无 @Configuration 但是有  (@Component || @ComponentScan || @Import || @ImportResource || @Bean ) lite配置类
- *       都不满足就不是配置类
- *
- *       将配置类添加到集合中 --> configCandidates
- *
- * 4. 对 configCandidates 进行升序排序。可通过 @Order 实现排序
- *
- * 5. 创建解析器
- * {@link org.springframework.context.annotation.ConfigurationClassParser#ConfigurationClassParser(org.springframework.core.type.classreading.MetadataReaderFactory, org.springframework.beans.factory.parsing.ProblemReporter, org.springframework.core.env.Environment, org.springframework.core.io.ResourceLoader, org.springframework.beans.factory.support.BeanNameGenerator, org.springframework.beans.factory.support.BeanDefinitionRegistry)}
- *
- * 6. 使用解析器解析 configCandidates。{@link org.springframework.context.annotation.ConfigurationClassParser#parse(java.util.Set)}
- *      注：解析是有序的。先解析完非 @Import(DeferredImportSelector.class) 的配置类，在解析 @Import(DeferredImportSelector.class)
- *
- *      1. 先解析的内容 @Component、@ComponentScans、@ComponentScan、@Bean、@ImportResource、@Import(非实现DeferredImportSelector.class)
- *          {@link org.springframework.context.annotation.ConfigurationClassParser#processConfigurationClass(org.springframework.context.annotation.ConfigurationClass, java.util.function.Predicate)}
- *          为了处理配置类的父类是配置类的情况，采用 do...while 递归解析 保证所有的内容都能解析完
- *              {@link org.springframework.context.annotation.ConfigurationClassParser#doProcessConfigurationClass(org.springframework.context.annotation.ConfigurationClass, org.springframework.context.annotation.ConfigurationClassParser.SourceClass, java.util.function.Predicate)}
- *                  1. 有@Component 注解，解析成员内部类信息 {@link org.springframework.context.annotation.ConfigurationClassParser#processMemberClasses(org.springframework.context.annotation.ConfigurationClass, org.springframework.context.annotation.ConfigurationClassParser.SourceClass, java.util.function.Predicate)}
- *                  2. 解析 @PropertySource
- *                  3. 对 @ComponentScans、@ComponentScan 解析。
- *                      实例化 Scanner，默认会添加对@Component 解析的 includeFilter {@link ClassPathBeanDefinitionScanner#ClassPathBeanDefinitionScanner(BeanDefinitionRegistry, boolean, Environment, ResourceLoader)}
- *                      {@link org.springframework.context.annotation.ComponentScanAnnotationParser#parse(org.springframework.core.annotation.AnnotationAttributes, java.lang.String)}
- *                      {@link org.springframework.context.annotation.ClassPathBeanDefinitionScanner#doScan(java.lang.String...)}
- *                      3.1 excludeFilter + includeFilter + @Conditional 的校验 {@link org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#isCandidateComponent(org.springframework.core.type.classreading.MetadataReader)}
- *                          注：
- *                      3.2 设置BeanDefinition信息：beanName、@Autowired、@Lazy、@Primary、@DependsOn、@Role、@Description
- *                      3.3 校验是否可以注册到BeanDefinitionMap中 {@link org.springframework.context.annotation.ClassPathBeanDefinitionScanner#checkCandidate(java.lang.String, org.springframework.beans.factory.config.BeanDefinition)}
- *                      3.4 注册 BeanDefinition 到 IOC 容器中{@link ClassPathBeanDefinitionScanner#registerBeanDefinition(BeanDefinitionHolder, BeanDefinitionRegistry)}
- *                      
- *      2. 后解析的内容 @Import(DeferredImportSelector.class)
- *          {@link org.springframework.context.annotation.ConfigurationClassParser.DeferredImportSelectorHandler#process()}
- *              最终还是调用该方法解析配置类 {@link org.springframework.context.annotation.ConfigurationClassParser#processConfigurationClass(org.springframework.context.annotation.ConfigurationClass, java.util.function.Predicate)}
- *
- *      解析完的结果就是 Map<ConfigurationClass, ConfigurationClass> configurationClasses
- *
- * 7. 遍历 configurationClasses，将解析完的配置内容 定义成 BeanDefinition 注册到 BeanDefinitionMap中
- *      {@link org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader#loadBeanDefinitions(java.util.Set)}
- *      {@link org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsForConfigurationClass(org.springframework.context.annotation.ConfigurationClass, org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader.TrackedConditionEvaluator)}
- *          1. 注册 @Import(非BeanDefinitionRegistry.class) 导入的类 {@link ConfigurationClassBeanDefinitionReader#registerBeanDefinitionForImportedConfigurationClass(ConfigurationClass)}
- *          2. 注册 @Bean {@link ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsForBeanMethod(BeanMethod)}
- *          3. 注册 @ImportResource {@link ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsFromImportedResources(Map)}
- *          4. 注册 @Import(BeanDefinitionRegistry.class) {@link ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsFromRegistrars(Map)}
- * */
-```
-
 ## ClassPathBeanDefinitionScanner
 
 `ClassPathBeanDefinitionScanner` 是用来扫描包路径下的文件，判断是否符合bean的约定，满足就注册到BeanDefinitionMap中
@@ -1896,6 +2066,8 @@ public class Demo {
 
 ## @EnableAspectJAutoProxy
 
+> [示例代码](#@Aspect)
+>
 > pointcut表达式 https://zhuanlan.zhihu.com/p/63001123
 >
 > CGLIB介绍与原理 https://blog.csdn.net/zghwaicsdn/article/details/50957474
@@ -2372,10 +2544,19 @@ public class AopTest6 {
 
 ## @EnableAsync
 
+> `@EnableAsync` 会创建用来解析`@Async`注解的Advisor
+>
+> - `@Async` 标注在类上，类中所有的方法都会被代理
+>- `@Async` 标注在方法上，方法会被代理
+> - `@Async("beanName")` 通过注解值，指定方法要使用的的Executor
+>
+> 注：equals、hashCode、toString 是不会代理的
+
 ### 示例代码
 ```java
 @EnableAsync(mode = AdviceMode.PROXY)
 @Component
+// @Async
 public class EnableAsyncTest {
     @Async
     public void asyncTask() {
@@ -2514,6 +2695,7 @@ public class EnableAsyncTest {
 ```
 ### `AsyncExecutionInterceptor#invoke`
 [为啥执行该方法，看Spring代理对象的执行](#细说`ReflectiveMethodInvocation#proceed()`)
+
 ```java
 /**
  * {@link AsyncExecutionInterceptor#invoke(MethodInvocation)}
@@ -2529,9 +2711,956 @@ public class EnableAsyncTest {
 ```
 
 ## @EnableTransactionManagement
+
+> 前置知识：Connection是支持设置 事务隔离级别、是否只读的 ，是否自动提交事务
+>
+> #### 事务注解的使用
+>
+> 1. `@EnableTransactionManagement` 启用事务的功能
+> 2. `@Transactional` 标注在 类或者方法上，表示开始事务
+> 3. 想使用`@Transactional` 必须的配置`TransactionManager`(事务管理器)。配置方式有两种：
+>    - 注入类型的bean`TransactionManager`
+>    - 注入类型的bean`TransactionManagementConfigurer`
+> 4. 使用`@TransactionalEventListener`可以在事务完成时接收发布的事件
+>
+> #### 第三方持久层框架对接Spring事务
+>
+> ​	持久层框架要想使用Spring事务的功能，需要使用Spring提供的`DataSourceUtils`(工具类) 获取连接
+>
+> #### 事务传播行为
+>
+> - TransactionDefinition.PROPAGATION_REQUIRED：支持当前事务，如果不存在就创建一个新的
+> - TransactionDefinition.PROPAGATION_SUPPORTS：支持当前事务，如果不存在就以非事务的方式执行
+> - TransactionDefinition.PROPAGATION_MANDATORY：支持当前事务，如果不存在就抛出异常
+> - TransactionDefinition.PROPAGATION_REQUIRES_NEW：创建一个新的事务，如果存在事务就暂停当前事务
+> - TransactionDefinition.PROPAGATION_NOT_SUPPORTED：非事务的方式执行，如果存在事务就暂停当前事务
+> - TransactionDefinition.PROPAGATION_NEVER：非事务的方式执行，如果存在事务就抛出异常
+> - TransactionDefinition.PROPAGATION_NESTED：如果当前存在事务，则在嵌套事务内执行。否则与 PROPAGATION_REQUIRED 类似的操作
+>   - 是`DataSourceTransactionManager` 则是使用 savepoint 来实现嵌套事务
+>
+> #### Spring事务设置到重要的类
+>
+> - TransactionManager 事务管理器
+> - TransactionSynchronizationManager 事务同步管理
+> - TransactionSynchronization 事务同步
+>   -  ConnectionSynchronization（没有被Spring事务管理，是自动提交的，只不过在Spring事务结束的时候会回调接口 关闭连接，取消绑定的资源）
+>   - TransactionalApplicationListenerSynchronization（在事务完成时，回调方法发布时间，回调callback）
+> - 事务对象 DataSourceTransactionObject
+> - 事务状态 DefaultTransactionStatus
+> - 事务信息 TransactionAspectSupport.TransactionInfo
+> - DataSourceUtils 使用这个工具类获取连接，才能使用对接上Spring事务的功能
+
+### 类图
+
+`@EnableTransactionManagement`
+
+![EnableTransactionManagement](.README_imgs/EnableTransactionManagement.png)
+
+`InfrastructureAdvisorAutoProxyCreator`
+
+![PlantUML diagram](.README_imgs/oujZNORuxfKsYibbtAXchfBu3gT4qgzT0SMnYYtiKTjm6vN.png)
+
+`TransactionInfo`
+
+> 每个`@Transaction`方法对应一个 TransactionInfo 实例
+
+![TransactionInfo类图](.README_imgs/TransactionInfo类图.png)
+
+### 示例代码
+
+#### 动态数据源+事务管理器配置
+
+```java
+@Configuration
+public class Config {
+    public static ThreadLocal<String> currentDB = new NamedThreadLocal<>("动态数据源key");
+
+    //    @Bean
+    public TransactionManagementConfigurer transactionManagementConfigurer() {
+        return new TransactionManagementConfigurer() {
+            @Override
+            public TransactionManager annotationDrivenTransactionManager() {
+                JdbcTransactionManager jdbcTransactionManager = new JdbcTransactionManager();
+                jdbcTransactionManager.setDataSource(dynamicDataSource());
+                return jdbcTransactionManager;
+            }
+        };
+    }
+
+    @Bean
+    public TransactionManager transactionManager() {
+        DataSourceTransactionManager dataSourceTransactionManager = new DataSourceTransactionManager();
+        dataSourceTransactionManager.setDataSource(dynamicDataSource());
+        return dataSourceTransactionManager;
+    }
+
+    @Bean
+    public JdbcTemplate jdbcTemplate() {
+        JdbcTemplate jdbcTemplate = new JdbcTemplate();
+        jdbcTemplate.setDataSource(dynamicDataSource());
+        return jdbcTemplate;
+    }
+
+    @Bean
+    public AbstractRoutingDataSource dynamicDataSource() {
+        AbstractRoutingDataSource dataSource = new AbstractRoutingDataSource() {
+            @Override
+            protected Object determineCurrentLookupKey() {
+                return currentDB.get();
+            }
+        };
+        HashMap<Object, Object> map = new HashMap<>();
+        map.put("db1", dataSource1());
+        map.put("db2", dataSource2());
+        dataSource.setTargetDataSources(map);
+        dataSource.setDefaultTargetDataSource(dataSource1());
+        return dataSource;
+    }
+
+    @Bean
+    public DataSource dataSource1() {
+        return genDs.apply("d1");
+    }
+
+    @Bean
+    public DataSource dataSource2() {
+        return genDs.apply("d2");
+    }
+
+    public Function<String, DataSource> genDs = dbName -> {
+        DruidDataSource druidDataSource = new DruidDataSource();
+        druidDataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
+        druidDataSource.setUrl(String.format("jdbc:mysql://localhost:3306/%s?useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowMultiQueries=true", dbName));
+        druidDataSource.setUsername("root");
+        druidDataSource.setPassword("root");
+        return druidDataSource;
+    };
+}
+```
+
+#### 出现异常不回滚
+
+```java
+@EnableTransactionManagement(mode = AdviceMode.PROXY, order = 1)
+@Configuration
+public class EnableTransactionManagementTest2 {
+    /**
+     * 测试事务回滚失败场景
+     *
+     * 首先对方法的增强都是通过Advisor接口实现的，具体的增强逻辑是 Advisor的Advice。
+     *
+     * 拿到Advisor：
+     * 1. 直接从容器中拿到Advisor类型的bean，添加到集合中
+     * 2. 解析@Aspect类 中的AOP注解 生成Advisor，添加到集合中
+     *
+     * 对集合 List<Advisor> 进行升序排序：可以通过 @Order 指定排序值，值越小的先执行，值相同就不动(默认策略)。
+     *
+     * 而事务的实现就是往容器中注入Advisor类型的bean，所以其添加到集合中的顺序肯定比AOP的Advisor要早。
+     *
+     * 当我们不给切面类和事务注解设置排序值，该默认值是Integer的最大值，又因为事务比切面类先添加的，所以在默认情况下
+     * 事务的Advice会比切面类先执行，所以方法抛出异常时最先捕获到的是 AOP，如果AOP不把异常往上抛出，则事务Advice就捕获不到异常，从而不会回滚。
+     *
+     * 但是，当我们给切面类设置排序值，让其优先于事务Advice先执行时，就可以保证 事务Advice是最先接触到异常的从而可以及时回滚。
+     */
+    /*@Component
+    @EnableAspectJAutoProxy*/
+    @Aspect
+    @Order(-1) // 指定排序值，让AOP先执行，从而保证最先拿到异常的是事务Advice 从而能及时回滚
+    public class MyAspect {
+        @Around("execution(* *test2(..))")
+        public void around(ProceedingJoinPoint proceedingJoinPoint) {
+            try {
+                proceedingJoinPoint.proceed();
+            } catch (Throwable e) {
+                System.err.println("MyAspect--->捕获到异常不抛出，所以事务不会回滚，异常信息：" + e.getMessage());
+            }
+        }
+    }
+
+    @Bean
+    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+    public static DefaultIntroductionAdvisor MyAdvisor() {
+        return new DefaultIntroductionAdvisor(new MethodInterceptor() {
+            @Nullable
+            @Override
+            public Object invoke(@Nonnull MethodInvocation invocation) throws Throwable {
+                try {
+                    return invocation.proceed();
+                } catch (Throwable e) {
+                    System.err.println("MyAdvisor--->捕获到异常不抛出，所以事务不会回滚，异常信息：" + e.getMessage());
+                    return null;
+                }
+            }
+        }) {
+            @Override
+            public boolean matches(Class<?> clazz) {
+                return EnableTransactionManagementTest2.class.isAssignableFrom(clazz);
+            }
+
+            @Override
+            public int getOrder() {
+                return -1;
+            }
+        };
+    }
+
+    @Autowired
+    public JdbcTemplate jdbcTemplate;
+
+    @Transactional(rollbackFor = Exception.class)
+    public void test2() {
+        System.out.println("数据库->" + jdbcTemplate.queryForObject("select database()", String.class));
+        jdbcTemplate.execute("truncate table t1");
+        jdbcTemplate.execute("insert into t1 values('haitao')");
+        throw new RuntimeException("抛出异常");
+    }
+
+    @Bean
+    public JdbcTemplate jdbcTemplate() {
+        JdbcTemplate jdbcTemplate = new JdbcTemplate();
+        jdbcTemplate.setDataSource(dataSource1());
+        return jdbcTemplate;
+    }
+
+    @Bean
+    public DataSource dataSource1() {
+        return genDs.apply("d1");
+    }
+
+    private Function<String, DataSource> genDs = dbName -> {
+        DruidDataSource druidDataSource = new DruidDataSource();
+        druidDataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
+        druidDataSource.setUrl(String.format("jdbc:mysql://localhost:3306/%s?useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowMultiQueries=true", dbName));
+        druidDataSource.setUsername("root");
+        druidDataSource.setPassword("root");
+        return druidDataSource;
+    };
+
+    @Bean
+    public TransactionManager annotationDrivenTransactionManager() {
+        JdbcTransactionManager jdbcTransactionManager = new JdbcTransactionManager();
+        jdbcTransactionManager.setDataSource(dataSource1());
+        return jdbcTransactionManager;
+    }
+
+    public static void main(String[] args) throws Exception {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(EnableTransactionManagementTest2.class);
+        context.getBean(EnableTransactionManagementTest2.class).test2();
+        System.out.println("表记录" + context.getBean(JdbcTemplate.class).queryForList("select * from t1", String.class));
+    }
+}
+```
+#### 事务传播行为
+
+```java
+/**
+ * @author haitao.chen
+ * email haitaoss@aliyun.com
+ * date 2022-10-20 20:40
+ * 事务传播行为
+ */
+@EnableTransactionManagement
+@EnableAspectJAutoProxy(exposeProxy = true)
+@Component
+@Import(Config.class)
+public class EnableTransactionManagementTest6 {
+    @Autowired
+    public JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    public ApplicationEventMulticaster multicaster;
+
+
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
+    public void test(Propagation propagation) {
+        System.out.println("数据库->" + jdbcTemplate.queryForObject("SELECT database()", String.class));
+        jdbcTemplate.execute("TRUNCATE TABLE t1");
+        jdbcTemplate.execute("INSERT INTO t1 VALUES('haitao')");
+
+        switch (propagation.value()) {
+            case TransactionDefinition.PROPAGATION_NESTED:
+                ((EnableTransactionManagementTest6) AopContext.currentProxy()).nested();
+                break;
+            case TransactionDefinition.PROPAGATION_REQUIRES_NEW:
+                ((EnableTransactionManagementTest6) AopContext.currentProxy()).requires_new();
+                break;
+            case TransactionDefinition.PROPAGATION_REQUIRED:
+                ((EnableTransactionManagementTest6) AopContext.currentProxy()).required();
+                break;
+            case TransactionDefinition.PROPAGATION_NOT_SUPPORTED:
+                ((EnableTransactionManagementTest6) AopContext.currentProxy()).not_supported();
+                break;
+        }
+        jdbcTemplate.execute("INSERT INTO t1 VALUES('haitao2')");
+        //        throw new RuntimeException("抛出异常");
+    }
+
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.NOT_SUPPORTED)
+    public void not_supported() {
+        //        seeTable();
+        jdbcTemplate.execute("INSERT INTO t1 VALUES('not_supported-->haitao')");
+    }
+
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
+    public void required() {
+        //        seeTable();
+        jdbcTemplate.execute("INSERT INTO t1 VALUES('required-->haitao')");
+    }
+
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.NESTED)
+    public void nested() {
+        //        seeTable();
+        jdbcTemplate.execute("INSERT INTO t1 VALUES('NESTED-->haitao')");
+    }
+
+    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRES_NEW/*,isolation = Isolation.READ_UNCOMMITTED*/)
+    public void requires_new() {
+        //        seeTable();
+        jdbcTemplate.execute("INSERT INTO t1 VALUES('REQUIRES_NEW-->haitao')");
+    }
+
+    @Transactional(propagation = Propagation.NEVER)
+    public void test1() {
+        jdbcTemplate.execute("INSERT INTO t1 VALUES('NEVER-->haitao')");
+        jdbcTemplate.execute("INSERT INTO t1 VALUES('NEVER-->haitao')");
+        jdbcTemplate.execute("INSERT INTO t1 VALUES('NEVER-->haitao')");
+        seeTable();
+    }
+
+    public void seeTable() {
+        System.out.println("表记录" + jdbcTemplate.queryForList("SELECT * FROM t1", String.class));
+    }
+
+    public static void main(String[] args) throws Exception {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(EnableTransactionManagementTest6.class);
+        EnableTransactionManagementTest6 bean = context.getBean(EnableTransactionManagementTest6.class);
+        // bean.test_show_db();// 测试动态数据源
+        try {
+            //            bean.seeTable();
+            //            bean.test(Propagation.NESTED);
+            //                        bean.test(Propagation.REQUIRES_NEW);
+            //            bean.test(Propagation.REQUIRED);
+            //            bean.test(Propagation.NOT_SUPPORTED);
+            //            bean.test1();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+        }
+        //        bean.seeTable();
+    }
+```
+
+
+
+#### `@TransactionalEventListener` 的使用
+
+```java
+/**
+ * @author haitao.chen
+ * email haitaoss@aliyun.com
+ * date 2022-10-20 20:40
+ * 事务事件，在事务完成时会将事件发布到事务监听器
+ */
+@EnableTransactionManagement
+@EnableAspectJAutoProxy(exposeProxy = true)
+@Component
+@Import(Config.class)
+public class EnableTransactionManagementTest7 {
+    @Autowired
+    public JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    public ApplicationEventMulticaster multicaster;
+
+    // @Transactional(propagation = Propagation.NEVER)
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void test_transaction_event() {
+        /**
+         * 必须在有事务的情况下发布，才能注册到事务同步资源中 {@link TransactionSynchronizationManager#synchronizations},
+         * 然后在事务结束之后，才发布数据到 @TransactionalEventListener
+         * */
+        multicaster.multicastEvent(new ApplicationEvent("自定义的事务事件") {
+            @Override
+            public Object getSource() {
+                return super.getSource();
+            }
+        });
+        System.out.println("test_transaction_event事务结束了...");
+    }
+
+    // @TransactionalEventListener(fallbackExecution = true) // 不在事务下发布的事件也处理
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMPLETION)
+    public void receive(ApplicationEvent applicationEvent) {
+        System.out.println("接受到事务完成事件-->" + applicationEvent);
+    }
+
+    /**
+     * 默认的 ListenerFactory bean，之前写的太死了不支持扩展 SynchronizationCallback
+     * {@link AbstractTransactionManagementConfiguration#transactionalEventListenerFactory()}
+     * */
+    //    @Component
+    public static class MyTransactionalEventListenerFactory extends TransactionalEventListenerFactory {
+
+        @Override
+        public ApplicationListener<?> createApplicationListener(String beanName, Class<?> type, Method method) {
+            ApplicationListener<?> applicationListener = super.createApplicationListener(beanName, type, method);
+            if (applicationListener instanceof TransactionalApplicationListenerMethodAdapter) {
+                TransactionalApplicationListenerMethodAdapter listener = (TransactionalApplicationListenerMethodAdapter) applicationListener;
+                // 设置callback
+                listener.addCallback(new TransactionalApplicationListener.SynchronizationCallback() {
+                    @Override
+                    public void preProcessEvent(ApplicationEvent event) {
+                        System.out.println("preProcessEvent-->" + event);
+                    }
+
+                    @Override
+                    public void postProcessEvent(ApplicationEvent event, Throwable ex) {
+                        System.out.println("postProcessEvent-->" + event);
+                    }
+                });
+            }
+            return applicationListener;
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(EnableTransactionManagementTest7.class);
+        EnableTransactionManagementTest7 bean = context.getBean(EnableTransactionManagementTest7.class);
+
+        bean.test_transaction_event();
+    }
+}
+```
+
+#### 事务切换数据源失效
+
+```java
+/**
+ * @author haitao.chen
+ * email haitaoss@aliyun.com
+ * date 2022-10-20 20:40
+ * 在事务内切换数据源
+ */
+@EnableTransactionManagement
+@EnableAspectJAutoProxy(exposeProxy = true)
+@Component
+@Import(Config.class)
+public class EnableTransactionManagementTest8 {
+    @Autowired
+    public JdbcTemplate jdbcTemplate;
+
+    public void test_show_db() {
+        EnableTransactionManagementTest8 currentProxy = (EnableTransactionManagementTest8) AopContext.currentProxy();
+        System.out.println("开启事务的情况----->");
+        currentProxy.transaction_showDb();
+        System.out.println("不开启事务的情况----->");
+        currentProxy.no_transaction_showDb();
+    }
+
+    @Transactional
+    public void transaction_showDb() {
+        /**
+         *  在事务内动态数据源无效的。因为一开事物就会使用DataSource作为key缓存连接在 resources(事务资源) 中
+         *  而 JdbcTemplate 依赖了Spring事务，即会执行 {@link DataSourceUtils#getConnection(DataSource)} 获取连接，
+         *  会使用 DataSource 作为key从 resources 中查询资源，找到就返回。因为开启了事务所以多次获取是无效的，都是返回resources中缓存的值。
+         * */
+        showDB();
+    }
+
+    public void no_transaction_showDb() {
+        /**
+         *  由于 JdbcTemplate 依赖了Spring事务，即会执行 {@link DataSourceUtils#getConnection(DataSource)} 获取连接，
+         *  会使用 DataSource 作为key从 resources 中查询资源，找到就返回。没开启事务所以从resources中找不到，所以会执行
+         *  {@link AbstractRoutingDataSource#getConnection()} 获取连接，又因为不开启事务，所以并不会将连接缓存到 resource、synchronizations 中，
+         *  所以每次执行SQL，都会 {@link AbstractRoutingDataSource#getConnection()}，从而每次都是新连接
+         * */
+        showDB();
+    }
+
+    private void showDB() {
+        currentDB.set("db1");
+        System.out.println("数据库->" + jdbcTemplate.queryForObject("select database()", String.class));
+        currentDB.set("db2");
+        System.out.println("数据库->" + jdbcTemplate.queryForObject("select database()", String.class));
+    }
+
+    public static void main(String[] args) throws Exception {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(EnableTransactionManagementTest8.class);
+        EnableTransactionManagementTest8 bean = context.getBean(EnableTransactionManagementTest8.class);
+        bean.test_show_db();// 测试动态数据源
+    }
+}
+```
+
+
+
+### 使用`@EnableTransactionManagement`会发生什么?
+
+> 就是注册解析`@Transactional` 注解的Advisor，而Advisor使用的Advice是`TransactionInterceptor`
+>
+> 所以要想知道Spring事务是如何实现的得看 [TransactionInterceptor#invoke](#细说`TransactionInterceptor#invoke`)
+
+```java
+/**
+ * 使用`@EnableTransactionManagement` 会导入`@Import(TransactionManagementConfigurationSelector.class)`
+ *
+ * 解析配置类在解析@Import的时候，因为 {@link TransactionManagementConfigurationSelector} 的父类 AdviceModeImportSelector 实现了 {@link ImportSelector}
+ *     所以会回调这个方法 {@link AdviceModeImportSelector#selectImports(AnnotationMetadata)}
+ *      - 拿到注解 `@EnableTransactionManagement(mode = AdviceMode.PROXY)` 的mode属性值，回调子类方法 {@link TransactionManagementConfigurationSelector#selectImports(AdviceMode)}
+ *
+ *
+ * 执行 {@link TransactionManagementConfigurationSelector#selectImports(AdviceMode)}
+ *      该方法返回这两个类 AutoProxyRegistrar、ProxyTransactionManagementConfiguration, 也就是会将其添加到 BeanDefinitionMap中。
+ *
+ * AutoProxyRegistrar {@link AutoProxyRegistrar}
+ *      继承 ImportBeanDefinitionRegistrar，所以解析@Import时会回调 {@link AutoProxyRegistrar#registerBeanDefinitions(AnnotationMetadata, BeanDefinitionRegistry)}
+ *      该方法会执行 {@link AopConfigUtils#registerAutoProxyCreatorIfNecessary(BeanDefinitionRegistry)} 也就是会注册
+ *      `InfrastructureAdvisorAutoProxyCreator` 到容器中。而这个类主要是拿到容器中 Advisor 类型的bean，且 Role 是 {@link BeanDefinition#ROLE_INFRASTRUCTURE} 才作为 Advisor，
+ *      然后遍历Advisor 判断处理的bean是否符合条件，符合就创建代理对象。
+ *      总结：就是注册InfrastructureAdvisorAutoProxyCreator,这个东西是BeanPostProcessor 在实例化前、提前AOP、初始后 会判断bean，是否要进行代理
+ *
+ * ProxyTransactionManagementConfiguration {@link ProxyTransactionManagementConfiguration}
+ *      继承 AbstractTransactionManagementConfiguration
+ *          1. 会依赖注入 {@link TransactionManagementConfigurer}，这个是用来配置事务管理器的 {@link AbstractTransactionManagementConfiguration#txManager}
+ *          2. 会通过@Bean注册 {@link TransactionalEventListenerFactory}，用于处理 @TransactionalEventListener 标注的方法，将方法构造成事件监听器，注册到事件广播器中
+ *
+ *      ProxyTransactionManagementConfiguration 通过@Bean 注册 Advisor、Advisor的Advice 和 AnnotationTransactionAttributeSource
+ *          Advisor {@link BeanFactoryTransactionAttributeSourceAdvisor}
+ *              实现 PointcutAdvisor 接口，所以是否要进行代理得看 {@link PointcutAdvisor#getPointcut()}，其Pointcut 是 TransactionAttributeSourcePointcut
+ *
+ *          Advice {@link TransactionInterceptor}
+ *              事务增强逻辑，就是靠这个实现的
+ *
+ *          Advisor和Advice都依赖这个bean {@link AnnotationTransactionAttributeSource}
+ *              用来查找、解析@Transactional。方法上找、类上找
+ **/
+```
+### `InfrastructureAdvisorAutoProxyCreator`
+[具体逻辑和`@EnableAspectJAutoProxy`是一样的](#@EnableAspectJAutoProxy)，区别就是：
+
+```java
+/**
+ * InfrastructureAdvisorAutoProxyCreator 的功能比较单一
+ *
+ * 只查找BeanFactory中Advisor类型 且 Role == BeanDefinition.ROLE_INFRASTRUCTURE 的bean  {@link InfrastructureAdvisorAutoProxyCreator#isEligibleAdvisorBean(String)}
+ * 然后使用这些Advisor判断执行后置处理器的bean是否符合增强规则，使用符合的Advisors来给bean创建代理对象
+ * */
+```
+注意：如果同时使用这两个注解，会注入的是`AnnotationAwareAspectJAutoProxyCreator`bean，因为这个就包含了`InfrastructureAdvisorAutoProxyCreator` 的功能
+```java
+@EnableTransactionManagement
+@EnableAspectJAutoProxy
+@Component
+public class A{}
+```
+
+### `TransactionAttributeSourcePointcut`
+
+```java
+/**
+ * TransactionAttributeSourcePointcut
+ *
+ * 类匹配和方法匹配是使用 transactionAttributeSource 来解析注解的
+ *      - ClassFilter {@link TransactionAttributeSourcePointcut.TransactionAttributeSourceClassFilter}
+ *          类不是java包下的 不是 Ordered类 就是匹配
+ *
+ *      - MethodMatcher {@link TransactionAttributeSourcePointcut#matches(Method, Class)}
+ *          查找 方法->方法声明的类 有@Transactional 就是匹配
+ * */
+```
+### `AnnotationTransactionAttributeSource`
+```java
+/**
+ * AnnotationTransactionAttributeSource
+ *
+ * @Transactional 解析成 RuleBasedTransactionAttribute，就是将注解的属性值设置到对象中
+ * {@link AnnotationTransactionAttributeSource#determineTransactionAttribute(AnnotatedElement)}
+ *      {@link SpringTransactionAnnotationParser#parseTransactionAnnotation(AnnotatedElement)}
+ *          {@link SpringTransactionAnnotationParser#parseTransactionAnnotation(AnnotationAttributes)}
+ * */
+```
+### `TransactionInterceptor#invoke`
+
+啥也没干，直接执行`TransactionAspectSupport#invokeWithinTransaction`
+
+### `TransactionAspectSupport#invokeWithinTransaction`
+
+```java
+/**
+ * 具体的代理逻辑
+ *
+ * 事务Advice {@link TransactionInterceptor} ,两个关键属性
+ *  - {@link TransactionAspectSupport#transactionManager}
+ *  - {@link TransactionAspectSupport#transactionAttributeSource}
+ *
+ * 事务Advice的增强逻辑
+ *  {@link TransactionInterceptor#invoke(MethodInvocation)}
+ *  {@link TransactionAspectSupport#invokeWithinTransaction(Method, Class, TransactionAspectSupport.InvocationCallback)}
+ *      1. 得到 `TransactionAttributeSource tas = getTransactionAttributeSource();`
+ *          也就是这个 AnnotationTransactionAttributeSource
+ *
+ *      2. 使用 tas 解析得到  `final TransactionAttribute txAttr = (tas != null ? tas.getTransactionAttribute(method, targetClass) : null);`
+ *          {@link TransactionAttributeSource#getTransactionAttribute(Method, Class)}
+ *          找@Transactional注解(先找方法->再从类找)，将注解的属性值映射到 TransactionAttribute 实例中。
+ *          注：默认的解析器，解析的结果是这个类 RuleBasedTransactionAttribute
+ *
+ *      3. 推断出要用的事务管理器 `final TransactionManager tm = determineTransactionManager(txAttr);`
+ *          {@link TransactionAspectSupport#determineTransactionManager(TransactionAttribute)}
+ *          推断顺序：@Transactional("tm1") 使用name从BeanFactory中获取bean  -> 默认的(通过TransactionManagementConfigurer来设置) -> BeanFactory中找TransactionManager类型的bean
+ *          注：找不到事务管理器就报错了
+ *
+ *      4.  创建事务，说白了就是通过DataSource获取Connection然后设置到事务管理器中 `TransactionInfo txInfo = createTransactionIfNecessary(ptm, txAttr, joinpointIdentification);`
+ *          {@link TransactionAspectSupport#createTransactionIfNecessary(PlatformTransactionManager, TransactionAttribute, String)}
+ *
+ *      5. 放行方法，出现异常就回滚或者提交
+ *          try{
+ *              // 放行方法
+ *              retVal = invocation.proceedWithInvocation();
+ *          }catch(Throwable ex){
+ *              出现异常的处理，看看是回滚还是提交事务。
+ *              看看异常类型是不是要回滚的类型，是就回滚，否则就提交事务 {@link RuleBasedTransactionAttribute#rollbackOn(Throwable)}
+ *              而具体的回滚类型是根据 @Transactional(rollbackFor = RuntimeException.class, rollbackForClassName = "a",noRollbackFor = Throwable.class, noRollbackForClassName = "b")
+ *              的值解析
+ *              completeTransactionAfterThrowing(txInfo, ex);
+ *          }finally {
+ *              // 清除事务信息
+ *              cleanupTransactionInfo(txInfo);
+ *          }
+ *          // 提交事务，其实就是执行 {@link AbstractPlatformTransactionManager#commit(TransactionStatus)}
+ *          commitTransactionAfterReturning(txInfo);
+ **/
+```
+### `TransactionAspectSupport#createTransactionIfNecessary`
+```java
+/**
+ * 创建事务 {@link TransactionAspectSupport#createTransactionIfNecessary(PlatformTransactionManager, TransactionAttribute, String)}
+ *      1. 根据 @Transactional 通过事务管理器获取 DefaultTransactionStatus(事务状态) {@link AbstractPlatformTransactionManager#getTransaction(TransactionDefinition)}
+ *
+ *      2. 将事务管理器、事务属性、方法标识和事务状态 装饰成 TransactionInfo
+ *
+ *      3. return TransactionInfo
+ **/
+```
+### `AbstractPlatformTransactionManager#getTransaction`
+```java
+/**
+ * {@link AbstractPlatformTransactionManager#getTransaction(TransactionDefinition)} 得到事务状态，返回的是 DefaultTransactionStatus
+ *
+ *  1. `Object transaction = doGetTransaction();` 其实就是创建事务对象，获取的意思是从 resource 中拿到资源设置给事务对象
+ *       会创建 DataSourceTransactionObject 对象，然后注入属性值：
+ *          从ThreadLocal中拿到 Map<DataSource,ConnectionHolder> {@link TransactionSynchronizationManager#resources}
+ *          DataSource 作为key，从 resources 拿到 ConnectionHolder 设置给事务对象
+ *
+ *  2. `isExistingTransaction(transaction)` 存在事务，就是事务对象有连接 且 连接是活动的事务 才是true
+ *          `return handleExistingTransaction(def, transaction, debugEnabled);` 存在事务的处理，就是根据传播行为看看是：暂停当前事务，新建事务，设置保存点等操作
+ *
+ *  3. 配置的事务传播行为是 PROPAGATION_MANDATORY 就报错，走到这一步说明是没有事务的，因为这个配置的要求是没有事务就报错
+ *
+ *  4. 配置的事务传播行为是 PROPAGATION_REQUIRED || PROPAGATION_REQUIRES_NEW || PROPAGATION_NESTED
+ *      4.1 `SuspendedResourcesHolder suspendedResources = suspend(null);` 暂停事务所有的资源
+ *          其实就是从ThreadLocal中取出这两个属性内容，记录到 SuspendedResourcesHolder 中
+ *              {@link TransactionSynchronizationManager#synchronizations}
+ *              {@link TransactionSynchronizationManager#resources}
+ *
+ *      4.2 `return startTransaction(def, transaction, debugEnabled, suspendedResources);` 开始事务，暂停的资源会记录在新事务状态中，因为事务结束之后要恢复之前的资源
+ *          开始事务 {@link AbstractPlatformTransactionManager#startTransaction(TransactionDefinition, Object, boolean, AbstractPlatformTransactionManager.SuspendedResourcesHolder)}
+ *
+ *  5. 创建空事务，其实就是没有事务。因为上面的条件都不满足，那就是说明不需要开启事务
+ *      `return DefaultTransactionStatus`
+ * */
+```
+### `AbstractPlatformTransactionManager#startTransaction`
+```java
+/**
+ * 开始事务 {@link AbstractPlatformTransactionManager#startTransaction(TransactionDefinition, Object, boolean, AbstractPlatformTransactionManager.SuspendedResourcesHolder)}
+ *
+ *  1. `DefaultTransactionStatus status = new DefaultTransactionStatus()` 初始化事务状态对象
+ *
+ *  2. `doBegin(transaction, definition);` 就是根据@Transactional注解值给事务对象设置属性
+ *      2.1 事务对象没有连接或者连接isSynchronizedWithTransaction 就通过数据源创建连接，然后设置给事务对
+ *      2.2 将 @Transactional 的信息设置到连接和事务对象中（设置的内容：自动提交、是否只读、隔离级别、超时时间）
+ *      2.3 是新创建的连接，就使用数据源作为key，将连接绑定是事务资源中 {@link TransactionSynchronizationManager#resources}
+ *      2.4 设置 ConnectionHolder 属性 isSynchronizedWithTransaction 为true
+ *
+ *  3. `prepareSynchronization(status, definition);` 准备同步，就是在 TransactionSynchronizationManager(事物同步管理对象)记录信息
+ *      - 记录事务隔离级别
+ *      - 是否只读
+ *      - 事务的name
+ *      - {@link TransactionSynchronizationManager#synchronizations} 属性初始化。
+ *          注：这个属性很关键，就是当前事务对象的同步资源(事件、与事务管理器不同DataSource生成的数据库连接等等)
+ *
+ *  4. `return status`
+ * */
+```
+### `AbstractPlatformTransactionManager#suspend`
+```java
+/**
+ * 暂停事务 {@link AbstractPlatformTransactionManager#suspend(Object)}
+ *
+ *  1. if  `TransactionSynchronizationManager.isSynchronizationActive()` 是活动的事务（表示当前线程存在开启的事务）
+ *      - 暂停事对象的同步资源
+ *          1. 就是拿到 {@link TransactionSynchronizationManager#synchronizations}，遍历执行 {@link TransactionSynchronization#suspend()}
+ *              对于 ConnectionSynchronization 类型，就是取消对 Connection 的引用(如果该Connection存在事务资源中，就取消resources(事务资源)对该Connection的引用;)
+ *          2. 清空线程事务同步资源，就是把属性从ThreadLocal中移除
+ *          3. 返回 事务同步资源
+ *
+ *      - 暂停事务对象资源
+ *          1. 取消事务对象绑定的连接信息 txObject.setConnectionHolder(null);
+ *          2. 从resources(事务资源)中移除事务对象对应的资源(就是移除DataSource作为key的资源) {@link TransactionSynchronizationManager#unbindResource(Object)}
+ *          3. 返回 移除的事务资源
+ *
+ *      - 装饰成SuspendedResourcesHolder，就是记录现在得值(事务同步资源、移除的事务资源)，后面恢复事务需要重新设置到 TransactionSynchronizationManager
+ *
+ *      - return SuspendedResourcesHolder
+ *
+ *  2. else-if `transaction != null` 事务不是null
+ *      - `Object suspendedResources = doSuspend(transaction);` 暂停事务对象资源
+ *
+ *      - 将暂停的事务对象资源 装饰到 SuspendedResourcesHolder 中
+ *
+ *      - return SuspendedResourcesHolder
+ *
+ *  3. else
+ *      return null
+ * */
+```
+### `AbstractPlatformTransactionManager#handleExistingTransaction`
+```java
+/**
+ *
+ * 存在事务的处理 {@link AbstractPlatformTransactionManager#handleExistingTransaction(TransactionDefinition, Object, boolean)}
+ *
+ *  1. 事务传播行为是 PROPAGATION_NEVER，直接报错
+ *
+ *  2. 事务传播行为是 PROPAGATION_NOT_SUPPORTED
+ *      2.1 `Object suspendedResources = suspend(transaction);` 暂停事务所有的资源
+ *
+ *      2.2 `return DefaultTransactionStatus` ,因为传播行为是以非事务的方式执行，所以不需要开启事务
+ *
+ *  3. 事务传播行为是 PROPAGATION_REQUIRES_NEW
+ *      3.1 `SuspendedResourcesHolder suspendedResources = suspend(transaction);` 暂停事务所有的资源
+ *      3.2 `return startTransaction(definition, transaction, debugEnabled, suspendedResources);`  开启新事物，会记录暂停事务的信息
+ *
+ *  4. 事务传播行为是 PROPAGATION_NESTED
+ *      - 是 DataSourceTransactionManager 事务管理器，就在当前事务上创建保存点
+ *      - 不是，就 `return startTransaction(definition, transaction, debugEnabled, null);`
+ * */
+```
+### `TransactionAspectSupport#completeTransactionAfterThrowing`
+```java
+/**
+ * 出现异常时完成事务，看看是回滚还是提交事务。{@link TransactionAspectSupport#completeTransactionAfterThrowing(TransactionAspectSupport.TransactionInfo, Throwable)}
+ *      1. 判断异常是否是需要回滚的类型：
+ *          - 使用 @Transactional 配置的rollback进行匹配，匹配就返回结果
+ *          - 没有匹配rollback，就判断异常是不是  RuntimeException 、Error 是就回滚
+ *          - 执行回滚 {@link AbstractPlatformTransactionManager#rollback(TransactionStatus)}
+ *
+ *      2. 不匹配就提交事务 {@link AbstractPlatformTransactionManager#commit(TransactionStatus)}
+ *
+ *      注：无论是rollback还是commit最终都会执行 {@link AbstractPlatformTransactionManager#cleanupAfterCompletion(DefaultTransactionStatus)} ，恢复暂停的资源
+ * */
+```
+### `TransactionAspectSupport#cleanupTransactionInfo`
+```java
+/**
+ * 清除事务信息 {@link TransactionAspectSupport#cleanupTransactionInfo(TransactionAspectSupport.TransactionInfo)}
+ *      `transactionInfoHolder.set(this.oldTransactionInfo);` 很简单，就是回复上一个事务信息到ThreadLocal中
+ * */
+```
+### `AbstractPlatformTransactionManager#rollback`
+```java
+/**
+ * 回滚 {@link AbstractPlatformTransactionManager#rollback(TransactionStatus)}
+ *
+ *  1. 回调TransactionSynchronization(事务同步资源)
+ *     beforeCompletion()
+ *
+ *  2. 回滚
+ *
+ *  3. 回调TransactionSynchronization(事务同步资源)
+ *     afterCompletion(int status)
+ *
+ *  4. 恢复暂停的事务资源  {@link AbstractPlatformTransactionManager#cleanupAfterCompletion(DefaultTransactionStatus)}
+ * */
+```
+### `AbstractPlatformTransactionManager#commit`
+```java
+/**
+ * 提交事务 {@link AbstractPlatformTransactionManager#commit(TransactionStatus)}
+ *      1. 回调TransactionSynchronization(事务同步资源)
+ *          beforeCommit(boolean readOnly)
+ *          beforeCompletion()
+ *
+ *      2. 提交事务
+ *
+ *      3. 回调TransactionSynchronization(事务同步资源)
+ *          afterCommit()
+ *          afterCompletion(int status)
+ *
+ *      4. 恢复暂停的事务资源  {@link AbstractPlatformTransactionManager#cleanupAfterCompletion(DefaultTransactionStatus)}
+ * */
+```
+### `AbstractPlatformTransactionManager#cleanupAfterCompletion`
+```java
+/**
+ * 完成后清除现场 {@link AbstractPlatformTransactionManager#cleanupAfterCompletion(DefaultTransactionStatus)}
+ *      1. `TransactionSynchronizationManager.clear();` 清空所有同步信息
+ *
+ *      2. `doCleanupAfterCompletion(status.getTransaction());` 就是从 {@link TransactionSynchronizationManager#resources} 中移除资源，并恢复事务对象的Connection原来的属性值
+ *
+ *      3. {@link AbstractPlatformTransactionManager#resume(Object, AbstractPlatformTransactionManager.SuspendedResourcesHolder)} 恢复暂停的资源到 TransactionSynchronizationManager 中
+ *          - 恢复事务资源
+ *          - 恢复事务同步资源
+ * */
+```
+### `@TransactionalEventListener`
+```java
+/**
+ *  首先`@EnableTransactionManagement`会导入ProxyTransactionManagementConfiguration
+ *  其父类 AbstractTransactionManagementConfiguration 会使用 @Bean注入 TransactionalEventListenerFactory
+ *  而TransactionalEventListenerFactory 是用来解析 @TransactionalEventListener 成 TransactionalApplicationListenerMethodAdapter 注册到事件广播器中
+ *
+ *
+ *  接收事件的逻辑 {@link TransactionalApplicationListenerMethodAdapter#onApplicationEvent(ApplicationEvent)}
+ *      if 是活动的事务(只要进入事务方法就是true)  且 实际激活的事务(必须不是空事务)
+ *          TransactionSynchronizationManager.registerSynchronization(new TransactionalApplicationListenerSynchronization<>(event, this, this.callbacks));
+ *          注册事务同步资源，在事务完成时(rollback或者commit)会调用其 listener、callbacks。也就是延时事件的发布
+ *          注：
+ *              - listener 就是 TransactionalApplicationListenerMethodAdapter
+ *              - 要想满足这个条件，就必须要事务方法内发布事件，否则是不满足的
+ *
+ *      else-if annotation.fallbackExecution()
+ *          `processEvent(event);` 处理事件，其实就是回调 @TransactionalEventListener 标注的方法
+ *      else
+ *          啥都不干
+ * */
+```
+### 扩展: AbstractRoutingDataSource
+```java
+/**
+ * 动态数据源原理 AbstractRoutingDataSource
+ *
+ * AbstractRoutingDataSource 实现 InitializingBean
+ *      其接口方法 {@link AbstractRoutingDataSource#afterPropertiesSet()} 会对属性赋值
+ *          - 将属性 {@link AbstractRoutingDataSource#targetDataSources} 拷贝到 {@link AbstractRoutingDataSource#resolvedDataSources}
+ *          - 将属性 {@link AbstractRoutingDataSource#defaultTargetDataSource} 拷贝到 {@link AbstractRoutingDataSource#resolvedDefaultDataSource}
+ *          Tips：拷贝的过程中会解析target里面的值，解析的结果存到 resolve中
+ *
+ * 使用姿势，获取连接。 {@link AbstractRoutingDataSource#getConnection()}
+ *      1. 推断出数据源 {@link AbstractRoutingDataSource#determineTargetDataSource()}
+ *          - 拿到 lookupKey {@link AbstractRoutingDataSource#determineCurrentLookupKey()}
+ *              子类重写这个方法，一般就是改成从ThreadLocal中获取
+ *          - 使用 lookupKey 从属性 {@link AbstractRoutingDataSource#resolvedDataSources} 获取数据源
+ *          - 没找到，就使用默认数据源 {@link AbstractRoutingDataSource#resolvedDefaultDataSource}
+ *          - 默认数据源也没得，直接报错
+ *      2. 使用推断的数据源，获取连接 {@link DataSource#getConnection()}
+ *
+ *      Tips：获取连接其实是从多个数据源中确定唯一一个数据源，再获取连接。用到的数据都是通过 {@link AbstractRoutingDataSource#afterPropertiesSet()} 接口方法设置的
+ */
+```
+### 扩展: DataSourceUtils
+
+> 这个工具类是Spring提供的用于获取数据库连接。持久层框架想使用Spring事务的功能，就得使用该工具类获取连接
+```java
+/**
+ * 使用DataSourceUtils获取连接
+ *      {@link DataSourceUtils#getConnection(DataSource)}
+ *      {@link DataSourceUtils#doGetConnection(DataSource)}
+ *
+ *  1. `TransactionSynchronizationManager.getResource(dataSource);` 使用 dataSource 为key，从 resources(事物资源)中获取资源
+ *      如果资源存在，就return
+ *
+ *  2. `Connection con = dataSource.getConnection();` 获取连接
+ *      注：如果是AbstractRoutingDataSource,就会先推断出数据源在获取连接
+ *
+ *  3. if TransactionSynchronizationManager.isSynchronizationActive() 如果线程存在事务
+ *      3.1 `TransactionSynchronizationManager.registerSynchronization(new ConnectionSynchronization(holderToUse, dataSource));`
+ *          注册到属性中 {@link TransactionSynchronizationManager#synchronizations}。存到这个属性的好处，在事务完成时(rollback、commit)会回调接口，释放连接
+ *
+ *      3.2 `TransactionSynchronizationManager.bindResource(dataSource, holderToUse);`
+ *          是新的连接就注册到 事物资源中，所以第二次获取连接就会返回resources中缓存的值
+ *
+ *      Tips：什么叫如果线程存在事务？可以这么理解，只要Java虚拟机栈中存在@Transactional的方法，这个判断就是true(空事务也算)
+ * */
+```
+### 扩展：TransactionSynchronizationManager
+
+```java
+public abstract class TransactionSynchronizationManager {
+
+    /**
+     * 事务资源，就是当前事物内涉及到的所有资源（数据库连接）
+     *
+     * 比如数据库连接：
+     *      Key：DataSource 对象
+     *      Value：ConnectionHolder
+     *
+     * 什么时候会设置值：
+     *      1. 开启新事务时，会通过 DataSource 获取连接，并将连接存到这里
+     *      2. 执行 {@link org.springframework.jdbc.datasource.DataSourceUtils#getConnection(DataSource)} 获取连接，使用 DataSource 做为key从 resources中找不到连接，
+     *          就会使用 DataSource获取连接，存到 synchronizations 和 这里
+     *      注：前提是在事务内执行。简单来说就是Java虚拟机栈中存在@Transactional的方法(就是有{@link TransactionInterceptor#invoke(MethodInvocation)})
+     *
+     * 什么时候移除key对应属性值：
+     *      - 暂停当前事务
+     *      - 完成当前事务(rollback或者commit)
+     *      Tips：{@link TransactionSynchronizationManager#doUnbindResource(Object)}
+     */
+    private static final ThreadLocal<Map<Object, Object>> resources =
+            new NamedThreadLocal<>("Transactional resources");
+
+    /**
+     * 事务同步资源，就是在事务中产生的 非事务管理器数据源生成的连接或者是用于在事务完成时(rollback或者commit)要触发事件，都算是事务同步资源
+     *
+     * 比如：
+     *      - ConnectionSynchronization
+     *          使用工具类获取连接会设置 {@link org.springframework.jdbc.datasource.DataSourceUtils#doGetConnection(DataSource)}
+     *          这种连接和事务连接不一样，是直接通过数据源获取的连接，不会配置自动提交、超时时间、隔离级别，默认是啥就是啥，
+     *          唯一的作用就是在事务完成时(rollback或者commit) 释放掉这些连接
+     *          比如：获取连接用的数据源(d1)和事务管理的数据源(d2)不是同一个时，就会将d1创建的连接装饰成 ConnectionSynchronization，
+     *              并将该对象存到 synchronizations 属性中，然后对应的连接也会存到注册到 resources 中
+     *
+     *      - TransactionalApplicationListenerSynchronization
+     *          发布事务事件时会设置 {@link TransactionalApplicationListenerMethodAdapter#onApplicationEvent(ApplicationEvent)}
+     *          作用就是在事务完成时(rollback或者commit) 回调其 TransactionalApplicationListener、SynchronizationCallback
+     *
+     * 什么时候会设置值：简单来说就是Java虚拟机栈中存在@Transactional的方法(就是有{@link TransactionInterceptor#invoke(MethodInvocation)})
+     *      具体一点就是执行完 {@link TransactionAspectSupport#createTransactionIfNecessary(PlatformTransactionManager, TransactionAttribute, String)}
+     *      该属性就会被初始化，在使用过程中会根据 `synchronizations.get() != null ` 来判断是激活了事务同步 {@link TransactionSynchronizationManager#isSynchronizationActive()}
+     *
+     * 什么时候清空该属性值：
+     *      1. 暂停当前事务
+     *      2. 完成当前事务(rollback或者commit)
+     *      Tips：{@link TransactionSynchronizationManager#clear()}
+     */
+    private static final ThreadLocal<Set<TransactionSynchronization>> synchronizations =
+            new NamedThreadLocal<>("Transaction synchronizations");
+
+    /**
+     * 实际激活的事务。
+     *  - 当前线程的事务不是空事务 就是 true
+     *  - 空事务 或者 执行非事务方法就是 false
+     */
+    private static final ThreadLocal<Boolean> actualTransactionActive =
+            new NamedThreadLocal<>("Actual transaction active");
+  
+		private static final ThreadLocal<String> currentTransactionName =
+            new NamedThreadLocal<>("Current transaction name");
+
+    private static final ThreadLocal<Boolean> currentTransactionReadOnly =
+            new NamedThreadLocal<>("Current transaction read-only status");
+
+    private static final ThreadLocal<Integer> currentTransactionIsolationLevel =
+            new NamedThreadLocal<>("Current transaction isolation level");
+}  
+```
+
+
+
 ## @EnableScheduling
+
 ## @EnableCaching
-## @Lookup 
+## @Lookup
 
 ### 有啥用？
 
@@ -2574,7 +3703,7 @@ public class LookupService {
 class Demo {
 
 }
-```
+````
 
 @Lookup 失效的情况
 

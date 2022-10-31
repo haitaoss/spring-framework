@@ -108,7 +108,11 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
         }
         // 记录 advised ，很关键 这里面有 这个类匹配的 advisor 集合信息
         this.advised = config;
-        // 补全代理接口。如果接口里面没有 SpringProxy、Advised、DecoratingProxy 的子类，就添加
+        /**
+         * 补全代理接口。如果接口里面没有 SpringProxy、Advised、DecoratingProxy 的子类，就添加。
+         *
+         * 用处：比如拿到代理对象实际的被代理对象 {@link AopUtils#getTargetClass(Object)}
+         * */
         this.proxiedInterfaces = AopProxyUtils.completeProxiedInterfaces(this.advised, true);
         findDefinedEqualsAndHashCodeMethods(this.proxiedInterfaces);
     }

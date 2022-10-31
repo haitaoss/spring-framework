@@ -1,7 +1,5 @@
 package cn.haitaoss;
 
-import org.springframework.context.annotation.ComponentScan;
-
 /**
  * @author haitao.chen
  * email haitaoss@aliyun.com
@@ -26,7 +24,7 @@ import org.springframework.context.annotation.ComponentScan;
 // @ImportResource("spring.xml")
 // @Component
 //@ComponentScan("cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner")
-@ComponentScan("cn.haitaoss.javaconfig.aop")
+//@ComponentScan("cn.haitaoss.javaconfig.aop")
 //@ComponentScan("cn.haitaoss.javaconfig.EnableAsync")
 public class AppConfig {
     public AppConfig() {

@@ -562,7 +562,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
     }
 
     /**
-     * TODOHAITAO 这个方注是 spring 最重要的一个方法，甚至体现整个 IOC 的声明周期
+     * 这个方注是 spring 最重要的一个方法，甚至体现整个 IOC 的声明周期
      *
      * @throws BeansException
      * @throws IllegalStateException
@@ -582,7 +582,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
             prepareRefresh();
 
             /**
-             *  TODOHAITAO 获取刷新bean工厂（这其实是一个模板方法，固定会执行子类的 refreshBeanFactory() 和 getBeanFactory() ）
+             *  获取刷新bean工厂（这其实是一个模板方法，固定会执行子类的 refreshBeanFactory() 和 getBeanFactory() ）
              *      - xml加载 spring会在这里加载 beanDefinition
              *      - javaConfig加载 只是刷新bean工厂，加载beanDefinition 是通过
              *          @see org.springframework.context.annotation.ConfigurationClassPostProcessor
@@ -611,7 +611,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
                 StartupStep beanPostProcess = this.applicationStartup.start("spring.context.beans.post-process");
                 // Invoke factory processors registered as beans in the context.
                 /**
-                 *  TODOHAITAO 执行 bean 工厂的后置处理器。作用：修改BeanDefinition 或者 加载BeanDefiniton
+                 *  执行 bean 工厂的后置处理器。作用：修改BeanDefinition 或者 加载BeanDefinition
                  *
                  *  总体流程：
                  *      1. 先执行 BeanDefinitionRegistryPostProcessor#postProcessBeanDefinitionRegistry
@@ -651,7 +651,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
                 // Initialize event multicaster for this context.
                 initApplicationEventMulticaster();
 
-                // TODOHAITAO 给子类的模板方法（springboot 是从这个方法启动 tomcat的）
+                // 给子类的模板方法（springboot 是从这个方法启动 tomcat的）
                 // Initialize other special beans in specific context subclasses.
                 onRefresh();
 
@@ -669,7 +669,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
                 registerListeners();
 
                 /**
-                 * TODOHAITAO 完成bean工厂初始化
+                 * 完成bean工厂初始化
                  * 初始化单实例bean，在这里面体现了 bean 的声明周期（实例化、初始化、初始化后等）
                  */
                 // Instantiate all remaining (non-lazy-init) singletons.
@@ -1087,7 +1087,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
         // Allow for caching all bean definition metadata, not expecting further changes.
         beanFactory.freezeConfiguration();
 
-        // TODOHAITAO 实例化所有剩余(非懒加载)单例bean
+        // 实例化所有剩余(非懒加载)单例bean
         // Instantiate all remaining (non-lazy-init) singletons.
         beanFactory.preInstantiateSingletons();
     }

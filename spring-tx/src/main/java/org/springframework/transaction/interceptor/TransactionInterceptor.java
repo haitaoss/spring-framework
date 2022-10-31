@@ -16,20 +16,19 @@
 
 package org.springframework.transaction.interceptor;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
-import java.util.Properties;
-
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
-
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.lang.Nullable;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionManager;
+
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.util.Properties;
 
 /**
  * AOP Alliance MethodInterceptor for declarative transaction
@@ -54,112 +53,117 @@ import org.springframework.transaction.TransactionManager;
 @SuppressWarnings("serial")
 public class TransactionInterceptor extends TransactionAspectSupport implements MethodInterceptor, Serializable {
 
-	/**
-	 * Create a new TransactionInterceptor.
-	 * <p>Transaction manager and transaction attributes still need to be set.
-	 * @see #setTransactionManager
-	 * @see #setTransactionAttributes(java.util.Properties)
-	 * @see #setTransactionAttributeSource(TransactionAttributeSource)
-	 */
-	public TransactionInterceptor() {
-	}
+    /**
+     * Create a new TransactionInterceptor.
+     * <p>Transaction manager and transaction attributes still need to be set.
+     * @see #setTransactionManager
+     * @see #setTransactionAttributes(java.util.Properties)
+     * @see #setTransactionAttributeSource(TransactionAttributeSource)
+     */
+    public TransactionInterceptor() {
+    }
 
-	/**
-	 * Create a new TransactionInterceptor.
-	 * @param ptm the default transaction manager to perform the actual transaction management
-	 * @param tas the attribute source to be used to find transaction attributes
-	 * @since 5.2.5
-	 * @see #setTransactionManager
-	 * @see #setTransactionAttributeSource
-	 */
-	public TransactionInterceptor(TransactionManager ptm, TransactionAttributeSource tas) {
-		setTransactionManager(ptm);
-		setTransactionAttributeSource(tas);
-	}
+    /**
+     * Create a new TransactionInterceptor.
+     * @param ptm the default transaction manager to perform the actual transaction management
+     * @param tas the attribute source to be used to find transaction attributes
+     * @since 5.2.5
+     * @see #setTransactionManager
+     * @see #setTransactionAttributeSource
+     */
+    public TransactionInterceptor(TransactionManager ptm, TransactionAttributeSource tas) {
+        setTransactionManager(ptm);
+        setTransactionAttributeSource(tas);
+    }
 
-	/**
-	 * Create a new TransactionInterceptor.
-	 * @param ptm the default transaction manager to perform the actual transaction management
-	 * @param tas the attribute source to be used to find transaction attributes
-	 * @see #setTransactionManager
-	 * @see #setTransactionAttributeSource
-	 * @deprecated as of 5.2.5, in favor of
-	 * {@link #TransactionInterceptor(TransactionManager, TransactionAttributeSource)}
-	 */
-	@Deprecated
-	public TransactionInterceptor(PlatformTransactionManager ptm, TransactionAttributeSource tas) {
-		setTransactionManager(ptm);
-		setTransactionAttributeSource(tas);
-	}
+    /**
+     * Create a new TransactionInterceptor.
+     * @param ptm the default transaction manager to perform the actual transaction management
+     * @param tas the attribute source to be used to find transaction attributes
+     * @see #setTransactionManager
+     * @see #setTransactionAttributeSource
+     * @deprecated as of 5.2.5, in favor of
+     * {@link #TransactionInterceptor(TransactionManager, TransactionAttributeSource)}
+     */
+    @Deprecated
+    public TransactionInterceptor(PlatformTransactionManager ptm, TransactionAttributeSource tas) {
+        setTransactionManager(ptm);
+        setTransactionAttributeSource(tas);
+    }
 
-	/**
-	 * Create a new TransactionInterceptor.
-	 * @param ptm the default transaction manager to perform the actual transaction management
-	 * @param attributes the transaction attributes in properties format
-	 * @see #setTransactionManager
-	 * @see #setTransactionAttributes(java.util.Properties)
-	 * @deprecated as of 5.2.5, in favor of {@link #setTransactionAttributes(Properties)}
-	 */
-	@Deprecated
-	public TransactionInterceptor(PlatformTransactionManager ptm, Properties attributes) {
-		setTransactionManager(ptm);
-		setTransactionAttributes(attributes);
-	}
-
-
-	@Override
-	@Nullable
-	public Object invoke(MethodInvocation invocation) throws Throwable {
-		// Work out the target class: may be {@code null}.
-		// The TransactionAttributeSource should be passed the target class
-		// as well as the method, which may be from an interface.
-		Class<?> targetClass = (invocation.getThis() != null ? AopUtils.getTargetClass(invocation.getThis()) : null);
-
-		// Adapt to TransactionAspectSupport's invokeWithinTransaction...
-		return invokeWithinTransaction(invocation.getMethod(), targetClass, new CoroutinesInvocationCallback() {
-			@Override
-			@Nullable
-			public Object proceedWithInvocation() throws Throwable {
-				return invocation.proceed();
-			}
-			@Override
-			public Object getTarget() {
-				return invocation.getThis();
-			}
-			@Override
-			public Object[] getArguments() {
-				return invocation.getArguments();
-			}
-		});
-	}
+    /**
+     * Create a new TransactionInterceptor.
+     * @param ptm the default transaction manager to perform the actual transaction management
+     * @param attributes the transaction attributes in properties format
+     * @see #setTransactionManager
+     * @see #setTransactionAttributes(java.util.Properties)
+     * @deprecated as of 5.2.5, in favor of {@link #setTransactionAttributes(Properties)}
+     */
+    @Deprecated
+    public TransactionInterceptor(PlatformTransactionManager ptm, Properties attributes) {
+        setTransactionManager(ptm);
+        setTransactionAttributes(attributes);
+    }
 
 
-	//---------------------------------------------------------------------
-	// Serialization support
-	//---------------------------------------------------------------------
+    @Override
+    @Nullable
+    public Object invoke(MethodInvocation invocation) throws Throwable {
+        /**
+         * 拿到被代理类
+         * */
+        // Work out the target class: may be {@code null}.
+        // The TransactionAttributeSource should be passed the target class
+        // as well as the method, which may be from an interface.
+        Class<?> targetClass = (invocation.getThis() != null ? AopUtils.getTargetClass(invocation.getThis()) : null);
 
-	private void writeObject(ObjectOutputStream oos) throws IOException {
-		// Rely on default serialization, although this class itself doesn't carry state anyway...
-		oos.defaultWriteObject();
+        // Adapt to TransactionAspectSupport's invokeWithinTransaction...
+        return invokeWithinTransaction(invocation.getMethod(), targetClass, new CoroutinesInvocationCallback() {
+            @Override
+            @Nullable
+            public Object proceedWithInvocation() throws Throwable {
+                return invocation.proceed();
+            }
 
-		// Deserialize superclass fields.
-		oos.writeObject(getTransactionManagerBeanName());
-		oos.writeObject(getTransactionManager());
-		oos.writeObject(getTransactionAttributeSource());
-		oos.writeObject(getBeanFactory());
-	}
+            @Override
+            public Object getTarget() {
+                return invocation.getThis();
+            }
 
-	private void readObject(ObjectInputStream ois) throws IOException, ClassNotFoundException {
-		// Rely on default serialization, although this class itself doesn't carry state anyway...
-		ois.defaultReadObject();
+            @Override
+            public Object[] getArguments() {
+                return invocation.getArguments();
+            }
+        });
+    }
 
-		// Serialize all relevant superclass fields.
-		// Superclass can't implement Serializable because it also serves as base class
-		// for AspectJ aspects (which are not allowed to implement Serializable)!
-		setTransactionManagerBeanName((String) ois.readObject());
-		setTransactionManager((PlatformTransactionManager) ois.readObject());
-		setTransactionAttributeSource((TransactionAttributeSource) ois.readObject());
-		setBeanFactory((BeanFactory) ois.readObject());
-	}
+
+    //---------------------------------------------------------------------
+    // Serialization support
+    //---------------------------------------------------------------------
+
+    private void writeObject(ObjectOutputStream oos) throws IOException {
+        // Rely on default serialization, although this class itself doesn't carry state anyway...
+        oos.defaultWriteObject();
+
+        // Deserialize superclass fields.
+        oos.writeObject(getTransactionManagerBeanName());
+        oos.writeObject(getTransactionManager());
+        oos.writeObject(getTransactionAttributeSource());
+        oos.writeObject(getBeanFactory());
+    }
+
+    private void readObject(ObjectInputStream ois) throws IOException, ClassNotFoundException {
+        // Rely on default serialization, although this class itself doesn't carry state anyway...
+        ois.defaultReadObject();
+
+        // Serialize all relevant superclass fields.
+        // Superclass can't implement Serializable because it also serves as base class
+        // for AspectJ aspects (which are not allowed to implement Serializable)!
+        setTransactionManagerBeanName((String) ois.readObject());
+        setTransactionManager((PlatformTransactionManager) ois.readObject());
+        setTransactionAttributeSource((TransactionAttributeSource) ois.readObject());
+        setBeanFactory((BeanFactory) ois.readObject());
+    }
 
 }

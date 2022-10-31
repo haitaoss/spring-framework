@@ -309,11 +309,13 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport imp
 
         /**
          * {@link AbstractAutoProxyCreator#customTargetSourceCreators} 属性不为null，就遍历 {@link TargetSourceCreator}
-         * 执行 {@link TargetSourceCreator#getTargetSource(Class, String)} 创建 TargetSource，返回值不是null就直接return
+         * 执行 {@link TargetSourceCreator#getTargetSource(Class, String)} 创建 TargetSource，返回值是null就直接return。
+         *
+         * 在这里使用 TargetSourceCreator 来创建代理对象也可以实现@Lazy的效果，即延时bean的创建，
+         * 因为这里直接返回了 代理对象，而执行代理对象在执行方法时会执行 {@link TargetSource#getTarget()} 拿到被代理对象,一般在这个方法就是 getBean 从而
+         * 可以实现延时bean的实例化
          *
          * 注：TargetSource 封装了被代理对象，然后aop是对TargetSource进行代理
-         *
-         * TODOHAITAO: 2022/10/3 我猜测这里都是直接返回null的
          * */
         // Create proxy here if we have a custom TargetSource.
         // Suppresses unnecessary default instantiation of the target bean:

@@ -22,13 +22,14 @@ import java.util.concurrent.TimeUnit;
  */
 @EnableAsync(mode = AdviceMode.PROXY)
 @Component
+@Async("executor")
 public class EnableAsyncTest {
-    @Async
+    //    @Async
     public void asyncTask() {
         System.out.println("EnableAsyncTest.asyncTask--->" + Thread.currentThread().getName());
     }
 
-    @Async("executor")
+    //    @Async("executor")
     public void asyncTask2() {
         System.out.println("EnableAsyncTest.asyncTask2--->" + Thread.currentThread().getName());
     }

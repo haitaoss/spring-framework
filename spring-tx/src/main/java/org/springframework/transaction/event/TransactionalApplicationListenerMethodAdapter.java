@@ -16,10 +16,6 @@
 
 package org.springframework.transaction.event;
 
-import java.lang.reflect.Method;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.event.ApplicationListenerMethodAdapter;
 import org.springframework.context.event.EventListener;
@@ -27,6 +23,10 @@ import org.springframework.context.event.GenericApplicationListener;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.Assert;
+
+import java.lang.reflect.Method;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * {@link GenericApplicationListener} adapter that delegates the processing of
@@ -46,64 +46,75 @@ import org.springframework.util.Assert;
  * @see TransactionalApplicationListenerAdapter
  */
 public class TransactionalApplicationListenerMethodAdapter extends ApplicationListenerMethodAdapter
-		implements TransactionalApplicationListener<ApplicationEvent> {
+        implements TransactionalApplicationListener<ApplicationEvent> {
 
-	private final TransactionalEventListener annotation;
+    private final TransactionalEventListener annotation;
 
-	private final TransactionPhase transactionPhase;
+    private final TransactionPhase transactionPhase;
 
-	private final List<SynchronizationCallback> callbacks = new CopyOnWriteArrayList<>();
-
-
-	/**
-	 * Construct a new TransactionalApplicationListenerMethodAdapter.
-	 * @param beanName the name of the bean to invoke the listener method on
-	 * @param targetClass the target class that the method is declared on
-	 * @param method the listener method to invoke
-	 */
-	public TransactionalApplicationListenerMethodAdapter(String beanName, Class<?> targetClass, Method method) {
-		super(beanName, targetClass, method);
-		TransactionalEventListener ann =
-				AnnotatedElementUtils.findMergedAnnotation(method, TransactionalEventListener.class);
-		if (ann == null) {
-			throw new IllegalStateException("No TransactionalEventListener annotation found on method: " + method);
-		}
-		this.annotation = ann;
-		this.transactionPhase = ann.phase();
-	}
+    /**
+     * 回调的，但是没看到预留的设置方法
+     */
+    private final List<SynchronizationCallback> callbacks = new CopyOnWriteArrayList<>();
 
 
-	@Override
-	public TransactionPhase getTransactionPhase() {
-		return this.transactionPhase;
-	}
+    /**
+     * Construct a new TransactionalApplicationListenerMethodAdapter.
+     * @param beanName the name of the bean to invoke the listener method on
+     * @param targetClass the target class that the method is declared on
+     * @param method the listener method to invoke
+     */
+    public TransactionalApplicationListenerMethodAdapter(String beanName, Class<?> targetClass, Method method) {
+        super(beanName, targetClass, method);
+        TransactionalEventListener ann =
+                AnnotatedElementUtils.findMergedAnnotation(method, TransactionalEventListener.class);
+        if (ann == null) {
+            throw new IllegalStateException("No TransactionalEventListener annotation found on method: " + method);
+        }
+        this.annotation = ann;
+        this.transactionPhase = ann.phase();
+    }
 
-	@Override
-	public void addCallback(SynchronizationCallback callback) {
-		Assert.notNull(callback, "SynchronizationCallback must not be null");
-		this.callbacks.add(callback);
-	}
+
+    @Override
+    public TransactionPhase getTransactionPhase() {
+        return this.transactionPhase;
+    }
+
+    @Override
+    public void addCallback(SynchronizationCallback callback) {
+        Assert.notNull(callback, "SynchronizationCallback must not be null");
+        this.callbacks.add(callback);
+    }
 
 
-	@Override
-	public void onApplicationEvent(ApplicationEvent event) {
-		if (TransactionSynchronizationManager.isSynchronizationActive() &&
-				TransactionSynchronizationManager.isActualTransactionActive()) {
-			TransactionSynchronizationManager.registerSynchronization(
-					new TransactionalApplicationListenerSynchronization<>(event, this, this.callbacks));
-		}
-		else if (this.annotation.fallbackExecution()) {
-			if (this.annotation.phase() == TransactionPhase.AFTER_ROLLBACK && logger.isWarnEnabled()) {
-				logger.warn("Processing " + event + " as a fallback execution on AFTER_ROLLBACK phase");
-			}
-			processEvent(event);
-		}
-		else {
-			// No transactional event execution at all
-			if (logger.isDebugEnabled()) {
-				logger.debug("No transaction is active - skipping " + event);
-			}
-		}
-	}
+    /**
+     * 触发条件使用事件广播器发布事件。
+     * 要想收到事务行为的事件：得在事务方法内使用事件广播器发布事件
+     * @param event the event to respond to
+     */
+    @Override
+    public void onApplicationEvent(ApplicationEvent event) {
+        /**
+         * 是活动的事务(只要进入事务方法就是true)  且 实际激活的事务(必须不是空事务)
+         * */
+        if (TransactionSynchronizationManager.isSynchronizationActive() &&
+                TransactionSynchronizationManager.isActualTransactionActive()) {
+            // 注册事务同步资源，在事务完成时(rollback或者commit)会调用其 listener、callbacks
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionalApplicationListenerSynchronization<>(event, this, this.callbacks));
+        } else if (this.annotation.fallbackExecution()) {
+            // 兜底执行
+            if (this.annotation.phase() == TransactionPhase.AFTER_ROLLBACK && logger.isWarnEnabled()) {
+                logger.warn("Processing " + event + " as a fallback execution on AFTER_ROLLBACK phase");
+            }
+            processEvent(event);
+        } else {
+            // No transactional event execution at all
+            if (logger.isDebugEnabled()) {
+                logger.debug("No transaction is active - skipping " + event);
+            }
+        }
+    }
 
 }

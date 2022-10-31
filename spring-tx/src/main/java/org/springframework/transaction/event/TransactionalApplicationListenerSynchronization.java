@@ -16,10 +16,11 @@
 
 package org.springframework.transaction.event;
 
-import java.util.List;
-
 import org.springframework.context.ApplicationEvent;
+import org.springframework.context.event.ApplicationListenerMethodAdapter;
 import org.springframework.transaction.support.TransactionSynchronization;
+
+import java.util.List;
 
 /**
  * {@link TransactionSynchronization} implementation for event processing with a
@@ -30,60 +31,64 @@ import org.springframework.transaction.support.TransactionSynchronization;
  * @param <E> the specific {@code ApplicationEvent} subclass to listen to
  */
 class TransactionalApplicationListenerSynchronization<E extends ApplicationEvent>
-		implements TransactionSynchronization {
+        implements TransactionSynchronization {
 
-	private final E event;
+    private final E event;
 
-	private final TransactionalApplicationListener<E> listener;
+    private final TransactionalApplicationListener<E> listener;
 
-	private final List<TransactionalApplicationListener.SynchronizationCallback> callbacks;
-
-
-	public TransactionalApplicationListenerSynchronization(E event, TransactionalApplicationListener<E> listener,
-			List<TransactionalApplicationListener.SynchronizationCallback> callbacks) {
-
-		this.event = event;
-		this.listener = listener;
-		this.callbacks = callbacks;
-	}
+    private final List<TransactionalApplicationListener.SynchronizationCallback> callbacks;
 
 
-	@Override
-	public int getOrder() {
-		return this.listener.getOrder();
-	}
+    public TransactionalApplicationListenerSynchronization(E event, TransactionalApplicationListener<E> listener,
+                                                           List<TransactionalApplicationListener.SynchronizationCallback> callbacks) {
 
-	@Override
-	public void beforeCommit(boolean readOnly) {
-		if (this.listener.getTransactionPhase() == TransactionPhase.BEFORE_COMMIT) {
-			processEventWithCallbacks();
-		}
-	}
+        this.event = event;
+        this.listener = listener;
+        this.callbacks = callbacks;
+    }
 
-	@Override
-	public void afterCompletion(int status) {
-		TransactionPhase phase = this.listener.getTransactionPhase();
-		if (phase == TransactionPhase.AFTER_COMMIT && status == STATUS_COMMITTED) {
-			processEventWithCallbacks();
-		}
-		else if (phase == TransactionPhase.AFTER_ROLLBACK && status == STATUS_ROLLED_BACK) {
-			processEventWithCallbacks();
-		}
-		else if (phase == TransactionPhase.AFTER_COMPLETION) {
-			processEventWithCallbacks();
-		}
-	}
 
-	private void processEventWithCallbacks() {
-		this.callbacks.forEach(callback -> callback.preProcessEvent(this.event));
-		try {
-			this.listener.processEvent(this.event);
-		}
-		catch (RuntimeException | Error ex) {
-			this.callbacks.forEach(callback -> callback.postProcessEvent(this.event, ex));
-			throw ex;
-		}
-		this.callbacks.forEach(callback -> callback.postProcessEvent(this.event, null));
-	}
+    @Override
+    public int getOrder() {
+        return this.listener.getOrder();
+    }
+
+    @Override
+    public void beforeCommit(boolean readOnly) {
+        if (this.listener.getTransactionPhase() == TransactionPhase.BEFORE_COMMIT) {
+            processEventWithCallbacks();
+        }
+    }
+
+    @Override
+    public void afterCompletion(int status) {
+        TransactionPhase phase = this.listener.getTransactionPhase();
+        if (phase == TransactionPhase.AFTER_COMMIT && status == STATUS_COMMITTED) {
+            processEventWithCallbacks();
+        } else if (phase == TransactionPhase.AFTER_ROLLBACK && status == STATUS_ROLLED_BACK) {
+            processEventWithCallbacks();
+        } else if (phase == TransactionPhase.AFTER_COMPLETION) {
+            processEventWithCallbacks();
+        }
+    }
+
+    private void processEventWithCallbacks() {
+        // 回调 SynchronizationCallback 前置方法
+        this.callbacks.forEach(callback -> callback.preProcessEvent(this.event));
+        try {
+            /**
+             * 回调监听器
+             * {@link ApplicationListenerMethodAdapter#processEvent(ApplicationEvent)}
+             * */
+            this.listener.processEvent(this.event);
+        } catch (RuntimeException | Error ex) {
+            // 回调 SynchronizationCallback 后置方法
+            this.callbacks.forEach(callback -> callback.postProcessEvent(this.event, ex));
+            throw ex;
+        }
+        // 回调 SynchronizationCallback 后置方法
+        this.callbacks.forEach(callback -> callback.postProcessEvent(this.event, null));
+    }
 
 }

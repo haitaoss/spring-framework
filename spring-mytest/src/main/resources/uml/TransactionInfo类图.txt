@@ -1,0 +1,168 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+
+
+class AbstractPlatformTransactionManager {
+
+  + commit(TransactionStatus): void
+  - triggerAfterCommit(DefaultTransactionStatus): void
+
+  # doRollback(DefaultTransactionStatus): void
+  # suspend(Object?): SuspendedResourcesHolder?
+  + getTransactionSynchronization(): int
+  # prepareTransactionStatus(TransactionDefinition, Object?, boolean, boolean, boolean, Object?): DefaultTransactionStatus
+  # newTransactionStatus(TransactionDefinition, Object?, boolean, boolean, boolean, Object?): DefaultTransactionStatus
+  - cleanupAfterCompletion(DefaultTransactionStatus): void
+  # triggerBeforeCommit(DefaultTransactionStatus): void
+  # doBegin(Object, TransactionDefinition): void
+  # doResume(Object?, Object): void
+  + getTransaction(TransactionDefinition?): TransactionStatus
+  # doGetTransaction(): Object
+  - startTransaction(TransactionDefinition, Object, boolean, SuspendedResourcesHolder?): TransactionStatus
+  # doSuspend(Object): Object
+  - handleExistingTransaction(TransactionDefinition, Object, boolean): TransactionStatus
+  # doCleanupAfterCompletion(Object): void
+  # doCommit(DefaultTransactionStatus): void
+  - processCommit(DefaultTransactionStatus): void
+}
+class AbstractTransactionStatus {
+  - rollbackOnly: boolean
+  - completed: boolean
+  - savepoint: Object?
+  + createSavepoint(): Object
+  + rollbackToSavepoint(Object): void
+  # getSavepoint(): Object?
+  + releaseSavepoint(Object): void
+  + isCompleted(): boolean
+  + releaseHeldSavepoint(): void
+  + createAndHoldSavepoint(): void
+  + isGlobalRollbackOnly(): boolean
+  + setRollbackOnly(): void
+  + isRollbackOnly(): boolean
+  + isLocalRollbackOnly(): boolean
+  + rollbackToHeldSavepoint(): void
+  # setSavepoint(Object?): void
+  + setCompleted(): void
+  + flush(): void
+  + hasSavepoint(): boolean
+  # getSavepointManager(): SavepointManager
+}
+class DataSourceTransactionManager {
+  - dataSource: DataSource?
+  - enforceReadOnly: boolean
+  + isEnforceReadOnly(): boolean
+  # doGetTransaction(): Object
+  # doCleanupAfterCompletion(Object): void
+  # doBegin(Object, TransactionDefinition): void
+  # doSuspend(Object): Object
+  # doSetRollbackOnly(DefaultTransactionStatus): void
+  # doResume(Object?, Object): void
+  # obtainDataSource(): DataSource
+  # translateException(String, SQLException): RuntimeException
+  # prepareTransactionalConnection(Connection, TransactionDefinition): void
+  + getDataSource(): DataSource?
+  + afterPropertiesSet(): void
+  + setDataSource(DataSource?): void
+  + getResourceFactory(): Object
+  + setEnforceReadOnly(boolean): void
+  # doCommit(DefaultTransactionStatus): void
+  # doRollback(DefaultTransactionStatus): void
+  # isExistingTransaction(Object): boolean
+}
+class DefaultTransactionStatus {
+  - suspendedResources: Object?
+  - newSynchronization: boolean
+  - newTransaction: boolean
+  - readOnly: boolean
+  - transaction: Object?
+  - debug: boolean
+  + getTransaction(): Object
+  + isReadOnly(): boolean
+  # getSavepointManager(): SavepointManager
+  + isNewSynchronization(): boolean
+  + isNewTransaction(): boolean
+  + isDebug(): boolean
+  + getSuspendedResources(): Object?
+  + isTransactionSavepointManager(): boolean
+  + hasTransaction(): boolean
+  + isGlobalRollbackOnly(): boolean
+  + flush(): void
+}
+interface PlatformTransactionManager << interface >> {
+  + getTransaction(TransactionDefinition?): TransactionStatus
+  + commit(TransactionStatus): void
+  + rollback(TransactionStatus): void
+}
+
+interface TransactionAttribute << interface >> {
+  + rollbackOn(Throwable): boolean
+  + getQualifier(): String?
+  + getLabels(): Collection<String>
+}
+
+
+interface TransactionStatus << interface >> {
+  + hasSavepoint(): boolean
+  + flush(): void
+}
+
+
+class TransactionInfo {
+  - oldTransactionInfo: TransactionInfo?
+  - joinpointIdentification: String
+  - transactionAttribute: TransactionAttribute?
+  - transactionStatus: TransactionStatus?
+  - transactionManager: PlatformTransactionManager?
+  + newTransactionStatus(TransactionStatus?): void
+  + toString(): String
+  + getTransactionAttribute(): TransactionAttribute?
+  + getTransactionStatus(): TransactionStatus?
+  + getTransactionManager(): PlatformTransactionManager
+  + getJoinpointIdentification(): String
+  - bindToThread(): void
+  - restoreThreadLocalStatus(): void
+  + hasTransaction(): boolean
+}
+
+
+
+
+class DefaultTransactionAttribute {
+  + setTimeoutString(String?): void
+  + getQualifier(): String?
+  + setLabels(Collection<String>): void
+  + getTimeoutString(): String?
+  + getDescriptor(): String?
+  + setDescriptor(String?): void
+  # getAttributeDescription(): StringBuilder
+  + rollbackOn(Throwable): boolean
+  + setQualifier(String?): void
+  + resolveAttributeStrings(StringValueResolver?): void
+  + getLabels(): Collection<String>
+}
+class RuleBasedTransactionAttribute {
+  + getRollbackRules(): List<RollbackRuleAttribute>
+  + rollbackOn(Throwable): boolean
+  + toString(): String
+  + setRollbackRules(List<RollbackRuleAttribute>): void
+}
+
+
+
+TransactionInfo *-- PlatformTransactionManager
+TransactionInfo *-- TransactionAttribute
+TransactionInfo *-- TransactionStatus
+TransactionInfo *-- TransactionInfo
+AbstractPlatformTransactionManager  -[#008200,dashed]-^  PlatformTransactionManager
+AbstractTransactionStatus           -[#008200,dashed]-^  TransactionStatus
+DataSourceTransactionManager        -[#000082,plain]-^  AbstractPlatformTransactionManager
+DefaultTransactionStatus            -[#000082,plain]-^  AbstractTransactionStatus
+
+DefaultTransactionAttribute    -[#008200,dashed]-^  TransactionAttribute
+RuleBasedTransactionAttribute  -[#000082,plain]-^  DefaultTransactionAttribute
+
+@enduml

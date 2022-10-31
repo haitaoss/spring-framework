@@ -106,7 +106,9 @@ public class AsyncExecutionInterceptor extends AsyncExecutionAspectSupport imple
         /**
          * 拿到方法对应的Executor。
          *
-         * 如果方法有注解@Async("beanName")，就通过beanName从容器中获取Executor，拿不到直接报错
+         * @Async的查找顺序：方法 -> 方法声明的类
+         *
+         *  有注解@Async("beanName")，就通过beanName从容器中获取Executor，拿不到直接报错
          * `@Async` 没有指定beanName，就使用默认的Executor {@link AsyncExecutionAspectSupport#defaultExecutor}，会在构造器设置这个属性
          *
          * 构造器 {@link AsyncExecutionAspectSupport#AsyncExecutionAspectSupport(Executor)}

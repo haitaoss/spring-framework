@@ -159,7 +159,8 @@ public abstract class AsyncExecutionAspectSupport implements BeanFactoryAware {
         if (executor == null) {
             Executor targetExecutor;
             /**
-             * 限定符，就是有@Async("x") 就返回其value属性值，否则就是null
+             * 限定符，就是有@Async("x") 就返回其value属性值，否则就是null。
+             * 注解的查找顺序：查找方法 -> 查找方法的类
              * {@link org.springframework.scheduling.annotation.AnnotationAsyncExecutionInterceptor#getExecutorQualifier(Method)}
              * */
             String qualifier = getExecutorQualifier(method);

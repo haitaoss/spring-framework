@@ -1,0 +1,36 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+interface BeanDefinitionRegistryPostProcessor << interface >> {
+  + postProcessBeanDefinitionRegistry(BeanDefinitionRegistry): void
+}
+interface BeanFactoryPostProcessor << interface >> {
+  + postProcessBeanFactory(ConfigurableListableBeanFactory): void
+}
+class ConfigurationClassPostProcessor {
+  + setProblemReporter(ProblemReporter?): void
+  + setMetadataReaderFactory(MetadataReaderFactory): void
+  + getOrder(): int
+  + setBeanNameGenerator(BeanNameGenerator): void
+  + setSourceExtractor(SourceExtractor?): void
+  + postProcessBeanFactory(ConfigurableListableBeanFactory): void
+  + postProcessBeanDefinitionRegistry(BeanDefinitionRegistry): void
+  + setResourceLoader(ResourceLoader): void
+  + setApplicationStartup(ApplicationStartup): void
+  + setBeanClassLoader(ClassLoader): void
+  + setEnvironment(Environment): void
+  + enhanceConfigurationClasses(ConfigurableListableBeanFactory): void
+  + processConfigBeanDefinitions(BeanDefinitionRegistry): void
+}
+class ImportAwareBeanPostProcessor {
+  + postProcessBeforeInitialization(Object, String): Object?
+  + postProcessProperties(PropertyValues?, Object, String): PropertyValues?
+}
+
+BeanDefinitionRegistryPostProcessor  -[#008200,plain]-^  BeanFactoryPostProcessor
+ConfigurationClassPostProcessor      -[#008200,dashed]-^  BeanDefinitionRegistryPostProcessor
+ImportAwareBeanPostProcessor         --*  ConfigurationClassPostProcessor
+@enduml

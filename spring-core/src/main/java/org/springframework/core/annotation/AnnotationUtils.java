@@ -168,6 +168,10 @@ public abstract class AnnotationUtils {
         if (annotationName.startsWith("java.")) {
             return true;
         }
+        /**
+         * clazz是java.包下的  或者 clazz是 Ordered 类
+         * 就 return false;
+         * */
         if (AnnotationsScanner.hasPlainJavaAnnotationsOnly(clazz)) {
             return false;
         }

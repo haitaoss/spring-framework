@@ -19,6 +19,7 @@ package org.springframework.aop.support;
 import org.springframework.aop.*;
 import org.springframework.aop.aspectj.AspectJExpressionPointcut;
 import org.springframework.aop.aspectj.annotation.AbstractAspectJAdvisorFactory;
+import org.springframework.aop.framework.AdvisedSupport;
 import org.springframework.core.BridgeMethodResolver;
 import org.springframework.core.MethodIntrospector;
 import org.springframework.lang.Nullable;
@@ -103,10 +104,18 @@ public abstract class AopUtils {
     public static Class<?> getTargetClass(Object candidate) {
         Assert.notNull(candidate, "Candidate object must not be null");
         Class<?> result = null;
+        /**
+         * Spring 的 JDK动态代理和Cglib代理 会实现这个接口
+         *  {@link JdkDynamicAopProxy#JdkDynamicAopProxy(AdvisedSupport)}
+         *  {@link CglibAopProxy#getProxy(ClassLoader)}
+         *
+         * 注：TargetClassAware 是 Advised 的父类
+         * */
         if (candidate instanceof TargetClassAware) {
             result = ((TargetClassAware) candidate).getTargetClass();
         }
         if (result == null) {
+            // 针对Cglib生成的代理对象
             result = (isCglibProxy(candidate) ? candidate.getClass()
                     .getSuperclass() : candidate.getClass());
         }
@@ -131,10 +140,10 @@ public abstract class AopUtils {
         }
         Method methodToUse = MethodIntrospector.selectInvocableMethod(method, targetType);
         if (Modifier.isPrivate(methodToUse.getModifiers()) && !Modifier.isStatic(methodToUse.getModifiers())
-            && SpringProxy.class.isAssignableFrom(targetType)) {
+                && SpringProxy.class.isAssignableFrom(targetType)) {
             throw new IllegalStateException(String.format(
                     "Need to invoke method '%s' found on proxy for target class '%s' but cannot "
-                    + "be delegated to target bean. Switch its visibility to package or protected.", method.getName(), method.getDeclaringClass()
+                            + "be delegated to target bean. Switch its visibility to package or protected.", method.getName(), method.getDeclaringClass()
                             .getSimpleName()));
         }
         return methodToUse;
@@ -270,7 +279,7 @@ public abstract class AopUtils {
                  * 默认是这个类型的 {@link AspectJExpressionPointcut#matches(Method, Class, boolean)}
                  * */
                 if (introductionAwareMethodMatcher
-                    != null ? introductionAwareMethodMatcher.matches(method, targetClass, hasIntroductions) : methodMatcher.matches(method, targetClass)) {
+                        != null ? introductionAwareMethodMatcher.matches(method, targetClass, hasIntroductions) : methodMatcher.matches(method, targetClass)) {
                     return true;
                 }
             }
@@ -392,7 +401,7 @@ public abstract class AopUtils {
         } catch (IllegalArgumentException ex) {
             throw new AopInvocationException(
                     "AOP configuration seems to be invalid: tried calling method [" + method + "] on target [" + target
-                    + "]", ex);
+                            + "]", ex);
         } catch (IllegalAccessException ex) {
             throw new AopInvocationException("Could not access method [" + method + "]", ex);
         }

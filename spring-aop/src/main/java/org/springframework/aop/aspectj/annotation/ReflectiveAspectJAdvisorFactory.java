@@ -348,9 +348,8 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
         // Now to configure the advice...
         springAdvice.setAspectName(aspectName);
         springAdvice.setDeclarationOrder(declarationOrder);
-        // 拿到方法的参数名称列表 todo 这是做啥的
         /**
-         *
+         * 拿到方法的参数名称列表
          * @Before(value = "execution(* test(..))", argNames = "A,B")
          * public void enhanceBefore(ProceedingJoinPoint proceedingJoinPoint, String A, String B) {}
          * 就是拿到 argNames 这个属性

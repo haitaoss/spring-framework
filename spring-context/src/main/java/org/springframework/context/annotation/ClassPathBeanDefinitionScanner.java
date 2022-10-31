@@ -264,7 +264,7 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
     }
 
     /**
-     * TODOHAITAO: 2022/8/27 包扫描 BeanDefinition
+     * 包扫描 BeanDefinition
      * Perform a scan within the specified base packages,
      * returning the registered bean definitions.
      * <p>This method does <i>not</i> register an annotation config processor
@@ -364,8 +364,8 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
         }
         throw new ConflictingBeanDefinitionException(
                 "Annotation-specified bean name '" + beanName + "' for bean class [" + beanDefinition.getBeanClassName()
-                + "] conflicts with existing, " + "non-compatible bean definition of same name and class ["
-                + existingDef.getBeanClassName() + "]");
+                        + "] conflicts with existing, " + "non-compatible bean definition of same name and class ["
+                        + existingDef.getBeanClassName() + "]");
     }
 
     /**

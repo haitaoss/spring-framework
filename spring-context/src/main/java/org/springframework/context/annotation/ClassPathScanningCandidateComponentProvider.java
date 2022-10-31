@@ -423,7 +423,7 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
             // 把我们的包路径转为资源路径
             String packageSearchPath =
                     ResourcePatternResolver.CLASSPATH_ALL_URL_PREFIX + resolveBasePackage(basePackage) + '/'
-                    + this.resourcePattern;
+                            + this.resourcePattern;
             // 扫描指定包路径下面的所有. class文件
             Resource[] resources = getResourcePatternResolver().getResources(packageSearchPath);
             boolean traceEnabled = logger.isTraceEnabled();
@@ -508,7 +508,7 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
         // 符合 includeFilters的会进行条件匹配，通过了才是Bean,也就是先看有没有 @Component,再看是否符合 @Conditional
         for (TypeFilter tf : this.includeFilters) {
             if (tf.match(metadataReader, getMetadataReaderFactory())) {
-                // TODOHAITAO: 2022/8/29 @Conditional 注解的判断
+                // @Conditional 注解的判断
                 return isConditionMatch(metadataReader);
             }
         }
@@ -544,7 +544,7 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
          * metadata.isIndependent() 成员内部类 不是独立类
          * */
         return (metadata.isIndependent() && (metadata.isConcrete() || (metadata.isAbstract()
-                                                                       && metadata.hasAnnotatedMethods(Lookup.class.getName()))));
+                && metadata.hasAnnotatedMethods(Lookup.class.getName()))));
     }
 
 

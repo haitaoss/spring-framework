@@ -1,0 +1,24 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+interface BeanPostProcessor << interface >> {
+  + postProcessAfterInitialization(Object, String): Object?
+  + postProcessBeforeInitialization(Object, String): Object?
+}
+class ImportAwareBeanPostProcessor {
+  + postProcessProperties(PropertyValues?, Object, String): PropertyValues?
+  + postProcessBeforeInitialization(Object, String): Object?
+}
+interface InstantiationAwareBeanPostProcessor << interface >> {
+  + postProcessBeforeInstantiation(Class<?>, String): Object?
+  + postProcessAfterInstantiation(Object, String): boolean
+  + postProcessPropertyValues(PropertyValues, PropertyDescriptor[], Object, String): PropertyValues?
+  + postProcessProperties(PropertyValues, Object, String): PropertyValues?
+}
+
+ImportAwareBeanPostProcessor         -[#008200,dashed]-^  InstantiationAwareBeanPostProcessor
+InstantiationAwareBeanPostProcessor  -[#008200,plain]-^  BeanPostProcessor
+@enduml

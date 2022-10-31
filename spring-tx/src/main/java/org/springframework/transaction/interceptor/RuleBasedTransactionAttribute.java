@@ -16,11 +16,13 @@
 
 package org.springframework.transaction.interceptor;
 
+import org.springframework.core.annotation.AnnotationAttributes;
+import org.springframework.lang.Nullable;
+import org.springframework.transaction.annotation.SpringTransactionAnnotationParser;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.springframework.lang.Nullable;
 
 /**
  * TransactionAttribute implementation that works out whether a given exception
@@ -38,123 +40,134 @@ import org.springframework.lang.Nullable;
 @SuppressWarnings("serial")
 public class RuleBasedTransactionAttribute extends DefaultTransactionAttribute implements Serializable {
 
-	/** Prefix for rollback-on-exception rules in description strings. */
-	public static final String PREFIX_ROLLBACK_RULE = "-";
+    /** Prefix for rollback-on-exception rules in description strings. */
+    public static final String PREFIX_ROLLBACK_RULE = "-";
 
-	/** Prefix for commit-on-exception rules in description strings. */
-	public static final String PREFIX_COMMIT_RULE = "+";
-
-
-	@Nullable
-	private List<RollbackRuleAttribute> rollbackRules;
+    /** Prefix for commit-on-exception rules in description strings. */
+    public static final String PREFIX_COMMIT_RULE = "+";
 
 
-	/**
-	 * Create a new RuleBasedTransactionAttribute, with default settings.
-	 * Can be modified through bean property setters.
-	 * @see #setPropagationBehavior
-	 * @see #setIsolationLevel
-	 * @see #setTimeout
-	 * @see #setReadOnly
-	 * @see #setName
-	 * @see #setRollbackRules
-	 */
-	public RuleBasedTransactionAttribute() {
-		super();
-	}
-
-	/**
-	 * Copy constructor. Definition can be modified through bean property setters.
-	 * @see #setPropagationBehavior
-	 * @see #setIsolationLevel
-	 * @see #setTimeout
-	 * @see #setReadOnly
-	 * @see #setName
-	 * @see #setRollbackRules
-	 */
-	public RuleBasedTransactionAttribute(RuleBasedTransactionAttribute other) {
-		super(other);
-		this.rollbackRules = (other.rollbackRules != null ? new ArrayList<>(other.rollbackRules) : null);
-	}
-
-	/**
-	 * Create a new DefaultTransactionAttribute with the given
-	 * propagation behavior. Can be modified through bean property setters.
-	 * @param propagationBehavior one of the propagation constants in the
-	 * TransactionDefinition interface
-	 * @param rollbackRules the list of RollbackRuleAttributes to apply
-	 * @see #setIsolationLevel
-	 * @see #setTimeout
-	 * @see #setReadOnly
-	 */
-	public RuleBasedTransactionAttribute(int propagationBehavior, List<RollbackRuleAttribute> rollbackRules) {
-		super(propagationBehavior);
-		this.rollbackRules = rollbackRules;
-	}
+    @Nullable
+    private List<RollbackRuleAttribute> rollbackRules;
 
 
-	/**
-	 * Set the list of {@code RollbackRuleAttribute} objects
-	 * (and/or {@code NoRollbackRuleAttribute} objects) to apply.
-	 * @see RollbackRuleAttribute
-	 * @see NoRollbackRuleAttribute
-	 */
-	public void setRollbackRules(List<RollbackRuleAttribute> rollbackRules) {
-		this.rollbackRules = rollbackRules;
-	}
+    /**
+     * Create a new RuleBasedTransactionAttribute, with default settings.
+     * Can be modified through bean property setters.
+     * @see #setPropagationBehavior
+     * @see #setIsolationLevel
+     * @see #setTimeout
+     * @see #setReadOnly
+     * @see #setName
+     * @see #setRollbackRules
+     */
+    public RuleBasedTransactionAttribute() {
+        super();
+    }
 
-	/**
-	 * Return the list of {@code RollbackRuleAttribute} objects
-	 * (never {@code null}).
-	 */
-	public List<RollbackRuleAttribute> getRollbackRules() {
-		if (this.rollbackRules == null) {
-			this.rollbackRules = new ArrayList<>();
-		}
-		return this.rollbackRules;
-	}
+    /**
+     * Copy constructor. Definition can be modified through bean property setters.
+     * @see #setPropagationBehavior
+     * @see #setIsolationLevel
+     * @see #setTimeout
+     * @see #setReadOnly
+     * @see #setName
+     * @see #setRollbackRules
+     */
+    public RuleBasedTransactionAttribute(RuleBasedTransactionAttribute other) {
+        super(other);
+        this.rollbackRules = (other.rollbackRules != null ? new ArrayList<>(other.rollbackRules) : null);
+    }
 
-
-	/**
-	 * Winning rule is the shallowest rule (that is, the closest in the
-	 * inheritance hierarchy to the exception). If no rule applies (-1),
-	 * return false.
-	 * @see TransactionAttribute#rollbackOn(java.lang.Throwable)
-	 */
-	@Override
-	public boolean rollbackOn(Throwable ex) {
-		RollbackRuleAttribute winner = null;
-		int deepest = Integer.MAX_VALUE;
-
-		if (this.rollbackRules != null) {
-			for (RollbackRuleAttribute rule : this.rollbackRules) {
-				int depth = rule.getDepth(ex);
-				if (depth >= 0 && depth < deepest) {
-					deepest = depth;
-					winner = rule;
-				}
-			}
-		}
-
-		// User superclass behavior (rollback on unchecked) if no rule matches.
-		if (winner == null) {
-			return super.rollbackOn(ex);
-		}
-
-		return !(winner instanceof NoRollbackRuleAttribute);
-	}
+    /**
+     * Create a new DefaultTransactionAttribute with the given
+     * propagation behavior. Can be modified through bean property setters.
+     * @param propagationBehavior one of the propagation constants in the
+     * TransactionDefinition interface
+     * @param rollbackRules the list of RollbackRuleAttributes to apply
+     * @see #setIsolationLevel
+     * @see #setTimeout
+     * @see #setReadOnly
+     */
+    public RuleBasedTransactionAttribute(int propagationBehavior, List<RollbackRuleAttribute> rollbackRules) {
+        super(propagationBehavior);
+        this.rollbackRules = rollbackRules;
+    }
 
 
-	@Override
-	public String toString() {
-		StringBuilder result = getAttributeDescription();
-		if (this.rollbackRules != null) {
-			for (RollbackRuleAttribute rule : this.rollbackRules) {
-				String sign = (rule instanceof NoRollbackRuleAttribute ? PREFIX_COMMIT_RULE : PREFIX_ROLLBACK_RULE);
-				result.append(',').append(sign).append(rule.getExceptionName());
-			}
-		}
-		return result.toString();
-	}
+    /**
+     * Set the list of {@code RollbackRuleAttribute} objects
+     * (and/or {@code NoRollbackRuleAttribute} objects) to apply.
+     * @see RollbackRuleAttribute
+     * @see NoRollbackRuleAttribute
+     */
+    public void setRollbackRules(List<RollbackRuleAttribute> rollbackRules) {
+        this.rollbackRules = rollbackRules;
+    }
+
+    /**
+     * Return the list of {@code RollbackRuleAttribute} objects
+     * (never {@code null}).
+     */
+    public List<RollbackRuleAttribute> getRollbackRules() {
+        if (this.rollbackRules == null) {
+            this.rollbackRules = new ArrayList<>();
+        }
+        return this.rollbackRules;
+    }
+
+
+    /**
+     * Winning rule is the shallowest rule (that is, the closest in the
+     * inheritance hierarchy to the exception). If no rule applies (-1),
+     * return false.
+     * @see TransactionAttribute#rollbackOn(java.lang.Throwable)
+     */
+    @Override
+    public boolean rollbackOn(Throwable ex) {
+        RollbackRuleAttribute winner = null;
+        int deepest = Integer.MAX_VALUE;
+
+        if (this.rollbackRules != null) {
+            /**
+             * 规则是啥看这里 {@link SpringTransactionAnnotationParser#parseTransactionAnnotation(AnnotationAttributes)}
+             * */
+            for (RollbackRuleAttribute rule : this.rollbackRules) {
+                /**
+                 * depth = -1 表示没匹配到
+                 * */
+                int depth = rule.getDepth(ex);
+                if (depth >= 0 && depth < deepest) {
+                    deepest = depth;
+                    // 记录匹配的规则
+                    winner = rule;
+                }
+            }
+        }
+
+        // User superclass behavior (rollback on unchecked) if no rule matches.
+        if (winner == null) {
+            /**
+             * 使用父类匹配规则 {@link DefaultTransactionAttribute#rollbackOn(Throwable)}
+             *  很简单 `return (ex instanceof RuntimeException || ex instanceof Error);`
+             * */
+            return super.rollbackOn(ex);
+        }
+        // 不是 NoRollbackRuleAttribute 就回滚
+        return !(winner instanceof NoRollbackRuleAttribute);
+    }
+
+
+    @Override
+    public String toString() {
+        StringBuilder result = getAttributeDescription();
+        if (this.rollbackRules != null) {
+            for (RollbackRuleAttribute rule : this.rollbackRules) {
+                String sign = (rule instanceof NoRollbackRuleAttribute ? PREFIX_COMMIT_RULE : PREFIX_ROLLBACK_RULE);
+                result.append(',').append(sign).append(rule.getExceptionName());
+            }
+        }
+        return result.toString();
+    }
 
 }

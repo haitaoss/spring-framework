@@ -16,10 +16,15 @@
 
 package org.springframework.transaction.annotation;
 
+import org.aopalliance.intercept.MethodInvocation;
+import org.springframework.aop.Advisor;
+import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.AdviceMode;
 import org.springframework.context.annotation.AdviceModeImportSelector;
 import org.springframework.context.annotation.AutoProxyRegistrar;
 import org.springframework.transaction.config.TransactionManagementConfigUtils;
+import org.springframework.transaction.interceptor.BeanFactoryTransactionAttributeSourceAdvisor;
+import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.util.ClassUtils;
 
 /**
@@ -37,29 +42,38 @@ import org.springframework.util.ClassUtils;
  */
 public class TransactionManagementConfigurationSelector extends AdviceModeImportSelector<EnableTransactionManagement> {
 
-	/**
-	 * Returns {@link ProxyTransactionManagementConfiguration} or
-	 * {@code AspectJ(Jta)TransactionManagementConfiguration} for {@code PROXY}
-	 * and {@code ASPECTJ} values of {@link EnableTransactionManagement#mode()},
-	 * respectively.
-	 */
-	@Override
-	protected String[] selectImports(AdviceMode adviceMode) {
-		switch (adviceMode) {
-			case PROXY:
-				return new String[] {AutoProxyRegistrar.class.getName(),
-						ProxyTransactionManagementConfiguration.class.getName()};
-			case ASPECTJ:
-				return new String[] {determineTransactionAspectClass()};
-			default:
-				return null;
-		}
-	}
+    /**
+     * Returns {@link ProxyTransactionManagementConfiguration} or
+     * {@code AspectJ(Jta)TransactionManagementConfiguration} for {@code PROXY}
+     * and {@code ASPECTJ} values of {@link EnableTransactionManagement#mode()},
+     * respectively.
+     */
+    @Override
+    protected String[] selectImports(AdviceMode adviceMode) {
+        switch (adviceMode) {
+            case PROXY:
+                /**
+                 * AutoProxyRegistrar 会注册 ProxyTransactionManagementConfiguration。
+                 * 而 ProxyTransactionManagementConfiguration ，会拿到容器中 Advisor 类型的bean 且 Role=={@link BeanDefinition#ROLE_INFRASTRUCTURE}} 才作为 Advisor，
+                 * 然后使用Advisor判断执行后置处理器的bean，是否创建代理对象。所以具体的逻辑还得看 Advisor 怎么写的
+                 *
+                 * ProxyTransactionManagementConfiguration 会注册 Advisor。注册的是这个 {@link BeanFactoryTransactionAttributeSourceAdvisor}
+                 * 而Advisor的具体增强逻辑是看其 {@link Advisor#getAdvice()}，而这个类会注册这个 {@link TransactionInterceptor} 作为其Advice，
+                 * 所以具体的增强逻辑看这个 {@link TransactionInterceptor#invoke(MethodInvocation)}
+                 * */
+                return new String[]{AutoProxyRegistrar.class.getName(),
+                        ProxyTransactionManagementConfiguration.class.getName()};
+            case ASPECTJ:
+                return new String[]{determineTransactionAspectClass()};
+            default:
+                return null;
+        }
+    }
 
-	private String determineTransactionAspectClass() {
-		return (ClassUtils.isPresent("javax.transaction.Transactional", getClass().getClassLoader()) ?
-				TransactionManagementConfigUtils.JTA_TRANSACTION_ASPECT_CONFIGURATION_CLASS_NAME :
-				TransactionManagementConfigUtils.TRANSACTION_ASPECT_CONFIGURATION_CLASS_NAME);
-	}
+    private String determineTransactionAspectClass() {
+        return (ClassUtils.isPresent("javax.transaction.Transactional", getClass().getClassLoader()) ?
+                TransactionManagementConfigUtils.JTA_TRANSACTION_ASPECT_CONFIGURATION_CLASS_NAME :
+                TransactionManagementConfigUtils.TRANSACTION_ASPECT_CONFIGURATION_CLASS_NAME);
+    }
 
 }

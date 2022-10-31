@@ -43,6 +43,9 @@ import java.security.PrivilegedExceptionAction;
  */
 public class SimpleInstantiationStrategy implements InstantiationStrategy {
 
+    /**
+     * 当前正在调用的 FactoryBean，就是@Bean方法
+     */
     private static final ThreadLocal<Method> currentlyInvokedFactoryMethod = new ThreadLocal<>();
 
 
@@ -157,8 +160,10 @@ public class SimpleInstantiationStrategy implements InstantiationStrategy {
                 ReflectionUtils.makeAccessible(factoryMethod);
             }
 
+            // 当前值
             Method priorInvokedFactoryMethod = currentlyInvokedFactoryMethod.get();
             try {
+                // 记录当前方法
                 currentlyInvokedFactoryMethod.set(factoryMethod);
                 // 反射执行 method 而已
                 Object result = factoryMethod.invoke(factoryBean, args);
@@ -168,8 +173,10 @@ public class SimpleInstantiationStrategy implements InstantiationStrategy {
                 return result;
             } finally {
                 if (priorInvokedFactoryMethod != null) {
+                    // 恢复当前值
                     currentlyInvokedFactoryMethod.set(priorInvokedFactoryMethod);
                 } else {
+                    // 移除
                     currentlyInvokedFactoryMethod.remove();
                 }
             }

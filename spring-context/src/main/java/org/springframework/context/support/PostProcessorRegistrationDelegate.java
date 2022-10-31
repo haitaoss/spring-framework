@@ -46,8 +46,7 @@ final class PostProcessorRegistrationDelegate {
 
 
     /**
-     * TODOHAITAO
-     *
+     * 调用 BeanFactoryPostProcessor 接口方法
      * @param beanFactory               子类创建的bean 工厂
      * @param beanFactoryPostProcessors 当前bean工厂中的 BeanPostProcessor
      */
@@ -123,7 +122,7 @@ final class PostProcessorRegistrationDelegate {
             /**
              *  在这里典型的 BeanDefinitionRegistryPostProcessor就是 ConfigurationClassPostProcessor
              *  用于进行bean定义的加载，比如我们的包扫描，@import等等。。。。。。。。。
-             *  TODOHAITAO BeanDefinitionRegistryPostProcessor#postProcessBeanDefinitionRegistry。可用来修改和注册 BeanDefinition
+             *  BeanDefinitionRegistryPostProcessor#postProcessBeanDefinitionRegistry。可用来修改和注册 BeanDefinition
              *      注：JavaConfig 就是通过 ConfigurationClassPostProcessor
              */
             invokeBeanDefinitionRegistryPostProcessors(currentRegistryProcessors, registry, beanFactory.getApplicationStartup());
@@ -153,7 +152,7 @@ final class PostProcessorRegistrationDelegate {
             currentRegistryProcessors.clear();
 
             /**
-             * TODOHAITAO BeanDefinitionRegistryPostProcessor 的兜底操作
+             * BeanDefinitionRegistryPostProcessor 的兜底操作
              * 这是是一个兜底操作，因为 有可能会在 BeanDefinitionRegistryPostProcessor#postProcessBeanDefinitionRegistry 里面又注册了 BeanDefinitionRegistryPostProcessor
              * @see cn.haitaoss.javaconfig.beanfactorypostprocessor.MyBeanFactoryPostProcessor3
              */
@@ -215,7 +214,7 @@ final class PostProcessorRegistrationDelegate {
 
         // First, invoke the BeanFactoryPostProcessors that implement PriorityOrdered.
         sortPostProcessors(priorityOrderedPostProcessors, beanFactory);
-        // TODOHAITAO BeanFactoryPostProcessor#postProcessBeanFactory 此时 beanDefinition 都加载完了,可以在这里创建bean 来实现提前创建的目的
+        // BeanFactoryPostProcessor#postProcessBeanFactory 此时 beanDefinition 都加载完了,可以在这里创建bean 来实现提前创建的目的
         invokeBeanFactoryPostProcessors(priorityOrderedPostProcessors, beanFactory);
 
         // Next, invoke the BeanFactoryPostProcessors that implement Ordered.

@@ -23,10 +23,7 @@ import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.beans.factory.config.ConstructorArgumentValues;
 import org.springframework.beans.factory.config.ConstructorArgumentValues.ValueHolder;
 import org.springframework.beans.factory.config.DependencyDescriptor;
-import org.springframework.core.CollectionFactory;
-import org.springframework.core.MethodParameter;
-import org.springframework.core.NamedThreadLocal;
-import org.springframework.core.ParameterNameDiscoverer;
+import org.springframework.core.*;
 import org.springframework.lang.Nullable;
 import org.springframework.util.*;
 
@@ -356,17 +353,26 @@ class ConstructorResolver {
         BeanWrapperImpl bw = new BeanWrapperImpl();
         this.beanFactory.initBeanWrapper(bw);
 
+        // 配置类实例
         Object factoryBean;
+        // 配置类
         Class<?> factoryClass;
+        // 方法是不是静态的
         boolean isStatic;
 
+        /**
+         * @Bean 标注的static方法 解析成的 BeanDefinition 是没有 factoryBeanName 的
+         * {@link org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsForBeanMethod(org.springframework.context.annotation.BeanMethod)}
+         * */
         String factoryBeanName = mbd.getFactoryBeanName();
         if (factoryBeanName != null) {
             if (factoryBeanName.equals(beanName)) {
                 throw new BeanDefinitionStoreException(mbd.getResourceDescription(), beanName,
                         "factory-bean reference points back to the same bean definition");
             }
-            // 先创建工厂bean
+            /**
+             * 先创建工厂bean。也就是说只有非静态的@Bean方法的bean在实例化前要先实例化其工厂bean
+             * */
             factoryBean = this.beanFactory.getBean(factoryBeanName);
             if (mbd.isSingleton() && this.beanFactory.containsSingleton(beanName)) {
                 throw new ImplicitlyAppearedSingletonException();
@@ -409,6 +415,7 @@ class ConstructorResolver {
         }
 
         if (factoryMethodToUse == null || argsToUse == null) {
+            // 如果 factoryClass 是cglib生成的类，就返回其父类
             // Need to determine the factory method...
             // Try all methods with this name to see if they match the given arguments.
             factoryClass = ClassUtils.getUserClass(factoryClass);
@@ -416,6 +423,7 @@ class ConstructorResolver {
             List<Method> candidates = null;
             if (mbd.isFactoryMethodUnique) {
                 if (factoryMethodToUse == null) {
+                    // 解析过才有值
                     factoryMethodToUse = mbd.getResolvedFactoryMethod();
                 }
                 if (factoryMethodToUse != null) {
@@ -424,24 +432,29 @@ class ConstructorResolver {
             }
             if (candidates == null) {
                 candidates = new ArrayList<>();
+                // 拿到类的所有的方法
                 Method[] rawCandidates = getCandidateMethods(factoryClass, mbd);
                 for (Method candidate : rawCandidates) {
+                    // 方法名与当前@Bean的方法名一致
                     if (Modifier.isStatic(candidate.getModifiers()) == isStatic && mbd.isFactoryMethod(candidate)) {
+                        // 记录一下
                         candidates.add(candidate);
                     }
                 }
             }
 
+            // 只有一个，就直接反射执行方法就能完成实例化
             if (candidates.size() == 1 && explicitArgs == null && !mbd.hasConstructorArgumentValues()) {
                 Method uniqueCandidate = candidates.get(0);
                 if (uniqueCandidate.getParameterCount() == 0) {
+                    // 记录到BeanDefinition中，下次就别解析了
                     mbd.factoryMethodToIntrospect = uniqueCandidate;
                     synchronized (mbd.constructorArgumentLock) {
                         mbd.resolvedConstructorOrFactoryMethod = uniqueCandidate;
                         mbd.constructorArgumentsResolved = true;
                         mbd.resolvedConstructorArguments = EMPTY_ARGS;
                     }
-                    // 使用实例化策略实例化当前bean，就是反射调用method，就结果返回而已
+                    // 使用实例化策略实例化当前bean，就是反射调用method，将结果返回而已
                     bw.setBeanInstance(instantiate(beanName, mbd, factoryBean, uniqueCandidate, EMPTY_ARGS));
                     return bw;
                 }
@@ -490,10 +503,19 @@ class ConstructorResolver {
                         // Resolved constructor arguments: type conversion and/or autowiring necessary.
                         try {
                             String[] paramNames = null;
+                            /**
+                             *  {@link DefaultParameterNameDiscoverer}
+                             *  {@link PrioritizedParameterNameDiscoverer#getParameterNames(Method)}
+                             * */
                             ParameterNameDiscoverer pnd = this.beanFactory.getParameterNameDiscoverer();
                             if (pnd != null) {
+                                // 拿到方法参数列表
                                 paramNames = pnd.getParameterNames(candidate);
                             }
+                            /**
+                             * 创建参数数组，就是遍历参数列表拿到依赖注入的值而已
+                             *  {@link AutowireCapableBeanFactory#resolveDependency(DependencyDescriptor, String, Set, TypeConverter)}
+                             * */
                             argsHolder = createArgumentArray(beanName, mbd, resolvedValues, bw,
                                     paramTypes, paramNames, candidate, autowiring, candidates.size() == 1);
                         } catch (UnsatisfiedDependencyException ex) {
@@ -680,6 +702,7 @@ class ConstructorResolver {
         Set<ConstructorArgumentValues.ValueHolder> usedValueHolders = new HashSet<>(paramTypes.length);
         Set<String> autowiredBeanNames = new LinkedHashSet<>(4);
 
+        // 遍历参数列表，挨个从BeanFactory中寻找要注入的值
         for (int paramIndex = 0; paramIndex < paramTypes.length; paramIndex++) {
             Class<?> paramType = paramTypes[paramIndex];
             String paramName = (paramNames != null ? paramNames[paramIndex] : "");
@@ -734,6 +757,7 @@ class ConstructorResolver {
                                     "] - did you specify the correct bean references as arguments?");
                 }
                 try {
+                    // 解析依赖咯
                     Object autowiredArgument = resolveAutowiredArgument(
                             methodParam, beanName, autowiredBeanNames, converter, fallback);
                     args.rawArguments[paramIndex] = autowiredArgument;
@@ -748,6 +772,7 @@ class ConstructorResolver {
         }
 
         for (String autowiredBeanName : autowiredBeanNames) {
+            // 注册依赖关系
             this.beanFactory.registerDependentBean(autowiredBeanName, beanName);
             if (logger.isDebugEnabled()) {
                 logger.debug("Autowiring by type from bean name '" + beanName +

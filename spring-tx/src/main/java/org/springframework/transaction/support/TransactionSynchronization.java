@@ -16,9 +16,9 @@
 
 package org.springframework.transaction.support;
 
-import java.io.Flushable;
-
 import org.springframework.core.Ordered;
+
+import java.io.Flushable;
 
 /**
  * Interface for transaction synchronization callbacks.
@@ -89,6 +89,7 @@ public interface TransactionSynchronization extends Ordered, Flushable {
 	}
 
 	/**
+	 * commit才会触发
 	 * Invoked before transaction commit (before "beforeCompletion").
 	 * Can e.g. flush transactional O/R Mapping sessions to the database.
 	 * <p>This callback does <i>not</i> mean that the transaction will actually be committed.
@@ -106,6 +107,7 @@ public interface TransactionSynchronization extends Ordered, Flushable {
 	}
 
 	/**
+	 * commit和rollback都会触发
 	 * Invoked before transaction commit/rollback.
 	 * Can perform resource cleanup <i>before</i> transaction completion.
 	 * <p>This method will be invoked after {@code beforeCommit}, even when
@@ -120,6 +122,7 @@ public interface TransactionSynchronization extends Ordered, Flushable {
 	}
 
 	/**
+	 * commit才会触发
 	 * Invoked after transaction commit. Can perform further operations right
 	 * <i>after</i> the main transaction has <i>successfully</i> committed.
 	 * <p>Can e.g. commit further operations that are supposed to follow on a successful
@@ -138,6 +141,7 @@ public interface TransactionSynchronization extends Ordered, Flushable {
 	}
 
 	/**
+	 * commit和rollback都会触发
 	 * Invoked after transaction commit/rollback.
 	 * Can perform resource cleanup <i>after</i> transaction completion.
 	 * <p><b>NOTE:</b> The transaction will have been committed or rolled back already,
