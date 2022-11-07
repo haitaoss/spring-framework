@@ -54,7 +54,9 @@ abstract class TransactionAttributeSourcePointcut extends StaticMethodMatcherPoi
          * 会执行抽象方法 `getTransactionAttributeSource` 然后执行 {@link TransactionAttributeSource#getTransactionAttribute(Method, Class)}
          *
          * {@link AbstractFallbackTransactionAttributeSource#getTransactionAttribute(Method, Class)}
-         * 注：过滤规则很简单，方法 -> 方法声明的类 先找到@Transactional就返回。也就是有注解就是匹配
+         * 注：
+         *  1. 过滤规则很简单，方法 -> 方法声明的类 先找到@Transactional就返回。也就是有注解就是匹配
+         *  2. 如果方法不是public的，直接返回null 不解析上面的@Transactional注解，也就是不代理
          * */
         TransactionAttributeSource tas = getTransactionAttributeSource();
         return (tas == null || tas.getTransactionAttribute(method, targetClass) != null);

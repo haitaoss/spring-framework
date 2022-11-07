@@ -605,7 +605,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
         // Eagerly cache singletons to be able to resolve circular references
         // even when triggered by lifecycle interfaces like BeanFactoryAware.
         boolean earlySingletonExposure = (mbd.isSingleton() && this.allowCircularReferences
-                && isSingletonCurrentlyInCreation(beanName));
+                                          && isSingletonCurrentlyInCreation(beanName));
         // 上述条件满足，允许中期暴露对象
         if (earlySingletonExposure) {
             if (logger.isTraceEnabled()) {
@@ -1522,6 +1522,8 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
          * 判断我们的bean的属性注入模型
          * AUTOWIRE_BY_NAME 根据名称注入
          * AUTOWIRE_BY_TYPE 根据类型注入
+         *
+         * 可以这样子指定：@Bean(autowire = Autowire.BY_NAME)
          * */
         int resolvedAutowireMode = mbd.getResolvedAutowireMode();
         if (resolvedAutowireMode == AUTOWIRE_BY_NAME || resolvedAutowireMode == AUTOWIRE_BY_TYPE) {
@@ -1587,7 +1589,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
                 pvs = pvsToUse;
             }
         }
-        // 判断是否检查依赖
+        // 需要检查依赖
         if (needsDepCheck) {
             if (filteredPds == null) {
                 filteredPds = filterPropertyDescriptorsForDependencyCheck(bw, mbd.allowCaching);
@@ -1768,7 +1770,9 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
      */
     protected boolean isExcludedFromDependencyCheck(PropertyDescriptor pd) {
         return (AutowireUtils.isExcludedFromDependencyCheck(pd)
+                // 忽略的类型
                 || this.ignoredDependencyTypes.contains(pd.getPropertyType())
+                // 忽略的接口
                 || AutowireUtils.isSetterDefinedInInterface(pd, this.ignoredDependencyInterfaces));
     }
 

@@ -1,9 +1,7 @@
 package cn.haitaoss;
 
 
-import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.annotation.ConfigurationClassPostProcessor;
 
 /**
  * @author haitao.chen
@@ -19,10 +17,41 @@ public class Test {
         /**
          * BeanPostProcessor执行过程：
          * 实例化前后置->推断构造器后置->实例化bean->合并BeanDefinition后置->实例化后后置->属性注入后置->初始化前后置->初始化后后置->销毁前后置(hit)
-         *
-         * {@link ConfigurationClassPostProcessor#postProcessBeanFactory(ConfigurableListableBeanFactory)}
-         * {@link ConfigurationClassPostProcessor#enhanceConfigurationClasses(ConfigurableListableBeanFactory)}
          * */
+
+        /**
+         * 已经掌握的注解
+         *
+         * @Configuration
+         *         @Import
+         *         @ImportResource
+         *         @Component
+         *         @Bean
+         *         @Lazy
+         *         @Autowired
+         *         @Resource
+         *         @Value
+         *         @Qualifier
+         *         @Primary
+         *         @PostConstruct
+         *         @PreDestroy
+         *         @Lookup
+         *         @EnableAspectJAutoProxy
+         *         @Aspect 、@Before 、@After、@AfterThrowing、@AfterReturning、@Around、@DeclareParents、@Pointcut
+         *         @EnableTransactionManagement、@Transactional、@TransactionalEventListener
+         *         @EnableAsync、@Async
+         *         @EnableScheduling、@Scheduled
+         *         @Scope、@Order
+         *         @DependsOn
+         *         @Conditional
+         *         @EventListener
+         *
+         * 带掌握
+         * @PropertySource
+         * */
+
+
+
     }
 
 

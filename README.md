@@ -1,28 +1,60 @@
+
 # 源码环境搭建
 
-## 本地编译配置
+## 本地编译源码配置
 
-1. 删掉代码检查规范
-2. 添加仓库
-3. 注释掉插件
-4. 配置环境变量，我配置的是 `JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-11.0.16.jdk/Contents/Home`
-5. 编译代码：`./gradlew build`
+`IDEA配置`
 
-## IDEA配置
+> JVM参数不要输出警告信息：--illegal-access=warn --add-opens java.base/java.lang=ALL-UNNAMED
 
-- 需要在idea中配置 gradle 的编译信息
+![image-20221105161913239](.README_imgs/image-20221105161913239.png)
 
-![img.png](.README_imgs/img.png)
+![image-20221105161946762](.README_imgs/image-20221105161946762.png)
 
-- 配置项目的编译器信息
+`build.gradle`
 
-![image-20220727215837291](.README_imgs/image-20220727215837291.png)
+![image-20221105170242530](.README_imgs/image-20221105170242530.png)![image-20221105170214480](.README_imgs/image-20221105170214480.png)
 
-- 使用 idea 的 gradle 插件构建失败，可以使用命令行进行构建 `./gradlew build`
+`settings.gradle`
 
-## 使用 lombok
+![image-20221105163526784](.README_imgs/image-20221105163526784.png)
 
-build.gradle 
+`spring-beans.gradle`
+
+![image-20221105170338680](.README_imgs/image-20221105170338680.png)
+
+## AspectJ Compiler 配置
+
+> AJC官网地址：https://www.eclipse.org/aspectj/downloads.php
+>
+> 我下载的版本：http://www.eclipse.org/downloads/download.php?file=/tools/aspectj/aspectj-1.9.6.jar
+>
+> 可以指定的AJC编译器参数：https://www.mojohaus.org/aspectj-maven-plugin/ajc_reference/standard_opts.html
+>
+> IDEA配置AJC教程：https://www.jetbrains.com/help/idea/2020.3/using-the-aspectj-ajc-compiler.html#controlling_aspectpath
+
+1. 本地安装AJC
+
+`java -jar aspectj-1.9.6.jar`
+
+2. IDEA配置使用AJC
+
+安装插件
+
+![image-20221106094309717](.README_imgs/image-20221106094309717.png)
+
+配置编译器
+
+![image-20221106100321643](.README_imgs/image-20221106100321643.png)
+
+需要使用AJC的模块需要指定
+
+![image-20221106100439676](.README_imgs/image-20221106100439676.png)
+
+## 依赖
+
+`build.gradle` 
+
 ```groovy
 dependencies {
     // lombok
@@ -30,28 +62,15 @@ dependencies {
     compileOnly 'org.projectlombok:lombok:1.18.2'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.2'
     testCompileOnly 'org.projectlombok:lombok:1.18.2'
-}
-
-```
-
-删除警告就报错的编译配置参数：
-全局搜索这个参数`-Werror` 注释掉就行了
-
-
-## junit5 的使用
-
-依赖：
-```groovy
-dependencies {
-    // 测试依赖
+  
+  	// junit5 测试依赖
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
 }
 ```
 
-IDEA配置：
-![img1.png](.README_imgs/img_1.png)
 # 源码分析
+
 ## [ASM 技术](https://asm.ow2.io/)
 
 > 简单来说，ASM是一个操作Java字节码的类库。
@@ -212,7 +231,6 @@ public AnnotationConfigApplicationContext() {
   this.scanner = new ClassPathBeanDefinitionScanner(this);
 }
 ```
-
 ### prepareBeanFactory
 ```java
 /**
@@ -823,7 +841,6 @@ public class MyApplicationListener implements ApplicationListener<MyApplicationE
  * 3. 使用 @Lookup 注解，延迟bean的创建，避免出现循环依赖问题
  */
 ```
-
 ## `ProxyFactory#getProxy`
 
 ### 示例代码
@@ -1244,7 +1261,6 @@ class MyAnnotationTypeFilter extends AnnotationTypeFilter {
 }
 
 ```
-
 ## 依赖注入原理
 > ### Spring依赖注入注解
 >
@@ -1796,7 +1812,6 @@ public class Test {
  * Tips: 具体的转换功能是有 PropertyEditor 和 ConversionService 实现的，而 ConversionService 的具体转换功能是由 GenericConverter 实现的。
  * */
 ```
-
 ## 类型转换
 
 [原理看这里](#细说`TypeConverterSupport#convertIfNecessary` )
@@ -1972,7 +1987,6 @@ public class TypeConverterTest {
     }
 }
 ```
-
 ## SpEL
 
 > [Spring官方文档](https://docs.spring.io/spring-framework/docs/3.0.x/reference/expressions.html)
@@ -2060,10 +2074,7 @@ public class Demo {
         System.out.println(consumer.apply("testPropertyAccessor"));
     }
 }
-```
-
-
-
+``
 ## @EnableAspectJAutoProxy
 
 > [示例代码](#@Aspect)
@@ -2541,7 +2552,6 @@ public class AopTest6 {
     }
 }
 ```
-
 ## @EnableAsync
 
 > `@EnableAsync` 会创建用来解析`@Async`注解的Advisor
@@ -2709,7 +2719,6 @@ public class EnableAsyncTest {
  *          支持三种特殊的返回值类型 CompletableFuture、ListenableFuture、Future 会有返回值，其他的返回null
  * */
 ```
-
 ## @EnableTransactionManagement
 
 > 前置知识：Connection是支持设置 事务隔离级别、是否只读的 ，是否自动提交事务
@@ -3192,7 +3201,84 @@ public class EnableTransactionManagementTest8 {
 }
 ```
 
+#### 嵌套事务的方式解决事务内无法切换数据源问题
 
+```java
+/**
+ * @author haitao.chen
+ * email haitaoss@aliyun.com
+ * date 2022-10-20 20:40
+ * 嵌套事务的方式解决事务内无法切换数据源问题
+ * 原理：如果子事务是新开的，会先将父事务给暂停(就是移除事务资源)，所以子事务获取连接就可以通过DataSource在get一个，而不是从事务资源缓存中取
+ */
+@EnableTransactionManagement
+@EnableAspectJAutoProxy(exposeProxy = true)
+@Component
+@Import(Config.class)
+public class EnableTransactionManagementTest5 {
+    @Autowired
+    public JdbcTemplate jdbcTemplate;
+
+    @Transactional
+    public void test_show_db(Propagation propagation) {
+        showDB();
+        EnableTransactionManagementTest5 currentProxy = (EnableTransactionManagementTest5) AopContext.currentProxy();
+        currentDB.set("db2");
+        switch (propagation.value()) {
+            case TransactionDefinition.PROPAGATION_NESTED:
+                currentProxy.nested();
+                break;
+            case TransactionDefinition.PROPAGATION_REQUIRES_NEW:
+                currentProxy.requires_new();
+                break;
+            case TransactionDefinition.PROPAGATION_REQUIRED:
+                currentProxy.required();
+                break;
+            case TransactionDefinition.PROPAGATION_NOT_SUPPORTED:
+                currentProxy.not_supported();
+                break;
+        }
+        currentDB.remove();
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void not_supported() {
+        showDB();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void required() {
+        showDB();
+    }
+
+    @Transactional(propagation = Propagation.NESTED)
+    public void nested() {
+        showDB();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void requires_new() {
+        showDB();
+    }
+
+    private void showDB() {
+        System.out.println("数据库->" + jdbcTemplate.queryForObject("select database()", String.class));
+    }
+
+    public static void main(String[] args) throws Exception {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(EnableTransactionManagementTest5.class);
+        EnableTransactionManagementTest5 bean = context.getBean(EnableTransactionManagementTest5.class);
+        System.out.println("---->NESTED");
+        bean.test_show_db(Propagation.NESTED); // 不可以
+        System.out.println("---->REQUIRES_NEW");
+        bean.test_show_db(Propagation.REQUIRES_NEW); // 可以
+        System.out.println("---->REQUIRED");
+        bean.test_show_db(Propagation.REQUIRED); // 不可以
+        System.out.println("---->NOT_SUPPORTED");
+        bean.test_show_db(Propagation.NOT_SUPPORTED); // 可以
+    }
+}
+```
 
 ### 使用`@EnableTransactionManagement`会发生什么?
 
@@ -3654,11 +3740,502 @@ public abstract class TransactionSynchronizationManager {
             new NamedThreadLocal<>("Current transaction isolation level");
 }  
 ```
-
-
-
 ## @EnableScheduling
+> ### 使用Spring的定时任务
+>
+> 1. `@EnableScheduling` 启用任务调度，其实就是注册一个BeanPostProcessor
+> 2. `@Scheduled` 标注在方法上，定时任务会执行方法。
+> 3. `@Scheduled` 会被解析成 cron定时任务、周期任务、延时任务
+> 4. 一个方法可以标注多个`@Scheduled` 
+> 5. 可以使用`SchedulingConfigurer、TaskScheduler、ScheduledExecutorService`配置调度任务需要的线程池
+>
+> **注：任务调度最终是使用JDK提供的`ScheduledExecutorService`实现的**
+>
+> ### 关键的类
+>
+> - bean：SchedulingConfigurer
+>     功能很强大，接口方法的入参是 ScheduledTaskRegistrar 对象，那就可以做很多事情，比如：设置任务调度器、调度任务、销毁任务等等
+>
+> - bean：TaskScheduler、ScheduledExecutorService
+>     给 ScheduledTaskRegistrar 设置任务调度器的
+>
+> - bean：ScheduledAnnotationBeanPostProcessor
+>     用来解析@Scheduled成Task，然后注册到 ScheduledTaskRegistrar 中
+>
+> - ScheduledTaskRegistrar
+>     调度任务注册器，可以注册、销毁定时任务
+>
+> - TaskScheduler
+>     任务调度器，依赖了 ScheduledExecutorService
+>
+> - ScheduledTask
+>     要调度的Task的装饰对象，是 Task + ScheduledFuture 的装饰对象
+>
+> - ScheduledFuture
+>     用来取消定时任务的执行
+>
+> - ScheduledExecutorService
+>     JDK提供的创建定时任务的工具类，调度任务会返回 ScheduledFuture
+>
+> - 具体有这几种Task
+>
+>     - TriggerTask：延时一次执行，run方法是执行完具体的Task后，使用触发器获取下次执行时间 再发起延时一次执行的任务，从而实现递归执行，也就是实现定时任务
+>     - CronTask：和TriggerTask是一样的原理，区别是下次执行时间是解析cron表达式获取的
+>     - FixedDelayTask：固定延时时间执行任务
+>     - FixedRateTask：固定周期执行任务
+>
+>     **注：延时任务的特点是任务的耗时+延时时间等于下次任务的执行时间，而周期任务是到了就执行**
+![EnableScheduling类图](.README_imgs/EnableScheduling类图.png)
 
+### 示例代码
+
+#### JDK提供的定时任务API
+
+```java
+/**
+ * @author haitao.chen
+ * email haitaoss@aliyun.com
+ * date 2022-11-05 09:29
+ * JDK提供的定时任务API
+ */
+public class TestJDKSchedulerAPI {
+    /**
+     * `ScheduledExecutorService`是基于多线程的，设计的初衷是为了解决`Timer`单线程执行，多个任务之间会互相影响的问题。
+     *
+     * 它主要包含4个方法：
+     *  - `schedule(Runnable command,long delay,TimeUnit unit)`，带延迟时间的调度，只执行一次，调度之后可通过Future.get()阻塞直至任务执行完毕。
+     *  - `schedule(Callable<V> callable,long delay,TimeUnit unit)`，带延迟时间的调度，只执行一次，调度之后可通过Future.get()阻塞直至任务执行完毕，并且可以获取执行结果。
+     *  - `scheduleAtFixedRate`，表示以固定频率执行的任务，如果当前任务耗时较多，超过定时周期period，则当前任务结束后会立即执行。
+     *  - `scheduleWithFixedDelay`，表示以固定延时执行任务，延时是相对当前任务结束为起点计算开始时间。
+     *  注：返回值是 ScheduledFuture ,可以执行 {@link Future#cancel(boolean)} 中断定时任务的执行
+     * */
+    @SneakyThrows
+    public static void main(String[] args) {
+        ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(2);
+        Runnable run = () -> {
+            System.out.println(LocalDateTime.now() + "--->" + Thread.currentThread().getName() + "--->执行了...Runnable");
+            try {
+                TimeUnit.SECONDS.sleep(2);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+            // throw new RuntimeException("中断周期任务的执行");
+        };
+        Callable<String> call = () -> {
+            System.out.println(LocalDateTime.now() + "--->" + Thread.currentThread().getName() + "--->执行了...Callable");
+            return "return...msg";
+        };
+
+        // 延时3秒执行
+        scheduledExecutorService.schedule(run, 3, TimeUnit.SECONDS);
+        System.out.println("=============================================");
+
+        // 延时3秒执行,堵塞等待结果
+        ScheduledFuture<String> schedule = scheduledExecutorService.schedule(call, 3, TimeUnit.SECONDS);
+        schedule.cancel(true);
+        /*String ret = schedule.get();
+        System.out.println("ret = " + ret);*/
+        System.out.println("=============================================");
+
+
+        // 第一次执行延时一秒，后面按照1秒一次执行
+        scheduledExecutorService.scheduleAtFixedRate(run, 1, 1, TimeUnit.SECONDS);
+        System.out.println("=============================================");
+
+        // 第一次执行延时一秒，任务执行完之后延时3秒在执行任务
+        scheduledExecutorService.scheduleWithFixedDelay(run, 1, 1, TimeUnit.SECONDS);
+
+        //        scheduledExecutorService.shutdown();
+    }
+}
+```
+
+#### 计算cron表达式下次执行时间
+
+```java
+public class TestSpringCronAPI {
+
+    public static void main(String[] args) {
+        String expression = "*/1 5 12 * * ?";
+        CronExpression parse = CronExpression.parse(expression);
+
+        ZonedDateTime dateTime = ZonedDateTime.ofInstant(new Date().toInstant(), ZoneId.systemDefault());
+        ZonedDateTime next = parse.next(dateTime);
+        // 下一次执行时间        
+        System.out.println(next.format(DateTimeFormatter.ISO_DATE_TIME));
+
+    }
+}
+```
+
+#### 配置任务调度器
+
+```java
+/**
+ * @author haitao.chen
+ * email haitaoss@aliyun.com
+ * date 2022-11-05 10:02
+ * 配置任务调度器
+ */
+@Configuration
+@EnableScheduling
+public class SchedulerConfig {
+    //    @Bean
+    public SchedulingConfigurer schedulingConfigurer() {
+        return new SchedulingConfigurer() {
+            @Override
+            public void configureTasks(ScheduledTaskRegistrar taskRegistrar) {
+                // 可以通过这个扩展要执行的 Task
+                taskRegistrar.addFixedRateTask(null);
+                taskRegistrar.addFixedDelayTask(null);
+                taskRegistrar.addCronTask(null);
+                taskRegistrar.addTriggerTask(null);
+
+                /**
+                 * 配置 调度器，用来调度 taskRegistrar 里面记录的task。设置了这个 下面@Bean注册的就没用了
+                 * 只支持：ScheduledExecutorService、TaskScheduler 两种类型
+                 * */
+                taskRegistrar.setScheduler(null);
+            }
+        };
+    }
+
+    /**
+     * {@link ScheduledAnnotationBeanPostProcessor#DEFAULT_TASK_SCHEDULER_BEAN_NAME} -> taskScheduler
+     *
+     * 查找顺序 ：TaskScheduler -> ScheduledExecutorService
+     * 注：都是byName 'taskScheduler' 找，找不到在byType找。找不到或者匹配多个不会报错只会导致 taskScheduler 是 null而已，后面会设置默认值
+     *      this.localExecutor = Executors.newSingleThreadScheduledExecutor();
+     *      this.taskScheduler = new ConcurrentTaskScheduler(this.localExecutor);
+     * */
+    @Bean
+    public TaskScheduler taskScheduler() {
+        ConcurrentTaskScheduler concurrentTaskScheduler = new ConcurrentTaskScheduler(scheduledExecutorService());
+        // 错误处理器，定时任务抛出了异常的处理操作
+        concurrentTaskScheduler.setErrorHandler(new ErrorHandler() {
+            @Override
+            public void handleError(Throwable t) {
+                System.err.println("执行任务出问题了，错误信息：" + t.getMessage());
+
+                // 抛出异常就会中断任务
+                // throw new RuntimeException(t.getMessage());
+            }
+        });
+        return concurrentTaskScheduler;
+    }
+
+    @Bean
+    public ScheduledExecutorService scheduledExecutorService() {
+        return Executors.newScheduledThreadPool(20);
+    }
+
+}
+```
+
+#### `@Scheduled`的使用方式
+
+```java
+/**
+ * @author haitao.chen
+ * email haitaoss@aliyun.com
+ * date 2022-11-05 10:02
+ * `@Scheduled`的使用：定时任务、周期任务、延时任务
+ */
+@Import(SchedulerConfig.class)
+public class TestSpringScheduler2 {
+    @Scheduled(cron = "*/1 * * * * ?") // [秒] [分] [时] [日期] [月] [星期] 好像采用的是延时执行
+    @Scheduled(fixedRate = 1, timeUnit = TimeUnit.SECONDS)
+    @Scheduled(fixedDelay = 1, initialDelay = 1)
+    @Scheduled(fixedDelay = 1, initialDelayString = "1")
+    /**
+     *  @Scheduled(initialDelay = 1, initialDelayString = "", cron = "", fixedDelay = 1, fixedDelayString = "", fixedRate = 1, fixedRateString = "", timeUnit = TimeUnit.MILLISECONDS)
+     *  1. initialDelayString、fixedDelayString、fixedRateString、cron 表示支持表达式
+     *  2. initialDelay、initialDelayString 设置任务启动时延时时间，这两个属性是互斥的只能设置一个
+     *  3. cron、fixedDelay、fixedDelayString、fixedRate、fixedRateString 是互斥的只能设置一个。也就是说明一个@Scheduled只能解析成一个Task
+     *  4. timeUnit 时间单位。初始延时时间、固定延时、固定频率 的时间会使用这个单位计算
+     * */
+    public void task1() {
+        System.out.println(LocalDateTime.now() + "--->" + Thread.currentThread().getName() + "--->执行了...Runnable");
+        try {
+            TimeUnit.SECONDS.sleep(2);
+        } catch (InterruptedException e) {
+
+        }
+        throw new RuntimeException("模拟任务出错");
+    }
+
+    public static void main(String[] args) {
+        new AnnotationConfigApplicationContext(TestSpringScheduler2.class);
+    }
+}
+```
+
+#### 销毁`@Scheduled`注册的定时任务
+
+```java
+/**
+ * @author haitao.chen
+ * email haitaoss@aliyun.com
+ * date 2022-11-05 10:02
+ * 销毁通过 @Scheduled 注册的定时任务
+ */
+@Import(SchedulerConfig.class)
+public class TestSpringScheduler3 {
+
+    @Scheduled(fixedDelay = 1, initialDelayString = "1", timeUnit = TimeUnit.SECONDS)
+    public void task1() {
+        System.out.println(LocalDateTime.now() + "--->" + Thread.currentThread().getName() + "--->执行了...Runnable");
+    }
+
+    @SneakyThrows
+    public static void main(String[] args) {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(TestSpringScheduler3.class);
+        TimeUnit.SECONDS.sleep(2);
+
+        /*// 销毁并不会从单例池中删掉，只是会触发 销毁bean的后置处理器，从而销毁依赖该bean的 ScheduledTask
+        context.getBeanFactory().destroyBean(context.getBean(TestSpringScheduler3.class));
+        System.out.println("TestSpringScheduler3 销毁了，其对应的schedule task 也会被销毁...");*/
+
+        // 销毁全部注册的定时任务，并关闭线程池
+        context.getBean(ScheduledAnnotationBeanPostProcessor.class).destroy();
+        System.out.println("没有活跃的线程，进程结束了");
+    }
+}
+```
+
+#### 动态注册、销毁定时任务
+
+```java
+/**
+ * @author haitao.chen
+ * email haitaoss@aliyun.com
+ * date 2022-11-05 10:02
+ *  动态注册、销毁定时任务
+ */
+@Import(SchedulerConfig.class)
+public class TestSpringScheduler4 implements SchedulingConfigurer {
+    private ScheduledTaskRegistrar taskRegistrar;
+    private final ConcurrentHashMap<String, ScheduledTask> taskMap = new ConcurrentHashMap<>();
+
+    @Override
+    public void configureTasks(ScheduledTaskRegistrar taskRegistrar) {
+        // 暴露出来
+        this.taskRegistrar = taskRegistrar;
+    }
+
+    public void addTask(String key, CronTask cronTask) {
+        ScheduledTask scheduledTask = taskRegistrar.scheduleCronTask(cronTask);
+        taskMap.put(key, scheduledTask);
+    }
+
+    public void destoryTask(String key) {
+        taskMap.remove(key).cancel();
+    }
+
+
+    @SneakyThrows
+    public static void main(String[] args) {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(TestSpringScheduler4.class);
+        TestSpringScheduler4 bean = context.getBean(TestSpringScheduler4.class);
+
+        Runnable run = () -> System.out.println(LocalDateTime.now() + "--->" + Thread.currentThread().getName() + "--->执行了...Runnable");
+        String t1 = "t1";
+        bean.addTask(t1, new CronTask(run, "*/1 * * * * ?"));
+
+        TimeUnit.SECONDS.sleep(2);
+
+        bean.destoryTask(t1);
+        System.out.println(String.format("中断：%S 任务", t1));
+    }
+}
+```
+### 使用`@EnableScheduling`会发生什么
+```java
+/**
+ * @EnableScheduling 会 @Import(SchedulingConfiguration.class)
+ *
+ * 而 {@link SchedulingConfiguration} 会通过 @Bean 的方式注册 ScheduledAnnotationBeanPostProcessor 到BeanFactory中
+ *
+ * BeanPostProcessor执行过程：
+ * 实例化前后置->推断构造器后置->实例化bean->合并BeanDefinition后置->实例化后后置->属性注入后置->初始化前后置->初始化后后置(hit)->销毁前后置(hit)
+ *
+ * {@link ScheduledAnnotationBeanPostProcessor}
+ *      其构造器会实例化一个属性 `this.registrar = new ScheduledTaskRegistrar();`
+ *      ScheduledTaskRegistrar 这个很关键，用来注册、执行定时任务的，定时任务的执行时依赖JDK的ScheduledExecutorService
+ *
+ * 初始化后后置 {@link ScheduledAnnotationBeanPostProcessor#postProcessAfterInitialization(Object, String)}
+ *      1. bean 是 AopInfrastructureBean、TaskScheduler、ScheduledExecutorService 类型
+ *          `return bean` 啥都不干
+ *      2. 在 nonAnnotatedClasses 中记录了，说明解析过了，没有@Scheduled标注的方法
+ *          `return bean` 啥都不干
+ *      3. 递归解析 bean的父类，bean的接口的父接口 里面的方法，判断是否有 @Scheduled、@Schedules
+ *
+ *      3.1 没有 @Scheduled、@Schedules
+ *          `this.nonAnnotatedClasses.add(targetClass);` 记录到集合中，下次就不要在判断了
+ *
+ *      3.2 有 @Scheduled、@Schedules
+ *          先遍历所有的方法，循环体内有按照注解遍历。因为方法可以写多个 @Scheduled ，也就是多个注解对应一个方法。
+ *          进行解析 {@link ScheduledAnnotationBeanPostProcessor#processScheduled(Scheduled, Method, Object)}
+ *          Tips：解析的出的ScheduledTask 会存到 {@link ScheduledAnnotationBeanPostProcessor#scheduledTasks} 属性中，用于bean销毁时将依赖bean的Task给注销
+ *                  `Map<Object, Set<ScheduledTask>> scheduledTasks`
+ *
+ * 销毁前后置 {@link ScheduledAnnotationBeanPostProcessor#postProcessBeforeDestruction(Object, String)}
+ *      1. 取出bean对应的task `Set<ScheduledTask> tasks = this.scheduledTasks.remove(bean);`
+ *      2. 回调方法注销定时任务 `ScheduledTask#cancel()`
+ *
+ *
+ * 监听事件 {@link ScheduledAnnotationBeanPostProcessor#onApplicationEvent(ContextRefreshedEvent)}
+ *      完成注册 {@link ScheduledAnnotationBeanPostProcessor#finishRegistration()} 就是遍历 scheduledTasks 中的task进行调度。
+ *      注：在IOC容器refresh结束时会执行{@link AbstractApplicationContext#finishRefresh()}，从而发布 ContextRefreshedEvent 事件，也就是这个时机 该方法会被回调
+ *
+ * ScheduledAnnotationBeanPostProcessor 销毁时 {@link ScheduledAnnotationBeanPostProcessor#destroy()}
+ *      1. 遍历 scheduledTasks，注销所有的任务
+ *      2. 回调其属性 ScheduledTaskRegistrar 的销毁方法 {@link ScheduledTaskRegistrar#destroy()}
+ *          2.1 停止所有调度的任务
+ *          2.2 关闭线程池
+ *
+ * 单例bean初始化后 {@link ScheduledAnnotationBeanPostProcessor#afterSingletonsInstantiated()}
+ *      1. 清除已解析的单例bean信息，因为是单例bean所有不会再创建了，所以这里可以直接情况，省内存
+ *          `this.nonAnnotatedClasses.clear();`
+ *      2. 没有 ApplicationContext 就提前注册task
+ *          {@link ScheduledAnnotationBeanPostProcessor#finishRegistration()}
+ *
+ *      注：在refresh阶段实例完所有单例bean后，会遍历单例bean，单例bean实现SmartInitializingSingleton接口，就回调
+ * */
+```
+### `ScheduledAnnotationBeanPostProcessor#processScheduled`
+```java
+/**
+* 解析@Scheduled注解 {@link ScheduledAnnotationBeanPostProcessor#processScheduled(Scheduled, Method, Object)}
+*
+*      1. 计算初始延时时间
+*          就是这两个的值算出来的值 `@Scheduled(initialDelay = -1, timeUnit = TimeUnit.MILLISECONDS)` 都是默认值算出的结果就是 -1 表示没有初始延时时间
+*
+*      2. 再次初始延时时间
+*          拿到注解的值 `@Scheduled(initialDelayString = "")` 支持占位符，计算的结果设置为 初始延时时间
+*          注：@Scheduled(initialDelayString = "1", initialDelay = 1) 是互斥的，这里会检验initialDelay指定了，就报错
+*
+*      3. 处理cron表达式
+*          拿到注解的值 @Scheduled(cron = "1 * * * * ?") 支持占位符。
+*          将cron表达式和method反射内容装饰成 CronTask 对象，然后使用 {@link ScheduledTaskRegistrar#scheduleCronTask(CronTask)} 调度任务，
+*          会返回 ScheduledTask
+*       4. 处理 fixedDelay
+*          拿到注解的值 @Scheduled(fixedDelay = 1)
+*          会装饰成 FixedDelayTask，然后 {@link ScheduledTaskRegistrar#scheduleFixedDelayTask(FixedDelayTask)} 调度任务，
+*          会返回 ScheduledTask
+*          注：如果cron指定了，这里就会报错。
+*
+*       5. 处理 fixedDelayString 表达式
+*          拿到注解的值 @Scheduled(fixedDelayString = "1") 支持占位符。
+*          会装饰成 FixedDelayTask，然后 {@link ScheduledTaskRegistrar#scheduleFixedDelayTask(FixedDelayTask)} 调度任务，
+*          会返回 ScheduledTask
+*          注：如果cron、fixedDelay指定了，这里就会报错。
+*
+*      6. 处理 fixedRate
+*          拿到注解的值 @Scheduled(fixedRate = 1)
+*          会装饰成 FixedRateTask，然后 {@link ScheduledTaskRegistrar#scheduleFixedDelayTask(FixedDelayTask)} 调度任务，
+*          会返回 ScheduledTask
+*          注：如果cron、fixedDelay、fixedDelayString指定了，这里就会报错。
+*
+*      7. 处理 fixedRateString
+*          拿到注解的值 @Scheduled(fixedRateString = "1")
+*          会装饰成 FixedRateTask，然后 {@link ScheduledTaskRegistrar#scheduleFixedDelayTask(FixedDelayTask)} 调度任务，
+*          会返回 ScheduledTask
+*          注：如果cron、fixedDelay、fixedDelayString、fixedRate指定了，这里就会报错。
+*
+*      8. 如果没有解析出 ScheduledTask 那就报错
+*
+*      9. 记录到属性中 {@link ScheduledAnnotationBeanPostProcessor#scheduledTasks}
+*          bean作为key，ScheduledTask作为value存进去
+*          注：目的是bean销毁的时候，拿到依赖bean的ScheduledTask，取消定时任务
+*
+*      注：
+*          1. ScheduledTask = ScheduledFuture + Task，ScheduledFuture 用于取消定时任务的执行，Task 就是定时任务的执行内容
+*          2. 一个 @Scheduled 只能解析成 CronTask、FixedDelayTask、FixedRateTask 其中一个，配置多个就报错
+*          3. 这里主要是将 Task注册到 ScheduledTaskRegistrar 中，并没有开始调度任务，等Spring refresh 结束时会回调 ScheduledAnnotationBeanPostProcessor
+*              从而回调 ScheduledTaskRegistrar 调度任务，其实是使用JDK提供的定时任务API实现的
+* */
+```
+### `ScheduledAnnotationBeanPostProcessor#finishRegistration`
+```java
+/**
+ * 完成注册 {@link ScheduledAnnotationBeanPostProcessor#finishRegistration()}
+ *  就是给 ScheduledTaskRegistrar 设置任务调度器，然后回调其方法
+ *
+ *  1. 加工 ScheduledTaskRegistrar
+ *      从容器中获取 SchedulingConfigurer 类型的bean，遍历回调方法 {@link SchedulingConfigurer#configureTasks(ScheduledTaskRegistrar)}
+ *      Tips：传入的是 ScheduledTaskRegistrar，所以可以在这里 注册任务、设置任务调度器或者将 ScheduledTaskRegistrar 实例暴露出去
+ *
+ *  2. 有待调度的task 但是 ScheduledTaskRegistrar 没有 TaskScheduler，那就需要给其设置任务调度器
+ *      beanL类型查找顺序 ：TaskScheduler -> ScheduledExecutorService
+ *      注：都是byName taskScheduler 找，找不到在byType找。找不到或者匹配多个无法确定，也不会报错只会导致 taskScheduler 是 null而已，后面会设置默认值的
+ *          this.localExecutor = Executors.newSingleThreadScheduledExecutor();
+ *          this.taskScheduler = new ConcurrentTaskScheduler(this.localExecutor);
+ *
+ *  3. 回调接口方法，调度注册的task
+ *      {@link ScheduledTaskRegistrar#afterPropertiesSet()}
+ * */
+```
+### `ScheduledTaskRegistrar#afterPropertiesSet`
+```java
+/**
+ * 其实就是调度注册的Task {@link ScheduledTaskRegistrar#afterPropertiesSet()}
+ *                     {@link ScheduledTaskRegistrar#scheduleTasks()}
+ *
+ *  1. 属性 {@link ScheduledTaskRegistrar#taskScheduler} 是null
+ *      // 设置默认值
+ *      this.localExecutor = Executors.newSingleThreadScheduledExecutor();
+ *      this.taskScheduler = new ConcurrentTaskScheduler(this.localExecutor);
+ *
+ *  2. 有 triggerTasks，遍历执行调度 {@link ScheduledTaskRegistrar#scheduleTriggerTask(TriggerTask)} 返回值不为null就存到 {@link org.springframework.scheduling.config.ScheduledTaskRegistrar#scheduledTasks} 属性中
+ *
+ *      触发器任务。最终用的是JDK的API实现的延时执行一次任务 {@link ScheduledThreadPoolExecutor#schedule(Runnable, long, TimeUnit)}
+ *      其Runnable是ReschedulingRunnable,而 {@link ReschedulingRunnable#run()}
+ *      就是递归执行 schedule 方法，也就是run方法被执行，会执行 {@link Trigger#nextExecutionTime(TriggerContext)} 得到下次执行时间
+ *      ,下次执行时间-当前时间就等于要延时执行的时间
+ *
+ *  3. 有 cronTasks，遍历执行调度 {@link ScheduledTaskRegistrar#scheduleCronTask(CronTask)} 返回值不为null就存到 {@link org.springframework.scheduling.config.ScheduledTaskRegistrar#scheduledTasks} 属性中
+ *      定时任务，和TriggerTask是一样的。
+ *      注：区别就是定时任务的 Trigger 是解析 cron表达式，获取下次执行时间，是这个 {@link CronTrigger#CronTrigger(String, TimeZone)}
+ *
+ *  4. 有 fixedRateTasks，遍历执行调度 {@link ScheduledTaskRegistrar#scheduleFixedRateTask(IntervalTask)} 返回值不为null就存到 {@link org.springframework.scheduling.config.ScheduledTaskRegistrar#scheduledTasks} 属性中
+ *      周期任务。最终用的是JDK的API实现的周期任务
+ *          {@link ScheduledThreadPoolExecutor#scheduleAtFixedRate(Runnable, long, long, TimeUnit)}
+ *          {@link ScheduledThreadPoolExecutor#scheduleAtFixedRate(Runnable, long, long, TimeUnit)}
+ *
+ *  5. 有 fixedDelayTasks，遍历执行调度 {@link ScheduledTaskRegistrar#scheduleFixedDelayTask(IntervalTask)} 返回值不为null就存到 {@link org.springframework.scheduling.config.ScheduledTaskRegistrar#scheduledTasks} 属性中
+ *      延时任务。最终用的是JDK的API实现的周期任务(在任务结束后再延时，也就是任务的耗时会影响下个任务的执行时间)
+ *          {@link ScheduledThreadPoolExecutor#scheduleWithFixedDelay(Runnable, long, long, TimeUnit)}
+ *          {@link ScheduledThreadPoolExecutor#scheduleWithFixedDelay(Runnable, long, long, TimeUnit)}
+ *
+ *  结论：Spring提供的定时任务处理器 ScheduledTaskRegistrar，支持四种定时任务：触发器任务、Cron任务、固定周期任务、固定延时任务。都是依赖JDK提供的ScheduledThreadPoolExecutor实现的。
+ *      Cron任务是特殊的触发器任务。触发器任务的特点是通过JDK的延时执行一次API的实现，其run方法会拿到触发器下次执行时间-当前时间得到延时时间，再次发起一个 延时执行一次 的任务，从而实现
+ *      任务的递归执行
+ *
+ * 调度的大致逻辑
+ *      {@link ScheduledTaskRegistrar#scheduleTriggerTask(TriggerTask)}
+ *      {@link ScheduledTaskRegistrar#scheduleCronTask(CronTask)}
+ *      {@link ScheduledTaskRegistrar#scheduleFixedRateTask(FixedRateTask)}
+ *      {@link ScheduledTaskRegistrar#scheduleFixedDelayTask(FixedDelayTask)}
+ *
+ *      1. 使用 Task 作为key从属性 {@link ScheduledTaskRegistrar#unresolvedTasks} 获取 ScheduledTask
+ *
+ *      2. 拿不到，将 Task 装饰成 ScheduledTask，记录一下是 newTask
+ *
+ *      3. taskScheduler(任务调度器) 不是null，使用任务调度器调度任务，并将返回的 ScheduledFuture 记录到 ScheduledTask 中
+ *          `scheduledTask.future = this.taskScheduler.schedule(task.getRunnable(), task.getTrigger());`
+ *          Tips：ScheduledFuture 这个是用来取消定时任务的
+ *
+ *      4.  taskScheduler(任务调度器) 是null
+ *          4.1 将 task 记录到对应的集合中
+ *          4.2 task作为key，ScheduledTask作为value 存到属性 {@link ScheduledTaskRegistrar#unresolvedTasks} 中
+ *          Tips: BeanPostProcessor解析@Scheduled注册定时任务就是走的这个逻辑，目的是将 ScheduledTask 存到后置处理器中，然后后置处理器可以在bean销毁的时候
+ *                  销毁bean产生的定时任务
+ *
+ *      5. 是 newTask，返回ScheduledTask 否则返回null
+ * */
+```
 ## @EnableCaching
 ## @Lookup
 

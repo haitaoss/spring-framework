@@ -159,6 +159,7 @@ public abstract class AbstractFallbackTransactionAttributeSource
      */
     @Nullable
     protected TransactionAttribute computeTransactionAttribute(Method method, @Nullable Class<?> targetClass) {
+        // 方法不是public 就直接返回null， 也就是说@Transactional 得标注在public方法上才有用
         // Don't allow no-public methods as required.
         if (allowPublicMethodsOnly() && !Modifier.isPublic(method.getModifiers())) {
             return null;

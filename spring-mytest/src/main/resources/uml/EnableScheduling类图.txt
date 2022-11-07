@@ -1,0 +1,163 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+
+interface ApplicationListener<E> << interface >> {
+  + onApplicationEvent(E): void
+  + forPayload(Consumer<T>): ApplicationListener<PayloadApplicationEvent<T>>
+}
+interface BeanPostProcessor << interface >> {
+  + postProcessBeforeInitialization(Object, String): Object?
+  + postProcessAfterInitialization(Object, String): Object?
+}
+interface DestructionAwareBeanPostProcessor << interface >> {
+  + postProcessBeforeDestruction(Object, String): void
+  + requiresDestruction(Object): boolean
+}
+interface DisposableBean << interface >> {
+  + destroy(): void
+}
+
+interface SmartInitializingSingleton << interface >> {
+  + afterSingletonsInstantiated(): void
+}
+
+class ConcurrentTaskScheduler {
+  + setClock(Clock): void
+  + setScheduledExecutor(ScheduledExecutorService?): void
+  + scheduleWithFixedDelay(Runnable, long): ScheduledFuture<?>
+  - initScheduledExecutor(ScheduledExecutorService?): ScheduledExecutorService
+  + getClock(): Clock
+  + scheduleWithFixedDelay(Runnable, Date, long): ScheduledFuture<?>
+  + scheduleAtFixedRate(Runnable, long): ScheduledFuture<?>
+  + schedule(Runnable, Date): ScheduledFuture<?>
+  - decorateTask(Runnable, boolean): Runnable
+  + scheduleAtFixedRate(Runnable, Date, long): ScheduledFuture<?>
+  + schedule(Runnable, Trigger): ScheduledFuture<?>?
+  + setErrorHandler(ErrorHandler): void
+}
+class CronTask {
+  + getExpression(): String
+}
+class FixedDelayTask
+class FixedRateTask
+class IntervalTask {
+  + getInitialDelay(): long
+  + getInterval(): long
+}
+class ScheduledAnnotationBeanPostProcessor {
+  + onApplicationEvent(ContextRefreshedEvent): void
+  - finishRegistration(): void
+  + destroy(): void
+  + requiresDestruction(Object): boolean
+  + getScheduledTasks(): Set<ScheduledTask>
+  + afterSingletonsInstantiated(): void
+  + postProcessAfterInitialization(Object, String): Object?
+  - resolveSchedulerBean(BeanFactory, Class<T>, boolean): T
+  # processScheduled(Scheduled, Method, Object): void
+  + postProcessBeforeDestruction(Object, String): void
+}
+interface ScheduledExecutorService << interface >> {
+  + schedule(Callable<V>, long, TimeUnit): ScheduledFuture<V>
+  + scheduleAtFixedRate(Runnable, long, long, TimeUnit): ScheduledFuture<?>
+  + schedule(Runnable, long, TimeUnit): ScheduledFuture<?>
+  + scheduleWithFixedDelay(Runnable, long, long, TimeUnit): ScheduledFuture<?>
+}
+interface ScheduledFuture<V> << interface >>
+class ScheduledTask {
+  + cancel(): void
+  + getTask(): Task
+  + toString(): String
+}
+class ScheduledTaskRegistrar {
+# scheduleTasks(): void
++ setTaskScheduler(TaskScheduler): void
++ destroy(): void
+- addScheduledTask(ScheduledTask?): void
++ scheduleTriggerTask(TriggerTask): ScheduledTask?
++ scheduleCronTask(CronTask): ScheduledTask?
++ scheduleFixedRateTask(IntervalTask): ScheduledTask?
++ scheduleFixedDelayTask(IntervalTask): ScheduledTask?
++ addTriggerTask(TriggerTask): void
++ addCronTask(CronTask): void
++ addFixedRateTask(IntervalTask): void
++ addFixedDelayTask(IntervalTask): void
+  + setScheduler(Object?): void
+  + hasTasks(): boolean
+  + afterPropertiesSet(): void
+}
+class ScheduledThreadPoolExecutor {
+  + schedule(Runnable, long, TimeUnit): ScheduledFuture<?>
+  + schedule(Callable<V>, long, TimeUnit): ScheduledFuture<V>
+  + scheduleAtFixedRate(Runnable, long, long, TimeUnit): ScheduledFuture<?>
+  + scheduleWithFixedDelay(Runnable, long, long, TimeUnit): ScheduledFuture<?>
+  + shutdown(): void
+}
+class SchedulingConfiguration {
+  + scheduledAnnotationProcessor(): ScheduledAnnotationBeanPostProcessor
+}
+interface SchedulingConfigurer << interface >> {
+  + configureTasks(ScheduledTaskRegistrar): void
+}
+class Task {
+  + getRunnable(): Runnable
+  + toString(): String
+}
+interface TaskScheduler << interface >> {
+  + scheduleWithFixedDelay(Runnable, long): ScheduledFuture<?>
+  + schedule(Runnable, Trigger): ScheduledFuture<?>?
+  + scheduleAtFixedRate(Runnable, Instant, Duration): ScheduledFuture<?>
+  + scheduleAtFixedRate(Runnable, Duration): ScheduledFuture<?>
+  + getClock(): Clock
+  + scheduleAtFixedRate(Runnable, Date, long): ScheduledFuture<?>
+  + scheduleWithFixedDelay(Runnable, Duration): ScheduledFuture<?>
+  + scheduleWithFixedDelay(Runnable, Instant, Duration): ScheduledFuture<?>
+  + schedule(Runnable, Date): ScheduledFuture<?>
+  + scheduleWithFixedDelay(Runnable, Date, long): ScheduledFuture<?>
+  + scheduleAtFixedRate(Runnable, long): ScheduledFuture<?>
+  + schedule(Runnable, Instant): ScheduledFuture<?>
+}
+class TriggerTask {
+  + getTrigger(): Trigger
+}
+
+DestructionAwareBeanPostProcessor     -[#008200,plain]-^  BeanPostProcessor
+ScheduledAnnotationBeanPostProcessor  -[#008200,dashed]-^  ApplicationListener
+ScheduledAnnotationBeanPostProcessor  -[#008200,dashed]-^  BeanPostProcessor
+ScheduledAnnotationBeanPostProcessor  -[#008200,dashed]-^  DestructionAwareBeanPostProcessor
+ScheduledAnnotationBeanPostProcessor  -[#008200,dashed]-^  DisposableBean
+ScheduledAnnotationBeanPostProcessor  -[#008200,dashed]-^  SmartInitializingSingleton
+
+ConcurrentTaskScheduler              "1" *-[#595959,plain]-> "scheduledExecutor\n1" ScheduledExecutorService
+ConcurrentTaskScheduler               -[#008200,dashed]-^  TaskScheduler
+CronTask                              -[#000082,plain]-^  TriggerTask
+FixedDelayTask                        -[#000082,plain]-^  IntervalTask
+FixedRateTask                         -[#000082,plain]-^  IntervalTask
+IntervalTask                          -[#000082,plain]-^  Task
+TriggerTask                              -[#000082,plain]-^  Task
+
+ScheduledTaskRegistrar               *--  Task
+
+
+ScheduledTaskRegistrar               *--  ScheduledTask
+ScheduledTask                        *--  ScheduledFuture
+ScheduledTask                        *--  Task
+
+ScheduledAnnotationBeanPostProcessor "1" *-[#595959,plain]-> "registrar\n1" ScheduledTaskRegistrar
+
+ScheduledTaskRegistrar                *-- ConcurrentTaskScheduler
+
+
+ScheduledTaskRegistrar               "1" *-[#595959,plain]-> "localExecutor\n1" ScheduledExecutorService
+
+
+
+
+
+ScheduledThreadPoolExecutor           -[#008200,dashed]-^  ScheduledExecutorService
+SchedulingConfiguration               -[#595959,dashed]->  ScheduledAnnotationBeanPostProcessor : "«create»"
+SchedulingConfigurer  *--  ScheduledTaskRegistrar
+@enduml

@@ -16,18 +16,6 @@
 
 package org.springframework.scheduling.concurrent;
 
-import java.time.Clock;
-import java.util.Date;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-
-import javax.enterprise.concurrent.LastExecution;
-import javax.enterprise.concurrent.ManagedScheduledExecutorService;
-
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.lang.Nullable;
 import org.springframework.scheduling.TaskScheduler;
@@ -37,6 +25,12 @@ import org.springframework.scheduling.support.TaskUtils;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ErrorHandler;
+
+import javax.enterprise.concurrent.LastExecution;
+import javax.enterprise.concurrent.ManagedScheduledExecutorService;
+import java.time.Clock;
+import java.util.Date;
+import java.util.concurrent.*;
 
 /**
  * Adapter that takes a {@code java.util.concurrent.ScheduledExecutorService} and
@@ -67,228 +61,237 @@ import org.springframework.util.ErrorHandler;
  */
 public class ConcurrentTaskScheduler extends ConcurrentTaskExecutor implements TaskScheduler {
 
-	@Nullable
-	private static Class<?> managedScheduledExecutorServiceClass;
+    @Nullable
+    private static Class<?> managedScheduledExecutorServiceClass;
 
-	static {
-		try {
-			managedScheduledExecutorServiceClass = ClassUtils.forName(
-					"javax.enterprise.concurrent.ManagedScheduledExecutorService",
-					ConcurrentTaskScheduler.class.getClassLoader());
-		}
-		catch (ClassNotFoundException ex) {
-			// JSR-236 API not available...
-			managedScheduledExecutorServiceClass = null;
-		}
-	}
-
-
-	private ScheduledExecutorService scheduledExecutor;
-
-	private boolean enterpriseConcurrentScheduler = false;
-
-	@Nullable
-	private ErrorHandler errorHandler;
-
-	private Clock clock = Clock.systemDefaultZone();
+    static {
+        try {
+            managedScheduledExecutorServiceClass = ClassUtils.forName(
+                    "javax.enterprise.concurrent.ManagedScheduledExecutorService",
+                    ConcurrentTaskScheduler.class.getClassLoader());
+        } catch (ClassNotFoundException ex) {
+            // JSR-236 API not available...
+            managedScheduledExecutorServiceClass = null;
+        }
+    }
 
 
-	/**
-	 * Create a new ConcurrentTaskScheduler,
-	 * using a single thread executor as default.
-	 * @see java.util.concurrent.Executors#newSingleThreadScheduledExecutor()
-	 */
-	public ConcurrentTaskScheduler() {
-		super();
-		this.scheduledExecutor = initScheduledExecutor(null);
-	}
+    private ScheduledExecutorService scheduledExecutor;
 
-	/**
-	 * Create a new ConcurrentTaskScheduler, using the given
-	 * {@link java.util.concurrent.ScheduledExecutorService} as shared delegate.
-	 * <p>Autodetects a JSR-236 {@link javax.enterprise.concurrent.ManagedScheduledExecutorService}
-	 * in order to use it for trigger-based scheduling if possible,
-	 * instead of Spring's local trigger management.
-	 * @param scheduledExecutor the {@link java.util.concurrent.ScheduledExecutorService}
-	 * to delegate to for {@link org.springframework.scheduling.SchedulingTaskExecutor}
-	 * as well as {@link TaskScheduler} invocations
-	 */
-	public ConcurrentTaskScheduler(ScheduledExecutorService scheduledExecutor) {
-		super(scheduledExecutor);
-		this.scheduledExecutor = initScheduledExecutor(scheduledExecutor);
-	}
+    private boolean enterpriseConcurrentScheduler = false;
 
-	/**
-	 * Create a new ConcurrentTaskScheduler, using the given {@link java.util.concurrent.Executor}
-	 * and {@link java.util.concurrent.ScheduledExecutorService} as delegates.
-	 * <p>Autodetects a JSR-236 {@link javax.enterprise.concurrent.ManagedScheduledExecutorService}
-	 * in order to use it for trigger-based scheduling if possible,
-	 * instead of Spring's local trigger management.
-	 * @param concurrentExecutor the {@link java.util.concurrent.Executor} to delegate to
-	 * for {@link org.springframework.scheduling.SchedulingTaskExecutor} invocations
-	 * @param scheduledExecutor the {@link java.util.concurrent.ScheduledExecutorService}
-	 * to delegate to for {@link TaskScheduler} invocations
-	 */
-	public ConcurrentTaskScheduler(Executor concurrentExecutor, ScheduledExecutorService scheduledExecutor) {
-		super(concurrentExecutor);
-		this.scheduledExecutor = initScheduledExecutor(scheduledExecutor);
-	}
+    @Nullable
+    private ErrorHandler errorHandler;
+
+    private Clock clock = Clock.systemDefaultZone();
 
 
-	private ScheduledExecutorService initScheduledExecutor(@Nullable ScheduledExecutorService scheduledExecutor) {
-		if (scheduledExecutor != null) {
-			this.scheduledExecutor = scheduledExecutor;
-			this.enterpriseConcurrentScheduler = (managedScheduledExecutorServiceClass != null &&
-					managedScheduledExecutorServiceClass.isInstance(scheduledExecutor));
-		}
-		else {
-			this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
-			this.enterpriseConcurrentScheduler = false;
-		}
-		return this.scheduledExecutor;
-	}
+    /**
+     * Create a new ConcurrentTaskScheduler,
+     * using a single thread executor as default.
+     * @see java.util.concurrent.Executors#newSingleThreadScheduledExecutor()
+     */
+    public ConcurrentTaskScheduler() {
+        super();
+        this.scheduledExecutor = initScheduledExecutor(null);
+    }
 
-	/**
-	 * Specify the {@link java.util.concurrent.ScheduledExecutorService} to delegate to.
-	 * <p>Autodetects a JSR-236 {@link javax.enterprise.concurrent.ManagedScheduledExecutorService}
-	 * in order to use it for trigger-based scheduling if possible,
-	 * instead of Spring's local trigger management.
-	 * <p>Note: This will only apply to {@link TaskScheduler} invocations.
-	 * If you want the given executor to apply to
-	 * {@link org.springframework.scheduling.SchedulingTaskExecutor} invocations
-	 * as well, pass the same executor reference to {@link #setConcurrentExecutor}.
-	 * @see #setConcurrentExecutor
-	 */
-	public void setScheduledExecutor(@Nullable ScheduledExecutorService scheduledExecutor) {
-		initScheduledExecutor(scheduledExecutor);
-	}
+    /**
+     * Create a new ConcurrentTaskScheduler, using the given
+     * {@link java.util.concurrent.ScheduledExecutorService} as shared delegate.
+     * <p>Autodetects a JSR-236 {@link javax.enterprise.concurrent.ManagedScheduledExecutorService}
+     * in order to use it for trigger-based scheduling if possible,
+     * instead of Spring's local trigger management.
+     * @param scheduledExecutor the {@link java.util.concurrent.ScheduledExecutorService}
+     * to delegate to for {@link org.springframework.scheduling.SchedulingTaskExecutor}
+     * as well as {@link TaskScheduler} invocations
+     */
+    public ConcurrentTaskScheduler(ScheduledExecutorService scheduledExecutor) {
+        super(scheduledExecutor);
+        this.scheduledExecutor = initScheduledExecutor(scheduledExecutor);
+    }
 
-	/**
-	 * Provide an {@link ErrorHandler} strategy.
-	 */
-	public void setErrorHandler(ErrorHandler errorHandler) {
-		Assert.notNull(errorHandler, "ErrorHandler must not be null");
-		this.errorHandler = errorHandler;
-	}
-
-	/**
-	 * Set the clock to use for scheduling purposes.
-	 * <p>The default clock is the system clock for the default time zone.
-	 * @since 5.3
-	 * @see Clock#systemDefaultZone()
-	 */
-	public void setClock(Clock clock) {
-		this.clock = clock;
-	}
-
-	@Override
-	public Clock getClock() {
-		return this.clock;
-	}
+    /**
+     * Create a new ConcurrentTaskScheduler, using the given {@link java.util.concurrent.Executor}
+     * and {@link java.util.concurrent.ScheduledExecutorService} as delegates.
+     * <p>Autodetects a JSR-236 {@link javax.enterprise.concurrent.ManagedScheduledExecutorService}
+     * in order to use it for trigger-based scheduling if possible,
+     * instead of Spring's local trigger management.
+     * @param concurrentExecutor the {@link java.util.concurrent.Executor} to delegate to
+     * for {@link org.springframework.scheduling.SchedulingTaskExecutor} invocations
+     * @param scheduledExecutor the {@link java.util.concurrent.ScheduledExecutorService}
+     * to delegate to for {@link TaskScheduler} invocations
+     */
+    public ConcurrentTaskScheduler(Executor concurrentExecutor, ScheduledExecutorService scheduledExecutor) {
+        super(concurrentExecutor);
+        this.scheduledExecutor = initScheduledExecutor(scheduledExecutor);
+    }
 
 
-	@Override
-	@Nullable
-	public ScheduledFuture<?> schedule(Runnable task, Trigger trigger) {
-		try {
-			if (this.enterpriseConcurrentScheduler) {
-				return new EnterpriseConcurrentTriggerScheduler().schedule(decorateTask(task, true), trigger);
-			}
-			else {
-				ErrorHandler errorHandler =
-						(this.errorHandler != null ? this.errorHandler : TaskUtils.getDefaultErrorHandler(true));
-				return new ReschedulingRunnable(task, trigger, this.clock, this.scheduledExecutor, errorHandler).schedule();
-			}
-		}
-		catch (RejectedExecutionException ex) {
-			throw new TaskRejectedException("Executor [" + this.scheduledExecutor + "] did not accept task: " + task, ex);
-		}
-	}
+    private ScheduledExecutorService initScheduledExecutor(@Nullable ScheduledExecutorService scheduledExecutor) {
+        if (scheduledExecutor != null) {
+            this.scheduledExecutor = scheduledExecutor;
+            this.enterpriseConcurrentScheduler = (managedScheduledExecutorServiceClass != null &&
+                    managedScheduledExecutorServiceClass.isInstance(scheduledExecutor));
+        } else {
+            this.scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
+            this.enterpriseConcurrentScheduler = false;
+        }
+        return this.scheduledExecutor;
+    }
 
-	@Override
-	public ScheduledFuture<?> schedule(Runnable task, Date startTime) {
-		long initialDelay = startTime.getTime() - this.clock.millis();
-		try {
-			return this.scheduledExecutor.schedule(decorateTask(task, false), initialDelay, TimeUnit.MILLISECONDS);
-		}
-		catch (RejectedExecutionException ex) {
-			throw new TaskRejectedException("Executor [" + this.scheduledExecutor + "] did not accept task: " + task, ex);
-		}
-	}
+    /**
+     * Specify the {@link java.util.concurrent.ScheduledExecutorService} to delegate to.
+     * <p>Autodetects a JSR-236 {@link javax.enterprise.concurrent.ManagedScheduledExecutorService}
+     * in order to use it for trigger-based scheduling if possible,
+     * instead of Spring's local trigger management.
+     * <p>Note: This will only apply to {@link TaskScheduler} invocations.
+     * If you want the given executor to apply to
+     * {@link org.springframework.scheduling.SchedulingTaskExecutor} invocations
+     * as well, pass the same executor reference to {@link #setConcurrentExecutor}.
+     * @see #setConcurrentExecutor
+     */
+    public void setScheduledExecutor(@Nullable ScheduledExecutorService scheduledExecutor) {
+        initScheduledExecutor(scheduledExecutor);
+    }
 
-	@Override
-	public ScheduledFuture<?> scheduleAtFixedRate(Runnable task, Date startTime, long period) {
-		long initialDelay = startTime.getTime() - this.clock.millis();
-		try {
-			return this.scheduledExecutor.scheduleAtFixedRate(decorateTask(task, true), initialDelay, period, TimeUnit.MILLISECONDS);
-		}
-		catch (RejectedExecutionException ex) {
-			throw new TaskRejectedException("Executor [" + this.scheduledExecutor + "] did not accept task: " + task, ex);
-		}
-	}
+    /**
+     * Provide an {@link ErrorHandler} strategy.
+     */
+    public void setErrorHandler(ErrorHandler errorHandler) {
+        Assert.notNull(errorHandler, "ErrorHandler must not be null");
+        this.errorHandler = errorHandler;
+    }
 
-	@Override
-	public ScheduledFuture<?> scheduleAtFixedRate(Runnable task, long period) {
-		try {
-			return this.scheduledExecutor.scheduleAtFixedRate(decorateTask(task, true), 0, period, TimeUnit.MILLISECONDS);
-		}
-		catch (RejectedExecutionException ex) {
-			throw new TaskRejectedException("Executor [" + this.scheduledExecutor + "] did not accept task: " + task, ex);
-		}
-	}
+    /**
+     * Set the clock to use for scheduling purposes.
+     * <p>The default clock is the system clock for the default time zone.
+     * @since 5.3
+     * @see Clock#systemDefaultZone()
+     */
+    public void setClock(Clock clock) {
+        this.clock = clock;
+    }
 
-	@Override
-	public ScheduledFuture<?> scheduleWithFixedDelay(Runnable task, Date startTime, long delay) {
-		long initialDelay = startTime.getTime() - this.clock.millis();
-		try {
-			return this.scheduledExecutor.scheduleWithFixedDelay(decorateTask(task, true), initialDelay, delay, TimeUnit.MILLISECONDS);
-		}
-		catch (RejectedExecutionException ex) {
-			throw new TaskRejectedException("Executor [" + this.scheduledExecutor + "] did not accept task: " + task, ex);
-		}
-	}
-
-	@Override
-	public ScheduledFuture<?> scheduleWithFixedDelay(Runnable task, long delay) {
-		try {
-			return this.scheduledExecutor.scheduleWithFixedDelay(decorateTask(task, true), 0, delay, TimeUnit.MILLISECONDS);
-		}
-		catch (RejectedExecutionException ex) {
-			throw new TaskRejectedException("Executor [" + this.scheduledExecutor + "] did not accept task: " + task, ex);
-		}
-	}
-
-	private Runnable decorateTask(Runnable task, boolean isRepeatingTask) {
-		Runnable result = TaskUtils.decorateTaskWithErrorHandler(task, this.errorHandler, isRepeatingTask);
-		if (this.enterpriseConcurrentScheduler) {
-			result = ManagedTaskBuilder.buildManagedTask(result, task.toString());
-		}
-		return result;
-	}
+    @Override
+    public Clock getClock() {
+        return this.clock;
+    }
 
 
-	/**
-	 * Delegate that adapts a Spring Trigger to a JSR-236 Trigger.
-	 * Separated into an inner class in order to avoid a hard dependency on the JSR-236 API.
-	 */
-	private class EnterpriseConcurrentTriggerScheduler {
+    @Override
+    @Nullable
+    public ScheduledFuture<?> schedule(Runnable task, Trigger trigger) {
+        try {
+            // 默认是false
+            if (this.enterpriseConcurrentScheduler) {
+                return new EnterpriseConcurrentTriggerScheduler().schedule(decorateTask(task, true), trigger);
+            } else {
+                // 错误处理器，默认就是出现错误就打日志
+                ErrorHandler errorHandler =
+                        (this.errorHandler != null ? this.errorHandler : TaskUtils.getDefaultErrorHandler(true));
+                /**
+                 * {@link ScheduledThreadPoolExecutor#schedule(Runnable, long, TimeUnit)}
+                 * */
+                return new ReschedulingRunnable(task, trigger, this.clock, this.scheduledExecutor, errorHandler).schedule();
+            }
+        } catch (RejectedExecutionException ex) {
+            throw new TaskRejectedException("Executor [" + this.scheduledExecutor + "] did not accept task: " + task, ex);
+        }
+    }
 
-		public ScheduledFuture<?> schedule(Runnable task, final Trigger trigger) {
-			ManagedScheduledExecutorService executor = (ManagedScheduledExecutorService) scheduledExecutor;
-			return executor.schedule(task, new javax.enterprise.concurrent.Trigger() {
-				@Override
-				@Nullable
-				public Date getNextRunTime(@Nullable LastExecution le, Date taskScheduledTime) {
-					return (trigger.nextExecutionTime(le != null ?
-							new SimpleTriggerContext(le.getScheduledStart(), le.getRunStart(), le.getRunEnd()) :
-							new SimpleTriggerContext()));
-				}
-				@Override
-				public boolean skipRun(LastExecution lastExecution, Date scheduledRunTime) {
-					return false;
-				}
-			});
-		}
-	}
+    @Override
+    public ScheduledFuture<?> schedule(Runnable task, Date startTime) {
+        long initialDelay = startTime.getTime() - this.clock.millis();
+        try {
+            return this.scheduledExecutor.schedule(decorateTask(task, false), initialDelay, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException ex) {
+            throw new TaskRejectedException("Executor [" + this.scheduledExecutor + "] did not accept task: " + task, ex);
+        }
+    }
+
+    @Override
+    public ScheduledFuture<?> scheduleAtFixedRate(Runnable task, Date startTime, long period) {
+        long initialDelay = startTime.getTime() - this.clock.millis();
+        try {
+            /**
+             * {@link ScheduledThreadPoolExecutor#scheduleAtFixedRate(Runnable, long, long, TimeUnit)}
+             * */
+            return this.scheduledExecutor.scheduleAtFixedRate(decorateTask(task, true), initialDelay, period, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException ex) {
+            throw new TaskRejectedException("Executor [" + this.scheduledExecutor + "] did not accept task: " + task, ex);
+        }
+    }
+
+    @Override
+    public ScheduledFuture<?> scheduleAtFixedRate(Runnable task, long period) {
+        try {
+            /**
+             * {@link ScheduledThreadPoolExecutor#scheduleAtFixedRate(Runnable, long, long, TimeUnit)}
+             * */
+            return this.scheduledExecutor.scheduleAtFixedRate(decorateTask(task, true), 0, period, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException ex) {
+            throw new TaskRejectedException("Executor [" + this.scheduledExecutor + "] did not accept task: " + task, ex);
+        }
+    }
+
+    @Override
+    public ScheduledFuture<?> scheduleWithFixedDelay(Runnable task, Date startTime, long delay) {
+        long initialDelay = startTime.getTime() - this.clock.millis();
+        try {
+            /**
+             * {@link ScheduledThreadPoolExecutor#scheduleWithFixedDelay(Runnable, long, long, TimeUnit)}
+             * */
+            return this.scheduledExecutor.scheduleWithFixedDelay(decorateTask(task, true), initialDelay, delay, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException ex) {
+            throw new TaskRejectedException("Executor [" + this.scheduledExecutor + "] did not accept task: " + task, ex);
+        }
+    }
+
+    @Override
+    public ScheduledFuture<?> scheduleWithFixedDelay(Runnable task, long delay) {
+        try {
+            /**
+             * {@link ScheduledThreadPoolExecutor#scheduleWithFixedDelay(Runnable, long, long, TimeUnit)}
+             * */
+            return this.scheduledExecutor.scheduleWithFixedDelay(decorateTask(task, true), 0, delay, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException ex) {
+            throw new TaskRejectedException("Executor [" + this.scheduledExecutor + "] did not accept task: " + task, ex);
+        }
+    }
+
+    private Runnable decorateTask(Runnable task, boolean isRepeatingTask) {
+        Runnable result = TaskUtils.decorateTaskWithErrorHandler(task, this.errorHandler, isRepeatingTask);
+        if (this.enterpriseConcurrentScheduler) {
+            result = ManagedTaskBuilder.buildManagedTask(result, task.toString());
+        }
+        return result;
+    }
+
+
+    /**
+     * Delegate that adapts a Spring Trigger to a JSR-236 Trigger.
+     * Separated into an inner class in order to avoid a hard dependency on the JSR-236 API.
+     */
+    private class EnterpriseConcurrentTriggerScheduler {
+
+        public ScheduledFuture<?> schedule(Runnable task, final Trigger trigger) {
+            ManagedScheduledExecutorService executor = (ManagedScheduledExecutorService) scheduledExecutor;
+            return executor.schedule(task, new javax.enterprise.concurrent.Trigger() {
+                @Override
+                @Nullable
+                public Date getNextRunTime(@Nullable LastExecution le, Date taskScheduledTime) {
+                    return (trigger.nextExecutionTime(le != null ?
+                            new SimpleTriggerContext(le.getScheduledStart(), le.getRunStart(), le.getRunEnd()) :
+                            new SimpleTriggerContext()));
+                }
+
+                @Override
+                public boolean skipRun(LastExecution lastExecution, Date scheduledRunTime) {
+                    return false;
+                }
+            });
+        }
+    }
 
 }
