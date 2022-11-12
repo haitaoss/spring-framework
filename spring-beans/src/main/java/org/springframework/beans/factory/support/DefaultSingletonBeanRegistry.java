@@ -112,6 +112,8 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
     private boolean singletonsCurrentlyInDestruction = false;
 
     /**
+     * 一次性的bean，记录的是 单例bean和ScopeBean 的 DisposableBeanAdapter 对象
+     *
      * Disposable bean instances: bean name to disposable instance.
      */
     private final Map<String, Object> disposableBeans = new LinkedHashMap<>();

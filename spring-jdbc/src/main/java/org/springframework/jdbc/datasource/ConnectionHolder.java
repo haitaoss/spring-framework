@@ -17,9 +17,12 @@
 package org.springframework.jdbc.datasource;
 
 import org.springframework.lang.Nullable;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.ResourceHolderSupport;
 import org.springframework.util.Assert;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Savepoint;
@@ -54,7 +57,28 @@ public class ConnectionHolder extends ResourceHolderSupport {
     private Connection currentConnection;
 
     /**
-     * 激活的事务(表示开启事务了？？？？)
+     * 激活的事务。就是当前事务对象用的连接
+     *
+     * 该属性是true说明已存在事务 {@link DataSourceTransactionManager#isExistingTransaction(Object)}
+     *
+     * 开启事务，其实就是给 DataSourceTransactionObject 设置ResourceHolderSupport类型的属性，
+     * 此时会将 transactionActive 和 synchronizedWithTransaction(父类的属性) 设置为true，只有在事务完成时，才会将该属性设置为false。
+     *    {@link org.springframework.jdbc.datasource.DataSourceTransactionManager#doBegin(Object, TransactionDefinition)}
+     *    {@link DataSourceTransactionManager#doCleanupAfterCompletion(Object)}
+     *
+     * 而在事务暂停时，其实并没有修改为false，因为没必要，因为事务暂停是直接将 DataSourceTransactionObject的ResourceHolderSupport类型的属性移除了，
+     * 并存到SuspendedResourcesHolder对象中，所以根本就没必要，因为从ThreadLocal中读不到了，并不会影响新事物的执行
+     *    {@link AbstractPlatformTransactionManager#suspend(Object)}
+     *
+     * 和其父类属性{@link ResourceHolderSupport#synchronizedWithTransaction}很像
+     * 区别：是事务对象的连接 transactionActive 是true，是事务内创建的连接 synchronizedWithTransaction 是true，
+     *      而事务对象的连接肯定是事务内创建的连接，事务内创建的连接 不一定是事务对象的连接。
+     *      比如你在事务方法内(空事务也算) 使用 {@link DataSourceUtils#doGetConnection(DataSource)}获取连接，使用的数据源和事务管理器的数据源不一致，
+     *      那就会创建出新的连接，这个连接 这称为事务内创建的连接 只会将连接的 synchronizedWithTransaction 设置为true，
+     *
+     *      Tips：
+     *      1. 事务对象的连接 至多只有一个，空事务没有
+     *      2. 事务内创建的连接 有多个
      */
     private boolean transactionActive = false;
 

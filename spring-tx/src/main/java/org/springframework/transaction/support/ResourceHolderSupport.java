@@ -16,10 +16,12 @@
 
 package org.springframework.transaction.support;
 
-import java.util.Date;
-
 import org.springframework.lang.Nullable;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionTimedOutException;
+
+import javax.sql.DataSource;
+import java.util.Date;
 
 /**
  * Convenient base class for resource holders.
@@ -35,6 +37,23 @@ import org.springframework.transaction.TransactionTimedOutException;
  */
 public abstract class ResourceHolderSupport implements ResourceHolder {
 
+	/**
+	 * 事务的同步资源，在事务内获取的资源，这个属性就是true。
+	 *
+	 * 将 synchronizedWithTransaction 设置为true 的情况
+	 * 	1. 开启事务创建的连接 {@link org.springframework.jdbc.datasource.DataSourceTransactionManager#doBegin(Object, TransactionDefinition)}
+	 * 	2. 执行 {@link org.springframework.jdbc.datasource.DataSourceUtils#doGetConnection(DataSource)} 获取连接
+	 * 		(空事务下 和 事务下使用与事务管理器配置的数据源不一致的数据源获取的连接)
+	 *
+	 *
+	 * 	只有在事务完成时，才会将该属性设置为false。
+	 *	{@link {@link DataSourceTransactionManager#doCleanupAfterCompletion(Object)}}
+	 *
+	 * 而在事务暂停时，其实并没有修改为false，因为没必要，因为事务暂停是直接将 DataSourceTransactionObject的ResourceHolderSupport类型的属性移除了
+	 * ，并存到SuspendedResourcesHolder对象中，
+	 * 所以根本就没必要，因为从ThreadLocal中读不到了，并不会影响新事物的执行
+	 *	{@link AbstractPlatformTransactionManager#suspend(Object)}
+	 */
 	private boolean synchronizedWithTransaction = false;
 
 	private boolean rollbackOnly = false;

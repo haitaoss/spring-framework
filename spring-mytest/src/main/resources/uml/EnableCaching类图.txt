@@ -1,0 +1,224 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AbstractCachingConfiguration {
+  + setImportMetadata(AnnotationMetadata): void
+  # useCachingConfigurer(CachingConfigurer): void
+  ~ setConfigurers(Collection<CachingConfigurer>): void
+}
+class AnnotationCacheOperationSource {
+  + hashCode(): int
+  # findCacheOperations(Method): Collection<CacheOperation>?
+  # findCacheOperations(Class<?>): Collection<CacheOperation>?
+  # determineCacheOperations(CacheOperationProvider): Collection<CacheOperation>?
+  + isCandidateClass(Class<?>): boolean
+  # allowPublicMethodsOnly(): boolean
+  + equals(Object?): boolean
+}
+class BeanFactoryCacheOperationSourceAdvisor {
+  + setCacheOperationSource(CacheOperationSource): void
+  + setClassFilter(ClassFilter): void
+  + getPointcut(): Pointcut
+}
+interface Cache << interface >> {
+  + get(Object): ValueWrapper?
+  + get(Object, Class<T>?): T?
+  + invalidate(): boolean
+  + putIfAbsent(Object, Object?): ValueWrapper?
+  + get(Object, Callable<T>): T?
+  + evict(Object): void
+  + evictIfPresent(Object): boolean
+  + clear(): void
+  + getNativeCache(): Object
+  + getName(): String
+  + put(Object, Object?): void
+}
+class CacheAspectSupport {
+  + getCacheResolver(): CacheResolver?
+  - collectPutRequests(Collection<CacheOperationContext>, Object?, Collection<CachePutRequest>): void
+  + setCacheResolver(CacheResolver?): void
+  - findCachedItem(Collection<CacheOperationContext>): ValueWrapper?
+  # invokeOperation(CacheOperationInvoker): Object?
+  # execute(CacheOperationInvoker, Object, Method, Object[]): Object?
+  # clearMetadataCache(): void
+  - isConditionPassing(CacheOperationContext, Object?): boolean
+  - getTargetClass(Object): Class<?>
+  - unwrapReturnValue(Object?): Object?
+  + setCacheManager(CacheManager): void
+  + afterPropertiesSet(): void
+  - findInCaches(CacheOperationContext, Object): ValueWrapper?
+  - processCacheEvicts(Collection<CacheOperationContext>, boolean, Object?): void
+  + setBeanFactory(BeanFactory): void
+  # methodIdentification(Method, Class<?>): String
+  - execute(CacheOperationInvoker, Method, CacheOperationContexts): Object?
+  # getCacheOperationMetadata(CacheOperation, Method, Class<?>): CacheOperationMetadata
+  - handleSynchronizedGet(CacheOperationInvoker, Object, Cache): Object?
+  - hasCachePut(CacheOperationContexts): boolean
+  # getCaches(CacheOperationInvocationContext<CacheOperation>, CacheResolver): Collection<Cache>
+  - logInvalidating(CacheOperationContext, CacheEvictOperation, Object?): void
+  + setCacheOperationSource(CacheOperationSource?): void
+  + getCacheOperationSource(): CacheOperationSource?
+  - performCacheEvict(CacheOperationContext, CacheEvictOperation, Object?): void
+  + configure(Supplier<CacheErrorHandler>?, Supplier<KeyGenerator>?, Supplier<CacheResolver>?, Supplier<CacheManager>?): void
+  + afterSingletonsInstantiated(): void
+  + getKeyGenerator(): KeyGenerator
+  # getOperationContext(CacheOperation, Method, Object[], Object, Class<?>): CacheOperationContext
+  - wrapCacheValue(Method, Object?): Object?
+  + setCacheOperationSources(CacheOperationSource[]): void
+  + setKeyGenerator(KeyGenerator): void
+  - generateKey(CacheOperationContext, Object?): Object
+  # getBean(String, Class<T>): T
+}
+interface CacheErrorHandler << interface >> {
+  + handleCacheClearError(RuntimeException, Cache): void
+  + handleCacheGetError(RuntimeException, Cache, Object): void
+  + handleCacheEvictError(RuntimeException, Cache, Object): void
+  + handleCachePutError(RuntimeException, Cache, Object, Object?): void
+}
+class CacheEvaluationContext {
+  + addUnavailableVariable(String): void
+  + lookupVariable(String): Object?
+}
+class CacheEvictOperation {
+  + isBeforeInvocation(): boolean
+  + isCacheWide(): boolean
+}
+class CacheInterceptor {
+  + invoke(MethodInvocation): Object?
+}
+interface CacheManager << interface >> {
+  + getCache(String): Cache?
+  + getCacheNames(): Collection<String>
+}
+class CacheOperation {
+  + getCondition(): String
+  + getKey(): String
+  + hashCode(): int
+  + getCacheManager(): String
+  + toString(): String
+  + getCacheNames(): Set<String>
+  + equals(Object?): boolean
+  + getName(): String
+  + getKeyGenerator(): String
+  + getCacheResolver(): String
+}
+class CachePutOperation {
+  + getUnless(): String?
+}
+interface CacheResolver << interface >> {
+  + resolveCaches(CacheOperationInvocationContext<?>): Collection<Cache>
+}
+class CacheableOperation {
+  + getUnless(): String?
+  + isSync(): boolean
+}
+class CachingConfigurationSelector {
+  - getProxyImports(): String[]
+  - getAspectJImports(): String[]
+  + selectImports(AdviceMode): String[]?
+}
+interface CachingConfigurer << interface >> {
+  + cacheManager(): CacheManager?
+  + keyGenerator(): KeyGenerator?
+  + cacheResolver(): CacheResolver?
+  + errorHandler(): CacheErrorHandler?
+}
+annotation EnableCaching << annotation >> {
+  + order(): int
+  + proxyTargetClass(): boolean
+  + mode(): AdviceMode
+}
+class InfrastructureAdvisorAutoProxyCreator {
+  # initBeanFactory(ConfigurableListableBeanFactory): void
+  # isEligibleAdvisorBean(String): boolean
+}
+interface KeyGenerator << interface >> {
+  + generate(Object, Method, Object[]): Object
+}
+class ProxyCachingConfiguration {
+  + cacheAdvisor(CacheOperationSource, CacheInterceptor): BeanFactoryCacheOperationSourceAdvisor
+  + cacheOperationSource(): CacheOperationSource
+  + cacheInterceptor(CacheOperationSource): CacheInterceptor
+}
+class SpringCacheAnnotationParser {
+  + isCandidateClass(Class<?>): boolean
+  - parseCacheAnnotations(DefaultCacheConfig, AnnotatedElement, boolean): Collection<CacheOperation>?
+  - parseCachingAnnotation(AnnotatedElement, DefaultCacheConfig, Caching, Collection<CacheOperation>): void
+  - validateCacheOperation(AnnotatedElement, CacheOperation): void
+  - parseCacheAnnotations(DefaultCacheConfig, AnnotatedElement): Collection<CacheOperation>?
+  - parsePutAnnotation(AnnotatedElement, DefaultCacheConfig, CachePut): CacheOperation
+  + equals(Object?): boolean
+  + parseCacheAnnotations(Class<?>): Collection<CacheOperation>?
+  - parseEvictAnnotation(AnnotatedElement, DefaultCacheConfig, CacheEvict): CacheEvictOperation
+  + hashCode(): int
+  - parseCacheableAnnotation(AnnotatedElement, DefaultCacheConfig, Cacheable): CacheableOperation
+  + parseCacheAnnotations(Method): Collection<CacheOperation>?
+}
+
+
+class CacheOperationContext {
+  # isConditionPassing(Object?): boolean
+  - createEvaluationContext(Object?): EvaluationContext
+  # canPutToCache(Object?): boolean
+  - extractArgs(Method, Object[]): Object[]
+  - createCacheNames(Collection<Cache>): Collection<String>
+  # generateKey(Object?): Object?
+   target: Object
+   args: Object[]
+   operation: CacheOperation
+   method: Method
+   caches: Collection<Cache>
+   cacheNames: Collection<String>
+}
+class CacheOperationContexts {
+  + get(Class<CacheOperation>): Collection<CacheOperationContext>
+  - determineSyncFlag(Method): boolean
+   synchronized: boolean
+}
+
+
+class CacheOperationExpressionEvaluator {
+  + createEvaluationContext(Collection<Cache>, Method, Object[], Object, Class<?>, Method, Object?, BeanFactory?): EvaluationContext
+  + key(String, AnnotatedElementKey, EvaluationContext): Object?
+  + unless(String, AnnotatedElementKey, EvaluationContext): boolean
+  + condition(String, AnnotatedElementKey, EvaluationContext): boolean
+  ~ clear(): void
+}
+class CachedExpressionEvaluator {
+  # getParameterNameDiscoverer(): ParameterNameDiscoverer
+  # getExpression(Map<ExpressionKey, Expression>, AnnotatedElementKey, String): Expression
+  - createKey(AnnotatedElementKey, String): ExpressionKey
+  # getParser(): SpelExpressionParser
+}
+
+EnableCaching   -[#595959,dashed]->  CachingConfigurationSelector            : "«create»"
+CachingConfigurationSelector   -[#595959,dashed]->  ProxyCachingConfiguration            : "«create»"
+CachingConfigurationSelector   -[#595959,dashed]->  InfrastructureAdvisorAutoProxyCreator            : "«create»"
+AbstractCachingConfiguration *-- CachingConfigurer
+CachingConfigurer *--  CacheManager
+CachingConfigurer *--  KeyGenerator
+CachingConfigurer *--  CacheResolver
+CachingConfigurer *--  CacheErrorHandler
+CacheManager *--  Cache
+AnnotationCacheOperationSource          *-- SpringCacheAnnotationParser
+SpringCacheAnnotationParser          -[#595959,dashed]->  CacheOperation            : "«create»"
+CacheEvictOperation                     -[#000082,plain]-^  CacheOperation
+CacheInterceptor                        -[#000082,plain]-^  CacheAspectSupport
+CachePutOperation                       -[#000082,plain]-^  CacheOperation
+CacheableOperation                      -[#000082,plain]-^  CacheOperation
+ProxyCachingConfiguration               -[#000082,plain]-^  AbstractCachingConfiguration
+ProxyCachingConfiguration               -[#595959,dashed]->  AnnotationCacheOperationSource         : "«create»"
+ProxyCachingConfiguration               -[#595959,dashed]->  BeanFactoryCacheOperationSourceAdvisor : "«create»"
+ProxyCachingConfiguration               -[#595959,dashed]->  CacheInterceptor                       : "«create»"
+CacheOperationContexts "1" *-[#595959,plain]-> "contexts\n*" CacheOperationContext
+CacheAspectSupport *-- CacheOperationContexts
+CacheOperationExpressionEvaluator *-- CacheEvaluationContext
+CacheOperationExpressionEvaluator  -[#000082,plain]-^  CachedExpressionEvaluator
+CacheAspectSupport *-- CacheOperationExpressionEvaluator
+
+@enduml
+
+

@@ -336,7 +336,6 @@ configure([rootProject] + javaProjects) { project ->
         enabled false
     }
 	test {
-        enabled false
 		useJUnitPlatform()
 		include(["**/*Tests.class", "**/*Test.class"])
 		systemProperty("java.awt.headless", "true")

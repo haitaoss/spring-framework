@@ -36,11 +36,18 @@ import java.util.function.Function;
 public class Demo {
 
 
-
     private String name;
+
 
     public static void x() {
         System.out.println("execute x...");
+    }
+
+    @Test
+    public void test_system_out() {
+        System.err.println("error...");
+        System.out.println("out...");
+        System.err.println("error...");
     }
 
     @Test
@@ -64,10 +71,6 @@ public class Demo {
         x.invoke(new Demo());
     }
 
-    @Test
-    public void test_util() {
-        //        Method specificMethod = AopUtils.getMostSpecificMethod(method, targetClass);
-    }
 
     @Test
     public void test_spel() {

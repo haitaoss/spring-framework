@@ -250,6 +250,16 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
     @Override
     protected boolean isExistingTransaction(Object transaction) {
         DataSourceTransactionObject txObject = (DataSourceTransactionObject) transaction;
+        /**
+         * 在开始事务时会将 isTransactionActive 设置为true
+         * 只有在事务完成时，才会将事务的持有的 getConnectionHolder().isTransactionActive() 设置为false
+         * 所以可以通过这个判断 是否存在事务
+         *
+         * 空事务不算存在事务，因为空事务不会开启事务(不会给事务对象创建数据库连接)，也就不会将 isTransactionActive 设置为true
+         *
+         * 在空事务下，使用{@link DataSourceUtils#doGetConnection(DataSource)}获取连接，也不会设置 isTransactionActive 为true，
+         * 只是存到了 {@link TransactionSynchronizationManager#resources}
+         * */
         return (txObject.hasConnectionHolder() && txObject.getConnectionHolder().isTransactionActive());
     }
 
@@ -269,7 +279,23 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
         Connection con = null;
 
         try {
-            // 没有连接 或者 是事务资源的对象
+            /**
+             * 没有连接 或者 连接是事务同步 那就应该创建一个新的连接
+             *
+             * 可以这么理解，当前方法叫 doBegin ，也就是要给事务对象绑定连接。连接没有那就创建一个在绑定合情合理，
+             * 而连接有了，但是连接是事务同步 说明上一个事务还未完成，你还要绑定 那也给你创建一个新的连接，这种属于非法操作了，如果你老老实实用Spring 别搞啥自定义，是不会出现这种情况的
+             *
+             * 因为 doBegin 是在 startTransaction 的时候会执行，而 startTransaction 之前会先暂停当前线程的事物资源，在开启事物，
+             * 而暂停就是
+             *      1. 移除事物对象的引用 `txObject.setConnectionHolder(null);`
+             *      2. 从 {@link TransactionSynchronizationManager#resources} 移除 ConnectionHolder 存起来。这个ConnectionHolder 其实就是上面置空的属性
+             *          Tips: 暂停事务的代码 {@link DataSourceTransactionManager#doSuspend(Object)}
+             *      记住代码是死的，Spring的事物代码都这么写了，所以基本不可能出现 isSynchronizedWithTransaction 的情况，除非开发人员玩花活
+             *
+             * 注：在一个Spring事务(单一事务、嵌套事务)
+             *      事务暂停：`txObject.setConnectionHolder(null)`
+             *      事务完成：` txObject.getConnectionHolder().setSynchronizedWithTransaction(false);`
+             * */
             if (!txObject.hasConnectionHolder() ||
                     txObject.getConnectionHolder().isSynchronizedWithTransaction()) {
                 /**
@@ -285,7 +311,13 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
                 txObject.setConnectionHolder(new ConnectionHolder(newCon), true);
             }
 
-            // 表示是
+            /**
+             * 表示 这个事务对象的连接 是事务同步
+             *
+             * 在事物完成时 会将该属性设置为 false
+             *  {@link DataSourceTransactionManager#doCleanupAfterCompletion(Object)}
+             *  {@link ConnectionHolder#clear()}
+             * */
             txObject.getConnectionHolder().setSynchronizedWithTransaction(true);
             con = txObject.getConnectionHolder().getConnection();
 
@@ -317,7 +349,10 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
              * 如果是只读的就执行sql设置为只读事务  `SET TRANSACTION READ ONLY`
              * */
             prepareTransactionalConnection(con, definition);
-            // 活动的事务
+            /**
+             * 活动的事务。
+             * 在事务完成时才会将该属性设置为false，暂停事务并不会
+             * */
             txObject.getConnectionHolder().setTransactionActive(true);
 
             /**
@@ -440,7 +475,12 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
             DataSourceUtils.releaseConnection(con, this.dataSource);
         }
 
-        // 清除保存信息
+        /**
+         * 清除保存信息
+         * 主要是将这个两个属性设置为false，表示事物完成了
+         *  {@link ConnectionHolder#transactionActive}
+         *  {@link ResourceHolderSupport#synchronizedWithTransaction}
+         * */
         txObject.getConnectionHolder().clear();
     }
 

@@ -51,23 +51,37 @@ import org.springframework.util.Assert;
 public class DefaultTransactionStatus extends AbstractTransactionStatus {
 
     /**
-     * 事务对象
+     * 事务对象，若是空事务该属性就是null
      */
     @Nullable
     private final Object transaction;
 
     /**
-     * 是否是 新事务。
+     * 新事务。事务是新开启的(非事务也算)，这个属性就是true。
+     *
+     * 用处：在事务完成时，会判断 transaction != null && newTransaction 就做处理(从事务资源中移除、释放连接等操作)
+     *      {@link AbstractPlatformTransactionManager#cleanupAfterCompletion(DefaultTransactionStatus)}
+     *
      * 举例事务嵌套：
      *  - require->require 第一个是true，第二个是false
      *  - require->nested 第一个是true，第二个是false
      *  - require->require_new  第一个、第二个都是true
      *  - require->not_supported  第一个是true，第二个是false
+     *  - not_supported->not_supported  第一个、第二个都是true(因为not_supported不算存在事务，所以再次执行也是按照新事物算)
+     *
      */
     private final boolean newTransaction;
 
     /**
-     * 是否是 新的同步。
+     * 新同步。
+     * 是true，那么在事务开启时会将事务的信息设置到 TransactionSynchronizationManager 中，而要想设置，那么得保证当前线程没有存东西在 TransactionSynchronizationManager 中
+     * 不存东西？那就是 事务被暂停了或者是非事务方法
+     *
+     *  {@link AbstractPlatformTransactionManager#prepareSynchronization}
+     *
+     * 单事务：该属性就是true，
+     * 嵌套事务：父事务肯定是true，而子事务，只有子事务和父事务不一样才是新的
+     *
      * 举例事务嵌套：
      *  - require->require 第一个是true，第二个是false
      *  - require->nested 第一个是true，第二个是false

@@ -7,13 +7,15 @@
 
 > JVM参数不要输出警告信息：--illegal-access=warn --add-opens java.base/java.lang=ALL-UNNAMED
 
+![image-20221112084615402](.README_imgs/image-20221112084615402.png)
+
 ![image-20221105161913239](.README_imgs/image-20221105161913239.png)
 
 ![image-20221105161946762](.README_imgs/image-20221105161946762.png)
 
 `build.gradle`
 
-![image-20221105170242530](.README_imgs/image-20221105170242530.png)![image-20221105170214480](.README_imgs/image-20221105170214480.png)
+![image-20221112084516396](.README_imgs/image-20221112084516396.png)
 
 `settings.gradle`
 
@@ -68,7 +70,6 @@ dependencies {
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
 }
 ```
-
 # 源码分析
 
 ## [ASM 技术](https://asm.ow2.io/)
@@ -90,7 +91,6 @@ dependencies {
 - 扫描到所有的 class 资源后，要判断该 class 是否作为一个 bean对象（比如标注了@Component 注解），
   如果我们通过反射来判断，那么在 Spring 启动阶段就会加载很多的bean，这势必会浪费系统资源和耗时（因为可能很多的工具类，是不需要Spring进行管理的）。
 ## Spring容器创建的核心流程
-
 ### 整体生命周期
 ```java
 /**
@@ -187,48 +187,50 @@ dependencies {
 ### AnnotationConfigApplicationContext 的实例化
 
 创建IOC容器
-```java
-new AnnotationConfigApplicationContext(AppConfig.class);
+```txt
+new AnnotationConfigApplicationContext(AppConfig.class)
 ```
 会执行无参构造器
 ```java
-public AnnotationConfigApplicationContext() {
-  StartupStep createAnnotatedBeanDefReader = this.getApplicationStartup().start("spring.context.annotated-bean-reader.create");
-  /**
-   * 读取器，读取class成BeanDefinition然后注册到BeanFactory中，读取的时候会解析 @Lazy、@Primary、DependsOn、@Role、Description 等信息设置到BeanDefinition中
-   *
-   * 比如 将入参配置类注册到 BeanFactory 中会用到
-   *  {@link AnnotationConfigApplicationContext#register(Class[])}
-   *      {@link AnnotatedBeanDefinitionReader#doRegisterBean(Class, String, Class[], Supplier, BeanDefinitionCustomizer[])}
-   *
-   * 实例化时会执行 `AnnotationConfigUtils.registerAnnotationConfigProcessors(this.registry);`
-   *  {@link AnnotationConfigUtils#registerAnnotationConfigProcessors(BeanDefinitionRegistry, Object)}
-   *      1. 给BeanFactory设置依赖比较器 `beanFactory.setDependencyComparator(AnnotationAwareOrderComparator.INSTANCE);`
-   *          - 依赖类型是集合时，会使用这个排序
-   *          - 依赖类型不是集合时，会使用这个拿到@Priority排序值，排序值小的就是要注入的
-   *
-   *      2. 给BeanFactory设置自动注入候选者解析器 `beanFactory.setAutowireCandidateResolver(new ContextAnnotationAutowireCandidateResolver());`
-   *          - @Lazy的处理、@Qualifier的处理
-   *
-   *      3. 注册bean到beanDefinitionMap中：
-   *          - ConfigurationClassPostProcessor：用来解析配置类，注册BeanDefinition
-   *          - AutowiredAnnotationBeanPostProcessor：处理@Autowired、@Value依赖注入
-   *          - CommonAnnotationBeanPostProcessor：处理@Resource依赖注入，@PreDestroy、@PostConstruct方法回调
-   *          - PersistenceAnnotationBeanPostProcessor：处理@PersistenceContext、@PersistenceUnit依赖注入的
-   *          - EventListenerMethodProcessor：处理方法有@EventListener的bean，使用 EventListenerFactory 将方法构造成 ApplicationListener 注册到事件广播器
-   *          - DefaultEventListenerFactory：用来将@EventListener标注的方法解析成ApplicationListener的
-   * */
-  this.reader = new AnnotatedBeanDefinitionReader(this);
-  createAnnotatedBeanDefReader.end();
-  /**
-   * 扫描器，用来扫描class文件的。
-   *
-   * 在实例化过程中会解析`META-INF/spring.components`文件，然后在 {@link ClassPathScanningCandidateComponentProvider#findCandidateComponents(String)} 会根据索引文件是否有内容
-   * 从而决定是索引扫描还是包扫描
-   *
-   * `CandidateComponentsIndexLoader.loadIndex(this.resourcePatternResolver.getClassLoader());`
-   * */
-  this.scanner = new ClassPathBeanDefinitionScanner(this);
+class AnnotationConfigApplicationContext {
+  public AnnotationConfigApplicationContext() {
+    StartupStep createAnnotatedBeanDefReader = this.getApplicationStartup().start("spring.context.annotated-bean-reader.create");
+    /**
+     * 读取器，读取class成BeanDefinition然后注册到BeanFactory中，读取的时候会解析 @Lazy、@Primary、DependsOn、@Role、Description 等信息设置到BeanDefinition中
+     *
+     * 比如 将入参配置类注册到 BeanFactory 中会用到
+     *  {@link AnnotationConfigApplicationContext#register(Class[])}
+     *      {@link AnnotatedBeanDefinitionReader#doRegisterBean(Class, String, Class[], Supplier, BeanDefinitionCustomizer[])}
+     *
+     * 实例化时会执行 `AnnotationConfigUtils.registerAnnotationConfigProcessors(this.registry);`
+     *  {@link AnnotationConfigUtils#registerAnnotationConfigProcessors(BeanDefinitionRegistry, Object)}
+     *      1. 给BeanFactory设置依赖比较器 `beanFactory.setDependencyComparator(AnnotationAwareOrderComparator.INSTANCE);`
+     *          - 依赖类型是集合时，会使用这个排序
+     *          - 依赖类型不是集合时，会使用这个拿到@Priority排序值，排序值小的就是要注入的
+     *
+     *      2. 给BeanFactory设置自动注入候选者解析器 `beanFactory.setAutowireCandidateResolver(new ContextAnnotationAutowireCandidateResolver());`
+     *          - @Lazy的处理、@Qualifier的处理
+     *
+     *      3. 注册bean到beanDefinitionMap中：
+     *          - ConfigurationClassPostProcessor：用来解析配置类，注册BeanDefinition
+     *          - AutowiredAnnotationBeanPostProcessor：处理@Autowired、@Value依赖注入
+     *          - CommonAnnotationBeanPostProcessor：处理@Resource依赖注入，@PreDestroy、@PostConstruct方法回调
+     *          - PersistenceAnnotationBeanPostProcessor：处理@PersistenceContext、@PersistenceUnit依赖注入的
+     *          - EventListenerMethodProcessor：处理方法有@EventListener的bean，使用 EventListenerFactory 将方法构造成 ApplicationListener 注册到事件广播器
+     *          - DefaultEventListenerFactory：用来将@EventListener标注的方法解析成ApplicationListener的
+     * */
+    this.reader = new AnnotatedBeanDefinitionReader(this);
+    createAnnotatedBeanDefReader.end();
+    /**
+     * 扫描器，用来扫描class文件的。
+     *
+     * 在实例化过程中会解析`META-INF/spring.components`文件，然后在 {@link ClassPathScanningCandidateComponentProvider#findCandidateComponents(String)} 会根据索引文件是否有内容
+     * 从而决定是索引扫描还是包扫描
+     *
+     * `CandidateComponentsIndexLoader.loadIndex(this.resourcePatternResolver.getClassLoader());`
+     * */
+    this.scanner = new ClassPathBeanDefinitionScanner(this);
+  }
 }
 ```
 ### prepareBeanFactory
@@ -846,39 +848,41 @@ public class MyApplicationListener implements ApplicationListener<MyApplicationE
 ### 示例代码
 
 ```java
-@Test
-public void 测试ProxyFactory() {
-  ProxyFactory proxyFactory = new ProxyFactory();
-  /** 
-  * 会装饰成 setTargetSource(new SingletonTargetSource(target));
-  * 因为代理对象执行的时候是执行 `targetSource.getTart()` 拿到被代理对象的，所以要将 Demo 包装成 TargetSource 类型
-  **/
-  proxyFactory.setTarget(new Demo());
-  // 是否优化，这个也是决定是否使用cglib代理的条件之一
-  proxyFactory.setOptimize(true);
-  // 接口类型，这个也是决定是否使用cglib代理的条件之一，代理接口的时候才需要设置这个
-  proxyFactory.setInterfaces();
-  // 约束是否使用cglib代理。但是这个没吊用，会有其他参数一起判断的，而且有优化机制 会优先选择cglib代理
-  proxyFactory.setProxyTargetClass(true);
-  /**
-   * addAdvice 会被装饰成 Advisor
-   * 这里不能乱写，因为后面解析的时候 要判断是否实现xx接口的
-   * 解析逻辑 {@link DefaultAdvisorAdapterRegistry#getInterceptors(Advisor)}
-   * */
-  proxyFactory.addAdvice(new MethodBeforeAdvice() {
-    @Override
-    public void before(Method method, Object[] args, Object target) throws Throwable {
-      method.invoke(target, args);
-    }
-  });
-  // 设置 Advisor，有点麻烦 还不如直接通过 addAdvice 设置，自动解析成advisor方便
-  proxyFactory.addAdvisor(new DefaultPointcutAdvisor(new MethodBeforeAdvice() {
-    @Override
-    public void before(Method method, Object[] args, Object target) throws Throwable {
-      method.invoke(target, args);
-    }
-  }));
-  proxyFactory.getProxy();
+public class Test{
+  @Test
+  public void 测试ProxyFactory() {
+    ProxyFactory proxyFactory = new ProxyFactory();
+    /**
+     * 会装饰成 setTargetSource(new SingletonTargetSource(target));
+     * 因为代理对象执行的时候是执行 `targetSource.getTart()` 拿到被代理对象的，所以要将 Demo 包装成 TargetSource 类型
+     **/
+    proxyFactory.setTarget(new Demo());
+    // 是否优化，这个也是决定是否使用cglib代理的条件之一
+    proxyFactory.setOptimize(true);
+    // 接口类型，这个也是决定是否使用cglib代理的条件之一，代理接口的时候才需要设置这个
+    proxyFactory.setInterfaces();
+    // 约束是否使用cglib代理。但是这个没吊用，会有其他参数一起判断的，而且有优化机制 会优先选择cglib代理
+    proxyFactory.setProxyTargetClass(true);
+    /**
+     * addAdvice 会被装饰成 Advisor
+     * 这里不能乱写，因为后面解析的时候 要判断是否实现xx接口的
+     * 解析逻辑 {@link DefaultAdvisorAdapterRegistry#getInterceptors(Advisor)}
+     * */
+    proxyFactory.addAdvice(new MethodBeforeAdvice() {
+      @Override
+      public void before(Method method, Object[] args, Object target) throws Throwable {
+        method.invoke(target, args);
+      }
+    });
+    // 设置 Advisor，有点麻烦 还不如直接通过 addAdvice 设置，自动解析成advisor方便
+    proxyFactory.addAdvisor(new DefaultPointcutAdvisor(new MethodBeforeAdvice() {
+      @Override
+      public void before(Method method, Object[] args, Object target) throws Throwable {
+        method.invoke(target, args);
+      }
+    }));
+    proxyFactory.getProxy();
+  }
 }
 ```
 
@@ -886,7 +890,7 @@ public void 测试ProxyFactory() {
 
 > ### CGLIB代理
 >
-> ```java
+> ```txt
 > Enhancer enhancer = new Enhancer();
 > enhancer.setCallbacks([DynamicAdvisedInterceptor,...]);
 > ```
@@ -895,9 +899,7 @@ public void 测试ProxyFactory() {
 >
 > ### JDK代理
 >
-> ```java
-> Proxy.newProxyInstance(classLoader, this.proxiedInterfaces, this);
-> ```
+> ` Proxy.newProxyInstance(classLoader, this.proxiedInterfaces, this)`
 >
 > 可以知道 第三个参数(InvocationHandler) 是 this，也就是 JdkDynamicAopProxy，而其{@link JdkDynamicAopProxy#advised}属性 其实就是 ProxyFactory从而可以拿到Advisors
 >
@@ -1181,7 +1183,7 @@ public void 测试ProxyFactory() {
         basePackages = "cn", // 扫描包路径
         useDefaultFilters = true, // 是否注册默认的 includeFilter，默认会注解扫描@Component注解的includeFilter
         nameGenerator = BeanNameGenerator.class, // beanName 生成器
-    		excludeFilters = {} // 扫描bean 排除filter。其中一个命中就不能作为bean
+    		excludeFilters = {}, // 扫描bean 排除filter。其中一个命中就不能作为bean
         includeFilters = {@ComponentScan.Filter(type = FilterType.CUSTOM, classes = MyAnnotationTypeFilter.class)} // 扫描bean 包含filter。其中一个命中就能作为bean
 )
 public class A{}
@@ -1193,8 +1195,7 @@ public class A{}
 
 ```properties
 cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$MyAnnotation
-
-cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$Haitao
+#cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$Haitao
 ```
 
 代码：
@@ -1297,7 +1298,7 @@ class MyAnnotationTypeFilter extends AnnotationTypeFilter {
 > - 在`finishBeanFactoryInitialization`时：
 >   - 给BeanFactory设置`ConversionService`。在依赖注入时，默认会使用`SimpleTypeConverter`要对注入值进行类型转换会使用这个东西，这个其实是`PropertyEditorRegistry`的子类，然后 `ConversionService` 就是其属性，真正进行类型转换是使用`ConversionService`
 >   
->   ```java
+>   ```txt
 >   // SimpleTypeConverter 其实就是 PropertyEditorRegistry的子类
 >   SimpleTypeConverter typeConverter = new SimpleTypeConverter();
 >   // 设置 conversionService
@@ -1306,7 +1307,6 @@ class MyAnnotationTypeFilter extends AnnotationTypeFilter {
 >   registrar.registerCustomEditors(typeConverter);
 >   ```
 ### 示例代码
-
 ```java
 @Component
 public class Test {
@@ -1536,7 +1536,6 @@ public class Test {
  * 			Tips:所以说@Resource 是byName再byType
  * */
 ```
-
 ### 细说`AutowiredFieldElement#inject`
 
 ![AutowiredFieldElement类图](.README_imgs/AutowiredFieldElement类图.png)
@@ -1989,53 +1988,90 @@ public class TypeConverterTest {
 ```
 ## SpEL
 
-> [Spring官方文档](https://docs.spring.io/spring-framework/docs/3.0.x/reference/expressions.html)
+> [Spring官方文档](https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#expressions)
+
+### SpEL_Simple_Demo
 
 ```java
-public class Demo {
+@Data
+public class SpEL_Simple_Demo {
     private String name;
 
-
-    @Test
-    public void test_spel() {
-        Demo demo = new Demo();
-
-        ExpressionParser parser = new SpelExpressionParser();
-
-        StandardEvaluationContext context = new StandardEvaluationContext(demo);
+    public static void main(String[] args) {
+        // 构造器参数就是根对象
+        StandardEvaluationContext context = new StandardEvaluationContext(new SpEL_Simple_Demo());
         context.setVariable("newName", "Mike Tesla");
 
+        ExpressionParser parser = new SpelExpressionParser();
         Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
         // 字符串
         System.out.println(consumer.apply("'a'"));
         // 运算
         System.out.println(consumer.apply("1+1"));
-        /**
-         * name 表示 context中的属性名
-         * #newName 表示获取变量
-         *
-         * 意思就是给name赋值
-         * */
+        // 给root对象的属性赋值
         System.out.println(consumer.apply("name = #newName"));
+        // 给变量赋值
+        System.out.println(consumer.apply("#newName = 'haitao'"));
+
+        System.out.println(consumer.apply("#newName2")); // 没有这个变量也不会报错，就是null而已
+
+    }
+}
+```
+
+### SpEL_root
+
+```java
+public class SpEL_root {
+    public String name;
+
+    public static void main(String[] args) {
+        // 构造器参数就是根对象
+        StandardEvaluationContext context = new StandardEvaluationContext(new SpEL_root()) {
+            @Override
+            public Object lookupVariable(String name) {
+                /**
+                 * 访问变量会执行这个
+                 * 就是 "#a" 才会执行
+                 * 注："#root" 这个比较特殊，不是回调该方法获取的
+                 * */
+                System.out.print("lookupVariable--->" + name + "===>");
+                return super.lookupVariable(name);
+            }
+        };
+        ExpressionParser parser = new SpelExpressionParser();
+        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
+
         /**
-         * name变量的值，这样子写就是访问属性
+         * #root.name 访问根对象的属性
+         * 访问root对象的属性，可以简化成 name
+         * #root 是访问根对象，因为root是关键字，不会回调 lookupVariable 获取变量
          * */
         System.out.println(consumer.apply("name"));
-        /**
-         * 设置BeanResolver,就是 @ 开头的会通过这个解析值
-         * */
-        context.setBeanResolver(new BeanResolver() {
-            @Override
-            public Object resolve(EvaluationContext context, String beanName) throws AccessException {
-                return "通过BeanResolver解析的值-->" + beanName;
-            }
-        });
-        // 会使用BeanResolver 解析
-        System.out.println(consumer.apply("@a"));
-        // 模板解析上下文，就是可以去掉模板字符
-        System.out.println(parser.parseExpression("#{@x}", new TemplateParserContext()).getValue(context));
+        System.out.println(consumer.apply("#root"));
+        System.out.println(consumer.apply("#root.name"));
 
-        // PropertyAccessor 用来解析属性是怎么取值的
+    }
+}
+
+```
+
+### SpEL_PropertyAccessor
+
+```java
+public class SpEL_PropertyAccessor {
+    public String name;
+
+    public static void main(String[] args) {
+        StandardEvaluationContext context = new StandardEvaluationContext(new SpEL_PropertyAccessor());
+        ExpressionParser parser = new SpelExpressionParser();
+        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
+
+        /**
+         * PropertyAccessor 用来解析属性是怎么取值的
+         *
+         * 就是 "a" 才会执行
+         * */
         context.addPropertyAccessor(new PropertyAccessor() {
             @Override
             public Class<?>[] getSpecificTargetClasses() {
@@ -2051,14 +2087,14 @@ public class Demo {
 
             @Override
             public boolean canRead(EvaluationContext context, Object target, String name) throws AccessException {
-                System.out.println("canRead...." + name);
+                System.out.print("canRead...." + name + "\t");
                 return true;
             }
 
             @Override
             public TypedValue read(EvaluationContext context, Object target, String name) throws AccessException {
-                System.out.println("read...." + name);
-                return null;
+                System.out.print("read...." + name + "\t");
+                return new TypedValue(name);
             }
 
             @Override
@@ -2071,20 +2107,164 @@ public class Demo {
 
             }
         });
-        System.out.println(consumer.apply("testPropertyAccessor"));
+
+        System.out.println(consumer.apply("name"));
+        System.out.println(consumer.apply("x"));
+        System.out.println(consumer.apply("#variable"));
     }
 }
-``
+```
+
+### SpEL_ParserContext
+
+```java
+public class SpEL_ParserContext {
+    public static void main(String[] args) {
+        StandardEvaluationContext context = new StandardEvaluationContext();
+        ExpressionParser parser = new SpelExpressionParser();
+
+        // 模板解析上下文，就是可以去掉模板字符
+        System.out.println(parser.parseExpression("#{#variable}",
+                new TemplateParserContext()).getValue(context));
+    }
+}
+```
+
+### SpEL_lookupVariable
+
+```java
+public class SpEL_lookupVariable {
+    public static void main(String[] args) {
+        StandardEvaluationContext context = new StandardEvaluationContext() {
+            @Override
+            public Object lookupVariable(String name) {
+                /**
+                 * 访问变量会执行这个
+                 * 就是 "#a" 才会执行
+                 * 注："#root" 这个比较特殊，不是回调该方法获取的
+                 * */
+                System.out.print("lookupVariable--->" + name + "===>");
+                return super.lookupVariable(name);
+            }
+        };
+        // 设置变量
+        context.setVariable("newName", "Mike Tesla");
+
+        ExpressionParser parser = new SpelExpressionParser();
+        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
+
+        /**
+         * name变量的值，这样子写就是访问属性。
+         *
+         * root对象的访问方式：
+         *  1. name
+         *  2. #name
+         *  3. #root.name
+         *
+         * 普通变量的访问方式：
+         *  1. #newName
+         * */
+        System.out.println(consumer.apply("#name"));
+        System.out.println(consumer.apply("#root"));
+        System.out.println(consumer.apply("#newName"));
+
+    }
+}
+```
+
+### SpEL_BeanResolver
+
+```java
+public class SpEL_BeanResolver {
+
+    public static void main(String[] args) {
+        StandardEvaluationContext context = new StandardEvaluationContext();
+        ExpressionParser parser = new SpelExpressionParser();
+        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
+
+        /**
+         * 设置BeanResolver,就是 @ 开头的会通过这个解析值
+         * */
+        context.setBeanResolver(new BeanResolver() {
+            @Override
+            public Object resolve(EvaluationContext context, String beanName) throws AccessException {
+                return "通过BeanResolver解析的值-->" + beanName;
+            }
+        });
+        // 会使用BeanResolver 解析
+        System.out.println(consumer.apply("@a"));
+        // 模板解析上下文，就是可以去掉模板字符
+        System.out.println(parser.parseExpression("#{@x}",
+                new TemplateParserContext()).getValue(context));
+    }
+}
+```
+
+### MethodSpELTest
+
+```java
+public class MethodSpELTest {
+    public static class MyStandardEvaluationContext extends StandardEvaluationContext {
+        private Object[] methodArgs;
+        private boolean resolved;
+
+        public void setMethodArgs(Object[] methodArgs) {
+            this.methodArgs = methodArgs;
+        }
+
+        @Override
+        public Object lookupVariable(String name) {
+            if (!resolved) {
+                resolvedMethodArgs();
+            }
+            return super.lookupVariable(name);
+        }
+
+        private void resolvedMethodArgs() {
+            for (int i = 0; i < methodArgs.length; i++) {
+                setVariable("p" + i, methodArgs[i]);
+                setVariable("a" + i, methodArgs[i]);
+            }
+            resolved = true;
+        }
+    }
+
+    public static void method(String a, Object object) {
+    }
+
+    public static void main(String[] args) throws Exception {
+        // 执行方法
+        Class<MethodSpELTest> methodSpELTestClass = MethodSpELTest.class;
+        Method method = methodSpELTestClass.getMethod("method", String.class, Object.class);
+        Object[] methodArgs = {"hello SpEL", new Object()};
+        method.invoke(null, methodArgs);
+
+        // 讲方法的入参 传入 构造 StandardEvaluationContext
+        ExpressionParser parser = new SpelExpressionParser();
+        MyStandardEvaluationContext evaluationContext = new MyStandardEvaluationContext();
+        evaluationContext.setMethodArgs(methodArgs);
+        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(evaluationContext);
+
+        // 进行表达式解析时 就能用到我们设置的变量了
+        System.out.println(consumer.apply("#a0.contains('SpEL')"));
+        System.out.println(consumer.apply("#a0.contains('haitao')"));
+    }
+}
+```
+
+
+
 ## @EnableAspectJAutoProxy
 
 > [示例代码](#@Aspect)
+>
+> [Spring AOP 文档](https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#aop-api)
 >
 > pointcut表达式 https://zhuanlan.zhihu.com/p/63001123
 >
 > CGLIB介绍与原理 https://blog.csdn.net/zghwaicsdn/article/details/50957474
 >
 > 只是看懂 Spring Aop 的实现原理，至于具体的AspectJ表达式如何匹配的没有看
-
 ### 类图
 
 ```java
@@ -2112,6 +2292,7 @@ public class Demo {
  *      使用ProxyFactory创建代理对象
  * */
 ```
+
 ![PlantUML diagram](.README_imgs/oujZNORuxfKsYibbtAXchfBu3gT4qgzT0SMnYYtiKTjm6vN.png)
 
 > @Aroun、@Before、@After、@AfterThrowing、@AfterReturning 解析成的 Advice
@@ -2143,7 +2324,6 @@ public class Demo {
 >   2. 和PointcutAdvisor一样。会获取其Advice属性，转换成MethodInterceptor对象，组成InterceptorChain，在执行代理对象的方法时，会执行与方法匹配的Interceptors
 
 ![PlantUML diagram](.README_imgs/pqIb5sweG-5033471.png)
-
 ### 1. 使用`@EnableAspectJAutoProxy`会发生什么?
 
 会往容器中添加 `AnnotationAwareAspectJAutoProxyCreator` 类的BeanDefinition，然后在IOC容器创建的时候会进行实例化。
@@ -2479,7 +2659,6 @@ public class Demo {
  * */
 ```
 ### 使用容器中的Advice
-
 ```java
 @EnableAspectJAutoProxy
 @Component
@@ -2519,7 +2698,6 @@ public class AopTest5 {
     }
 }
 ```
-
 ### 注册`AdvisorAdapter`
 
 ```java
@@ -2554,10 +2732,12 @@ public class AopTest6 {
 ```
 ## @EnableAsync
 
+> [文档](https://docs.spring.io/spring-framework/docs/current/reference/html/integration.html#scheduling-annotation-support-async)
+>
 > `@EnableAsync` 会创建用来解析`@Async`注解的Advisor
 >
 > - `@Async` 标注在类上，类中所有的方法都会被代理
->- `@Async` 标注在方法上，方法会被代理
+> - `@Async` 标注在方法上，方法会被代理
 > - `@Async("beanName")` 通过注解值，指定方法要使用的的Executor
 >
 > 注：equals、hashCode、toString 是不会代理的
@@ -2619,7 +2799,7 @@ public class EnableAsyncTest {
     }
 }
 ```
-### 原理
+### 类图
 > [ProxyFacoty#getProxy原理](#`ProxyFactory#getProxy`)
 
 ![AsyncAnnotationBeanPostProcessor类图](.README_imgs/AsyncAnnotationBeanPostProcessor类图.png)
@@ -2720,7 +2900,8 @@ public class EnableAsyncTest {
  * */
 ```
 ## @EnableTransactionManagement
-
+> [文档](https://docs.spring.io/spring-framework/docs/current/reference/html/data-access.html#transaction-declarative-annotations)
+>
 > 前置知识：Connection是支持设置 事务隔离级别、是否只读的 ，是否自动提交事务
 >
 > #### 事务注解的使用
@@ -2758,7 +2939,6 @@ public class EnableAsyncTest {
 > - 事务状态 DefaultTransactionStatus
 > - 事务信息 TransactionAspectSupport.TransactionInfo
 > - DataSourceUtils 使用这个工具类获取连接，才能使用对接上Spring事务的功能
-
 ### 类图
 
 `@EnableTransactionManagement`
@@ -2773,8 +2953,7 @@ public class EnableAsyncTest {
 
 > 每个`@Transaction`方法对应一个 TransactionInfo 实例
 
-![TransactionInfo类图](.README_imgs/TransactionInfo类图.png)
-
+![TransactionInfo类图](.README_imgs/TransactionInfo类图.png
 ### 示例代码
 
 #### 动态数据源+事务管理器配置
@@ -2960,7 +3139,6 @@ public class EnableTransactionManagementTest2 {
 }
 ```
 #### 事务传播行为
-
 ```java
 /**
  * @author haitao.chen
@@ -2973,96 +3151,93 @@ public class EnableTransactionManagementTest2 {
 @Component
 @Import(Config.class)
 public class EnableTransactionManagementTest6 {
-    @Autowired
-    public JdbcTemplate jdbcTemplate;
+  @Autowired
+  public JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    public ApplicationEventMulticaster multicaster;
+  @Autowired
+  public ApplicationEventMulticaster multicaster;
 
 
-    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
-    public void test(Propagation propagation) {
-        System.out.println("数据库->" + jdbcTemplate.queryForObject("SELECT database()", String.class));
-        jdbcTemplate.execute("TRUNCATE TABLE t1");
-        jdbcTemplate.execute("INSERT INTO t1 VALUES('haitao')");
+  @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
+  public void test(Propagation propagation) {
+    System.out.println("数据库->" + jdbcTemplate.queryForObject("SELECT database()", String.class));
+    jdbcTemplate.execute("TRUNCATE TABLE t1");
+    jdbcTemplate.execute("INSERT INTO t1 VALUES('haitao')");
 
-        switch (propagation.value()) {
-            case TransactionDefinition.PROPAGATION_NESTED:
-                ((EnableTransactionManagementTest6) AopContext.currentProxy()).nested();
-                break;
-            case TransactionDefinition.PROPAGATION_REQUIRES_NEW:
-                ((EnableTransactionManagementTest6) AopContext.currentProxy()).requires_new();
-                break;
-            case TransactionDefinition.PROPAGATION_REQUIRED:
-                ((EnableTransactionManagementTest6) AopContext.currentProxy()).required();
-                break;
-            case TransactionDefinition.PROPAGATION_NOT_SUPPORTED:
-                ((EnableTransactionManagementTest6) AopContext.currentProxy()).not_supported();
-                break;
-        }
-        jdbcTemplate.execute("INSERT INTO t1 VALUES('haitao2')");
-        //        throw new RuntimeException("抛出异常");
+    switch (propagation.value()) {
+      case TransactionDefinition.PROPAGATION_NESTED:
+        ((EnableTransactionManagementTest6) AopContext.currentProxy()).nested();
+        break;
+      case TransactionDefinition.PROPAGATION_REQUIRES_NEW:
+        ((EnableTransactionManagementTest6) AopContext.currentProxy()).requires_new();
+        break;
+      case TransactionDefinition.PROPAGATION_REQUIRED:
+        ((EnableTransactionManagementTest6) AopContext.currentProxy()).required();
+        break;
+      case TransactionDefinition.PROPAGATION_NOT_SUPPORTED:
+        ((EnableTransactionManagementTest6) AopContext.currentProxy()).not_supported();
+        break;
     }
+    jdbcTemplate.execute("INSERT INTO t1 VALUES('haitao2')");
+    //        throw new RuntimeException("抛出异常");
+  }
 
-    @Transactional(rollbackFor = Exception.class, propagation = Propagation.NOT_SUPPORTED)
-    public void not_supported() {
-        //        seeTable();
-        jdbcTemplate.execute("INSERT INTO t1 VALUES('not_supported-->haitao')");
-    }
+  @Transactional(rollbackFor = Exception.class, propagation = Propagation.NOT_SUPPORTED)
+  public void not_supported() {
+    //        seeTable();
+    jdbcTemplate.execute("INSERT INTO t1 VALUES('not_supported-->haitao')");
+  }
 
-    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
-    public void required() {
-        //        seeTable();
-        jdbcTemplate.execute("INSERT INTO t1 VALUES('required-->haitao')");
-    }
+  @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
+  public void required() {
+    //        seeTable();
+    jdbcTemplate.execute("INSERT INTO t1 VALUES('required-->haitao')");
+  }
 
-    @Transactional(rollbackFor = Exception.class, propagation = Propagation.NESTED)
-    public void nested() {
-        //        seeTable();
-        jdbcTemplate.execute("INSERT INTO t1 VALUES('NESTED-->haitao')");
-    }
+  @Transactional(rollbackFor = Exception.class, propagation = Propagation.NESTED)
+  public void nested() {
+    //        seeTable();
+    jdbcTemplate.execute("INSERT INTO t1 VALUES('NESTED-->haitao')");
+  }
 
-    @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRES_NEW/*,isolation = Isolation.READ_UNCOMMITTED*/)
-    public void requires_new() {
-        //        seeTable();
-        jdbcTemplate.execute("INSERT INTO t1 VALUES('REQUIRES_NEW-->haitao')");
-    }
+  @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRES_NEW/*,isolation = Isolation.READ_UNCOMMITTED*/)
+  public void requires_new() {
+    //        seeTable();
+    jdbcTemplate.execute("INSERT INTO t1 VALUES('REQUIRES_NEW-->haitao')");
+  }
 
-    @Transactional(propagation = Propagation.NEVER)
-    public void test1() {
-        jdbcTemplate.execute("INSERT INTO t1 VALUES('NEVER-->haitao')");
-        jdbcTemplate.execute("INSERT INTO t1 VALUES('NEVER-->haitao')");
-        jdbcTemplate.execute("INSERT INTO t1 VALUES('NEVER-->haitao')");
-        seeTable();
-    }
+  @Transactional(propagation = Propagation.NEVER)
+  public void test1() {
+    jdbcTemplate.execute("INSERT INTO t1 VALUES('NEVER-->haitao')");
+    jdbcTemplate.execute("INSERT INTO t1 VALUES('NEVER-->haitao')");
+    jdbcTemplate.execute("INSERT INTO t1 VALUES('NEVER-->haitao')");
+    seeTable();
+  }
 
-    public void seeTable() {
-        System.out.println("表记录" + jdbcTemplate.queryForList("SELECT * FROM t1", String.class));
-    }
+  public void seeTable() {
+    System.out.println("表记录" + jdbcTemplate.queryForList("SELECT * FROM t1", String.class));
+  }
 
-    public static void main(String[] args) throws Exception {
-        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(EnableTransactionManagementTest6.class);
-        EnableTransactionManagementTest6 bean = context.getBean(EnableTransactionManagementTest6.class);
-        // bean.test_show_db();// 测试动态数据源
-        try {
-            //            bean.seeTable();
-            //            bean.test(Propagation.NESTED);
-            //                        bean.test(Propagation.REQUIRES_NEW);
-            //            bean.test(Propagation.REQUIRED);
-            //            bean.test(Propagation.NOT_SUPPORTED);
-            //            bean.test1();
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-        }
-        //        bean.seeTable();
+  public static void main(String[] args) throws Exception {
+    AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(EnableTransactionManagementTest6.class);
+    EnableTransactionManagementTest6 bean = context.getBean(EnableTransactionManagementTest6.class);
+    // bean.test_show_db();// 测试动态数据源
+    try {
+      //            bean.seeTable();
+      //            bean.test(Propagation.NESTED);
+      //                        bean.test(Propagation.REQUIRES_NEW);
+      //            bean.test(Propagation.REQUIRED);
+      //            bean.test(Propagation.NOT_SUPPORTED);
+      //            bean.test1();
+    } catch (Exception e) {
+      e.printStackTrace();
+    } finally {
     }
+    //        bean.seeTable();
+  }
+}
 ```
-
-
-
 #### `@TransactionalEventListener` 的使用
-
 ```java
 /**
  * @author haitao.chen
@@ -3279,7 +3454,6 @@ public class EnableTransactionManagementTest5 {
     }
 }
 ```
-
 ### 使用`@EnableTransactionManagement`会发生什么?
 
 > 就是注册解析`@Transactional` 注解的Advisor，而Advisor使用的Advice是`TransactionInterceptor`
@@ -3339,9 +3513,7 @@ public class EnableTransactionManagementTest5 {
 @Component
 public class A{}
 ```
-
 ### `TransactionAttributeSourcePointcut`
-
 ```java
 /**
  * TransactionAttributeSourcePointcut
@@ -3358,17 +3530,36 @@ public class A{}
 ```java
 /**
  * AnnotationTransactionAttributeSource
+ *  功能很简单，就是解析 @Transactional 注解，解析成 TransactionAttribute 对象。
+ *  而 TransactionAttributeSourcePointcut 的 {@link MethodMatcher#matches(Method, Class)} 是执行下面的方法，返回值不是null 就是匹配
  *
- * @Transactional 解析成 RuleBasedTransactionAttribute，就是将注解的属性值设置到对象中
- * {@link AnnotationTransactionAttributeSource#determineTransactionAttribute(AnnotatedElement)}
- *      {@link SpringTransactionAnnotationParser#parseTransactionAnnotation(AnnotatedElement)}
- *          {@link SpringTransactionAnnotationParser#parseTransactionAnnotation(AnnotationAttributes)}
+ * {@link AbstractFallbackTransactionAttributeSource#computeTransactionAttribute(Method, Class)}
+ *
+ *  1. 方法不是public
+ *      return null
+ *  2. 尝试从 方法上找，有@Transactional就解析注解值，然后返回
+ *      不为null，就return
+ *
+ *  3. 尝试从 方法声明类上找，有@Transactional就解析注解值，然后返回
+ *      不为null，就return
+ *
+ *  4. 尝试从 代理对象的方法上找，有@Transactional就解析注解值，然后返回
+ *      不为null，就return
+ *
+ *  5. 尝试从 代理对象找， 有@Transactional就解析注解值，然后返回
+ *      不为null，就return
+ *
+ *  注：
+ *      1. 也就是说@Transactional 得标注在public方法上才有用
+ *      2. 解析是遍历所有的 TransactionAnnotationParser ，解析的结果不为null就返回，也就是谁先解析到就用其解析结果
+ *          {@link TransactionAnnotationParser#parseTransactionAnnotation(AnnotatedElement)}
+ *      3. Spring默认会使用SpringTransactionAnnotationParser，会将 @Transactional 解析成 RuleBasedTransactionAttribute 对象
+ *          就是将注解的属性值设置到对象中
  * */
 ```
 ### `TransactionInterceptor#invoke`
 
 啥也没干，直接执行`TransactionAspectSupport#invokeWithinTransaction`
-
 ### `TransactionAspectSupport#invokeWithinTransaction`
 
 ```java
@@ -3510,7 +3701,28 @@ public class A{}
  *      return null
  * */
 ```
+### AbstractPlatformTransactionManager#isExistingTransaction
+```java
+/**
+ * 是存在事务(空事务不算存在事务)
+ * {@link AbstractPlatformTransactionManager#isExistingTransaction(Object)}
+ * {@link DataSourceTransactionManager#isExistingTransaction(Object)}
+ *      `return (txObject.hasConnectionHolder() && txObject.getConnectionHolder().isTransactionActive());`
+ *
+ * 在开始事务时会给事务对象创建连接，并将连接的 isTransactionActive 设置为true
+ * 只有在事务完成时，才会将事务的持有的 getConnectionHolder().isTransactionActive() 设置为false
+ *
+ * 空事务不算存在事务，因为空事务不会开启事务(不会给事务对象创建数据库连接)，也就不会将连接的 isTransactionActive 设置为true
+ *
+ * 在空事务下，使用{@link DataSourceUtils#doGetConnection(DataSource)}获取连接，也不会设置 isTransactionActive 为true，
+ * 只会设置 synchronizedWithTransaction 为true，表示是事务内的连接，然后将连接存到 {@link TransactionSynchronizationManager#resources}
+ * 再次执行 {@link DataSourceUtils#doGetConnection(DataSource)} 就能拿到连接，进行复用
+ *
+ * 所以可以通过 isTransactionActive=true 判断 是否存在事务
+ * */
+```
 ### `AbstractPlatformTransactionManager#handleExistingTransaction`
+
 ```java
 /**
  *
@@ -3621,7 +3833,51 @@ public class A{}
  *          啥都不干
  * */
 ```
+### newTransactionStatus与prepareSynchronization
+```java
+/**
+ * 存在事务 和 不存在事务 两个分支，返回的事务状态都会执行 newTransactionStatus、prepareSynchronization
+ *      1. `newTransactionStatus` 是对之前设置的 newTransaction 做兜底校验
+ *      2. `prepareSynchronization` 最终的 newTransaction 是true，那就设置事务信息到 TransactionSynchronizationManager 中
+ *
+ *
+ * new事务状态(很关键，会对newSynchronization值做兜底校验)
+ * {@link AbstractPlatformTransactionManager#newTransactionStatus(TransactionDefinition, Object, boolean, boolean, boolean, Object)}
+ *      1. newSynchronization 且 !isSynchronizationActive  就是 真的新同步
+ *       `boolean actualNewSynchronization = newSynchronization && !TransactionSynchronizationManager.isSynchronizationActive();`
+ *
+ *        Tips：
+ *          兜底的校验是不是真的 actualNewSynchronization ,这一步校验非常关键，因为 prepareSynchronization 处理，就是根据这个值，
+ *          判断是否要覆盖(设置) TransactionSynchronizationManager 中记录的线程的事务资源,如果搞错了就会把现有的事务同步信息给覆盖掉，
+ *          所以设置的参数 newSynchronization 不准，还需要保证 !isSynchronizationActive 才算是 actualNewSynchronization
+ *          而 !isSynchronizationActive == false 是当 事务完成了、事务暂停了或者根本就没有事务(空事务也算是事务，没有事务指的是都没有执行事务方法)
+ *
+ *        注：newSynchronization 就是前面说了 "留意这些值"
+ *
+ *      2. 真正的 new 事务状态对象
+ *          `new DefaultTransactionStatus(transaction, newTransaction, actualNewSynchronization,definition.isReadOnly(), debug, suspendedResources);`
+ *
+ *
+ * 准备同步(就是设置TransactionSynchronizationManager)
+ * {@link AbstractPlatformTransactionManager#prepareSynchronization(DefaultTransactionStatus, TransactionDefinition)}
+ *  事务状态是新同步，才需要设置 `if status.isNewSynchronization()`
+ *      1. 真的活动的事务。就是得有事务，且事务是新的才是true
+ *          `TransactionSynchronizationManager.setActualTransactionActive(status.hasTransaction());`
+ *           hasTransaction --> transaction != null && newTransaction
+ *           注：这两个都是前面说了 "留意这些值"
+ *
+ *      2. 记录事务隔离级别
+ *          `TransactionSynchronizationManager.setCurrentTransactionIsolationLevel()`
+ *      3. 是否只读
+ *          `TransactionSynchronizationManager.setCurrentTransactionReadOnly(definition.isReadOnly());`
+ *      4. 事务的name
+ *          `TransactionSynchronizationManager.setCurrentTransactionName(definition.getName());`
+ *      5. 同步属性初始化，会根据这个属性是否为null判断 是不是 isNewSynchronization
+ *          `TransactionSynchronizationManager.initSynchronization();`
+ * */
+```
 ### 扩展: AbstractRoutingDataSource
+
 ```java
 /**
  * 动态数据源原理 AbstractRoutingDataSource
@@ -3654,23 +3910,31 @@ public class A{}
  *      {@link DataSourceUtils#doGetConnection(DataSource)}
  *
  *  1. `TransactionSynchronizationManager.getResource(dataSource);` 使用 dataSource 为key，从 resources(事物资源)中获取资源
- *      如果资源存在，就return
+ *      存在连接 且 连接是事务的同步资源 就返回这个连接
+ *          事务的同步资源：指的是在事务内创建的连接，目的就是为了在一个事务内能重复使用。
+ *              1. 开始事务时，创建的连接就会设置这个属性为true
+ *                  {@link DataSourceTransactionManager#doBegin(Object, TransactionDefinition)}
+ *
+ *              2. 当前方法(doGetConnection)，创建了新的连接，线程开启了事务(空事务也算是事务)，会设置这个属性为true
+ *                  {@link DataSourceUtils#doGetConnection(DataSource)}
  *
  *  2. `Connection con = dataSource.getConnection();` 获取连接
  *      注：如果是AbstractRoutingDataSource,就会先推断出数据源在获取连接
  *
  *  3. if TransactionSynchronizationManager.isSynchronizationActive() 如果线程存在事务
- *      3.1 `TransactionSynchronizationManager.registerSynchronization(new ConnectionSynchronization(holderToUse, dataSource));`
+ *
+ *      3.1 设置属性，标记是事务的同步资源 `holderToUse.setSynchronizedWithTransaction(true);`
+ *
+ *      3.2 `TransactionSynchronizationManager.registerSynchronization(new ConnectionSynchronization(holderToUse, dataSource));`
  *          注册到属性中 {@link TransactionSynchronizationManager#synchronizations}。存到这个属性的好处，在事务完成时(rollback、commit)会回调接口，释放连接
  *
- *      3.2 `TransactionSynchronizationManager.bindResource(dataSource, holderToUse);`
+ *      3.3 `TransactionSynchronizationManager.bindResource(dataSource, holderToUse);`
  *          是新的连接就注册到 事物资源中，所以第二次获取连接就会返回resources中缓存的值
  *
  *      Tips：什么叫如果线程存在事务？可以这么理解，只要Java虚拟机栈中存在@Transactional的方法，这个判断就是true(空事务也算)
  * */
 ```
-### 扩展：TransactionSynchronizationManager
-
+### 扩展: TransactionSynchronizationManager
 ```java
 public abstract class TransactionSynchronizationManager {
 
@@ -3740,7 +4004,253 @@ public abstract class TransactionSynchronizationManager {
             new NamedThreadLocal<>("Current transaction isolation level");
 }  
 ```
+### 扩展: ResourceHolderSupport&ConnectionHolder
+
+```java
+public abstract class ResourceHolderSupport implements ResourceHolder {
+
+	/**
+	 * 事务的同步资源，在事务内获取的资源，这个属性就是true。
+	 *
+	 * 将 synchronizedWithTransaction 设置为true 的情况
+	 * 	1. 开启事务创建的连接 {@link org.springframework.jdbc.datasource.DataSourceTransactionManager#doBegin(Object, TransactionDefinition)}
+	 * 	2. 执行 {@link org.springframework.jdbc.datasource.DataSourceUtils#doGetConnection(DataSource)} 获取连接
+	 * 		(空事务下 和 事务下使用与事务管理器配置的数据源不一致的数据源获取的连接)
+	 *
+	 *
+	 * 	只有在事务完成时，才会将该属性设置为false。
+	 *	{@link {@link DataSourceTransactionManager#doCleanupAfterCompletion(Object)}}
+	 *
+	 * 而在事务暂停时，其实并没有修改为false，因为没必要，因为事务暂停是直接将 DataSourceTransactionObject的ResourceHolderSupport类型的属性移除了
+	 * ，并存到SuspendedResourcesHolder对象中，
+	 * 所以根本就没必要，因为从ThreadLocal中读不到了，并不会影响新事物的执行
+	 *	{@link AbstractPlatformTransactionManager#suspend(Object)}
+	 */
+}  
+```
+
+```java
+public class ConnectionHolder extends ResourceHolderSupport {
+    /**
+     * 激活的事务。就是当前事务对象用的连接
+     *
+     * 该属性是true说明已存在事务 {@link DataSourceTransactionManager#isExistingTransaction(Object)}
+     *
+     * 开启事务，其实就是给 DataSourceTransactionObject 设置ResourceHolderSupport类型的属性，
+     * 此时会将 transactionActive 和 synchronizedWithTransaction(父类的属性) 设置为true，只有在事务完成时，才会将该属性设置为false。
+     *    {@link org.springframework.jdbc.datasource.DataSourceTransactionManager#doBegin(Object, TransactionDefinition)}
+     *    {@link DataSourceTransactionManager#doCleanupAfterCompletion(Object)}
+     *
+     * 而在事务暂停时，其实并没有修改为false，因为没必要，因为事务暂停是直接将 DataSourceTransactionObject的ResourceHolderSupport类型的属性移除了，
+     * 并存到SuspendedResourcesHolder对象中，所以根本就没必要，因为从ThreadLocal中读不到了，并不会影响新事物的执行
+     *    {@link AbstractPlatformTransactionManager#suspend(Object)}
+     *
+     * 和其父类属性{@link ResourceHolderSupport#synchronizedWithTransaction}很像
+     * 区别：是事务对象的连接 transactionActive 是true，是事务内创建的连接 synchronizedWithTransaction 是true，
+     *      而事务对象的连接肯定是事务内创建的连接，事务内创建的连接 不一定是事务对象的连接。
+     *      比如你在事务方法内(空事务也算) 使用 {@link DataSourceUtils#doGetConnection(DataSource)}获取连接，使用的数据源和事务管理器的数据源不一致，
+     *      那就会创建出新的连接，这个连接 这称为事务内创建的连接 只会将连接的 synchronizedWithTransaction 设置为true，
+     *
+     *      Tips：
+     *      1. 事务对象的连接 至多只有一个，空事务没有
+     *      2. 事务内创建的连接 有多个
+     */
+    private boolean transactionActive = false;
+}
+```
+### 扩展: TransactionInfo
+
+```java
+protected static final class TransactionInfo {
+        /**
+         * 事务管理器
+         */
+        @Nullable
+        private final PlatformTransactionManager transactionManager;
+
+        /**
+         * 事务属性。比如@Transactional注解的值就封装在里面
+         */
+        @Nullable
+        private final TransactionAttribute transactionAttribute;
+
+        /**
+         * 完全限定的方法名（就是会方法的唯一标识字符串）
+         */
+        private final String joinpointIdentification;
+
+				/**
+         * 事务状态：比如事务对象、资源(ConnectionHolder)、suspendedResources(被暂停事务的信息)
+         * 这个是最重要的东西，事务管理器开启事务其实就是创建这个对象
+         * {@link PlatformTransactionManager#getTransaction(TransactionDefinition)}
+         * {@link DefaultTransactionStatus}
+         */
+        @Nullable
+        private TransactionStatus transactionStatus;
+
+        /**
+         * 老的事务信息
+         */
+        @Nullable
+        private TransactionInfo oldTransactionInfo;
+}
+```
+### 扩展: DefaultTransactionStatus
+
+```java
+public class DefaultTransactionStatus extends AbstractTransactionStatus {
+
+    /**
+     * 事务对象，若是空事务该属性就是null
+     */
+    @Nullable
+    private final Object transaction;
+
+    /**
+     * 新事务。事务是新开启的(非事务也算)，这个属性就是true。
+     *
+     * 用处：在事务完成时，会判断 transaction != null && newTransaction 就做处理(从事务资源中移除、释放连接等操作)
+     *      {@link AbstractPlatformTransactionManager#cleanupAfterCompletion(DefaultTransactionStatus)}
+     *
+     * 举例事务嵌套：
+     *  - require->require 第一个是true，第二个是false
+     *  - require->nested 第一个是true，第二个是false
+     *  - require->require_new  第一个、第二个都是true
+     *  - require->not_supported  第一个是true，第二个是false
+     *  - not_supported->not_supported  第一个、第二个都是true(因为not_supported不算存在事务，所以再次执行也是按照新事物算)
+     *
+     */
+    private final boolean newTransaction;
+
+    /**
+     * 新同步。
+     * 是true，那么在事务开启时会将事务的信息设置到 TransactionSynchronizationManager 中
+     *  {@link AbstractPlatformTransactionManager#prepareSynchronization}
+     *
+     * 单事务：该属性就是true，
+     * 嵌套事务：父事务肯定是true，而子事务，只有子事务和父事务不一样才是新的
+     *
+     * 举例事务嵌套：
+     *  - require->require 第一个是true，第二个是false
+     *  - require->nested 第一个是true，第二个是false
+     *  - require->require_new  第一个、第二个都是true
+     *  - require->not_supported  第一个、第二个都是true
+     */
+    private final boolean newSynchronization;
+
+    private final boolean readOnly;
+
+    private final boolean debug;
+
+    /**
+     * 暂停的资源(上一个事务的连接和TransactionSynchronization等)
+     *    {@link AbstractPlatformTransactionManager.SuspendedResourcesHolder}
+     */
+    @Nullable
+    private final Object suspendedResources;
+}
+```
+### 扩展: DefaultTransactionStatus的赋值过程
+
+[最终都会执行newTransactionStatus与prepareSynchronization](#newTransactionStatus与prepareSynchronization)
+
+```java
+/**
+ * 使用事务管理器获取一个事务，主要分成存在事务和不存在事务的两个分支
+ * {@link AbstractPlatformTransactionManager#getTransaction(TransactionDefinition)}
+ *
+ * 存在事务的分支
+ * {@link AbstractPlatformTransactionManager#handleExistingTransaction(TransactionDefinition, Object, boolean)}
+ *      PROPAGATION_NOT_SUPPORTED
+ *          1. 暂停事务 `Object suspendedResources = suspend(transaction);`
+ *          2. 返回事务状态 `return prepareTransactionStatus(definition, null, false, newSynchronization, debugEnabled, suspendedResources);`
+ *          留意这些值：
+ *              transaction=null
+ *              newTransaction=false
+ *              newSynchronization=(getTransactionSynchronization() == SYNCHRONIZATION_ALWAYS);
+ *                  // getTransactionSynchronization() 是事务管理器的属性，默认是SYNCHRONIZATION_ALWAYS，也就是true
+ *
+ *      PROPAGATION_REQUIRES_NEW
+ *          1. 暂停事务 `Object suspendedResources = suspend(transaction);`
+ *          2. 返回事务状态 `return startTransaction(definition, transaction, debugEnabled, suspendedResources);`
+ *          注：走的是开启事务的路线 startTransaction
+ *
+ *      PROPAGATION_NESTED
+ *          事务管理器配置的 是 使用保存点来实现嵌套事务
+ *              1. 准备事务状态 `DefaultTransactionStatus status = prepareTransactionStatus(definition, transaction, false, false, debugEnabled, null);`
+ *              2. 设置保存点 `status.createAndHoldSavepoint();`
+ *              留意这些值：
+ *                  transaction=transaction
+ *                  newTransaction=false
+ *                  newSynchronization=false
+ *
+ *          事务管理器配置的 不是 使用保存点来实现嵌套事务
+ *              1. 返回事务状态 `return startTransaction(definition, transaction, debugEnabled, null);`
+ *              注：走的是开启事务的路线 startTransaction
+ *
+ *      PROPAGATION_SUPPORTS or PROPAGATION_REQUIRED
+ *          1. 返回事务状态 `return prepareTransactionStatus(definition, transaction, false, newSynchronization, debugEnabled, null);`
+ *          留意这些值：
+ *              transaction=transaction
+ *              newTransaction=false
+ *              newSynchronization=(getTransactionSynchronization() != SYNCHRONIZATION_NEVER);
+ *                  // getTransactionSynchronization() 是事务管理器的属性，默认是SYNCHRONIZATION_ALWAYS，也就是true
+ *
+ *      Tips：可以发现嵌套事务的执行，并不会暂停当前事务，不暂停也就是不会从 TransactionSynchronizationManager 移除当前线程的事务资源。
+ *
+ *
+ * 不存在事务的分支
+ *      if PROPAGATION_REQUIRED | PROPAGATION_REQUIRES_NEW | PROPAGATION_NESTED
+ *          1. 暂停事务 `Object suspendedResources = suspend(null);`
+ *          2. 返回事务状态 `return startTransaction(definition, transaction, debugEnabled, suspendedResources);`
+ *          注：走的是开启事务的路线 startTransaction
+ *
+ *          transaction=transaction
+ *          newTransaction=true
+ *          newSynchronization=(getTransactionSynchronization() != SYNCHRONIZATION_NEVER);
+ *              // getTransactionSynchronization() 是事务管理器的属性，默认是SYNCHRONIZATION_ALWAYS，也就是true
+ *          DefaultTransactionStatus status = newTransactionStatus(
+ *                 definition, transaction, true, newSynchronization, debugEnabled, suspendedResources);
+ *
+ *      else 就说明，设置的是空事务的事务传播行为
+ *          1. 返回事务状态 `return prepareTransactionStatus(def, null, true, newSynchronization, debugEnabled, null);`
+ *          留意这些值：
+ *              transaction=null
+ *              newTransaction=true
+ *              newSynchronization=(getTransactionSynchronization() == SYNCHRONIZATION_ALWAYS);
+ *                  // getTransactionSynchronization() 是事务管理器的属性，默认是SYNCHRONIZATION_ALWAYS，也就是true
+ *
+ *
+ * 开启事务做了啥？
+ * {@link AbstractPlatformTransactionManager#startTransaction(TransactionDefinition, Object, boolean, AbstractPlatformTransactionManager.SuspendedResourcesHolder)}
+ *      1. new事务状态 `DefaultTransactionStatus status = newTransactionStatus(definition, transaction, true, newSynchronization, debugEnabled, suspendedResources);`
+ *          留意这些值：
+ *              transaction=transaction
+ *              newTransaction=true
+ *              newSynchronization=(getTransactionSynchronization() != SYNCHRONIZATION_NEVER);
+ *                  // getTransactionSynchronization() 是事务管理器的属性，默认是SYNCHRONIZATION_ALWAYS，也就是true
+ *      2. 开始 `doBegin(transaction, definition);`
+ *          就是通过数据源获取连接，将超时时间、隔离级别、非自动提交设置给连接，将连接存到 resouces 中
+ *
+ *      3. 准备同步信息 `prepareSynchronization(status, definition);`
+ *      4. 返回事务状态 `return status;`
+ *
+ * 准备事务状态是做了啥？
+ * {@link AbstractPlatformTransactionManager#prepareTransactionStatus(TransactionDefinition, Object, boolean, boolean, boolean, Object)}
+ *     1. new事务状态  `new事务状态 `DefaultTransactionStatus status = newTransactionStatus(definition, transaction, true, newSynchronization, debugEnabled, suspendedResources);``
+ *     2. 准备同步信息 `prepareSynchronization(status, definition);`
+ *     3. 返回事务状态 `return status;`
+ *
+ *
+ * 所以说，存在事务 和 不存在事务 两个分支，返回的事务状态都会执行 newTransactionStatus、prepareSynchronization
+ *      1. `newTransactionStatus` 是对之前设置的 newTransaction 做兜底校验
+ *      2. `prepareSynchronization` 最终的 newTransaction 是true，那就设置事务信息到 TransactionSynchronizationManager 中
+ * */
+```
 ## @EnableScheduling
+
+> [文档](https://docs.spring.io/spring-framework/docs/current/reference/html/integration.html#scheduling-enable-annotation-support)
+>
 > ### 使用Spring的定时任务
 >
 > 1. `@EnableScheduling` 启用任务调度，其实就是注册一个BeanPostProcessor
@@ -3785,12 +4295,9 @@ public abstract class TransactionSynchronizationManager {
 >     - FixedRateTask：固定周期执行任务
 >
 >     **注：延时任务的特点是任务的耗时+延时时间等于下次任务的执行时间，而周期任务是到了就执行**
-![EnableScheduling类图](.README_imgs/EnableScheduling类图.png)
-
+> ![EnableScheduling类图](.README_imgs/EnableScheduling类图.png)
 ### 示例代码
-
 #### JDK提供的定时任务API
-
 ```java
 /**
  * @author haitao.chen
@@ -3850,7 +4357,6 @@ public class TestJDKSchedulerAPI {
     }
 }
 ```
-
 #### 计算cron表达式下次执行时间
 
 ```java
@@ -3868,7 +4374,6 @@ public class TestSpringCronAPI {
     }
 }
 ```
-
 #### 配置任务调度器
 
 ```java
@@ -3932,7 +4437,6 @@ public class SchedulerConfig {
 
 }
 ```
-
 #### `@Scheduled`的使用方式
 
 ```java
@@ -3970,7 +4474,6 @@ public class TestSpringScheduler2 {
     }
 }
 ```
-
 #### 销毁`@Scheduled`注册的定时任务
 
 ```java
@@ -4003,7 +4506,6 @@ public class TestSpringScheduler3 {
     }
 }
 ```
-
 #### 动态注册、销毁定时任务
 
 ```java
@@ -4237,6 +4739,627 @@ public class TestSpringScheduler4 implements SchedulingConfigurer {
  * */
 ```
 ## @EnableCaching
+> 官方文档：https://docs.spring.io/spring-framework/docs/current/reference/html/integration.html#cache
+>
+> [SpEL的简单使用](#SpEL)
+### 类图
+
+![EnableCaching类图](.README_imgs/EnableCaching类图.png)
+
+### 示例代码
+
+#### SpringCacheConfig
+
+```java
+/**
+ * @author haitao.chen
+ * email haitaoss@aliyun.com
+ * date 2022-11-07 20:17
+ *
+ */
+@EnableCaching
+public class SpringCacheConfig {
+    //    @Bean
+    public CachingConfigurer cachingConfigurer() {
+        return new CachingConfigurerSupport() {
+            @Override
+            public CacheManager cacheManager() {
+                return concurrentMapCacheManager();
+            }
+        };
+    }
+
+    //    @Bean
+    public CacheManager concurrentMapCacheManager() {
+        ConcurrentMapCacheManager cacheManager = new ConcurrentMapCacheManager();
+        return cacheManager;
+    }
+
+    @Bean
+    public CacheManager caffeineCacheManager() {
+        CaffeineCacheManager caffeineCacheManager = new CaffeineCacheManager();
+        return caffeineCacheManager;
+    }
+}
+```
+
+#### 简单使用
+
+```java
+@CacheConfig(cacheNames = "emp")
+@Import(SpringCacheConfig.class)
+public class EnableCachingTest {
+    @Data
+    public static class Emp {
+        static int count;
+        private String eId;
+        private String eName;
+
+        public void setEName(String eName) {
+            this.eName = eName + count++;
+        }
+    }
+
+   /* @Caching(cacheable = {@Cacheable(cacheNames = {"a", "b"}),
+            @Cacheable(condition = "#root.methodName.startsWith('x')"),},
+            evict = {@CacheEvict(beforeInvocation = true, allEntries = true,condition = "@enableCachingTest != null ")},
+            put = {@CachePut})*/
+    @CacheEvict(beforeInvocation = true, allEntries = true,condition = "@enableCachingTest != null ")
+    public void test() {
+        System.out.println("hello spring cache");
+    }
+
+    @Caching(put = {
+            @CachePut(key = "#emp.EId", unless = "#result == null"),
+            @CachePut(cacheNames = "emp", key = "#emp.EName", unless = "#result == null")
+    })
+    public Emp edit(Emp emp) {
+        System.out.println("cache option ---> 更新缓存的值");
+        return emp;
+    }
+
+    @CacheEvict(cacheNames = "emp", key = "#eId")
+    public void delete(String eId) {
+        System.out.println("cache option ---> 清空缓存");
+    }
+
+    @Cacheable(cacheNames = "emp", key = "#eId")
+    public Emp get(String eId) {
+        System.out.println("cache option ---> 查询数据库");
+        Emp emp = new Emp();
+        emp.setEId(eId);
+        emp.setEName("haitao");
+        return emp;
+    }
+
+    @Cacheable(cacheNames = "emp", key = "#eName")
+    public Emp getEName(String eName) {
+        return new Emp();
+    }
+
+    public static void main(String[] args) {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(EnableCachingTest.class);
+        EnableCachingTest bean = context.getBean(EnableCachingTest.class);
+        System.out.println("---->查询<----");
+        System.out.println(bean.get("1"));
+        System.out.println(bean.get("1"));
+
+        Emp emp = new Emp();
+        emp.setEId("1");
+        emp.setEName("haitao");
+        bean.edit(emp);
+
+        System.out.println("---->查询<----");
+        System.out.println(bean.get("1"));
+        System.out.println(bean.get("1"));
+
+        bean.delete("1");
+
+        System.out.println("---->查询<----");
+        System.out.println(bean.get("1"));
+        System.out.println(bean.get("1"));
+
+        System.out.println("======");
+        bean.test();
+    }
+
+}
+```
+
+### 使用`@EnableCaching`会发生什么?
+```java
+/**
+ * Tips：@EnableCaching 和 @EnableTransactionManagement 可以说是一模一样
+ *
+ * 使用`@EnableCaching` 会导入`@Import(CachingConfigurationSelector.class)`
+ *
+ * 解析配置类在解析@Import的时候，因为 {@link CachingConfigurationSelector} 的父类 AdviceModeImportSelector 实现了 {@link ImportSelector}
+ *     所以会回调这个方法 {@link AdviceModeImportSelector#selectImports(AnnotationMetadata)}
+ *      - 拿到注解 `@EnableCaching(mode = AdviceMode.PROXY)` 的mode属性值，回调子类方法 {@link CachingConfigurationSelector#selectImports(AdviceMode)}
+ *
+ *
+ * 执行 {@link CachingConfigurationSelector#selectImports(AdviceMode)}
+ *      该方法固定返回这两个类 AutoProxyRegistrar、ProxyCachingConfiguration, 也就是会将其添加到 BeanDefinitionMap中。
+ *      如果类路径中存在JavaCache相关的API还会返回 ProxyJCacheConfiguration，这里就不细说了。
+ *          <dependency>
+ *              <groupId>javax.cache</groupId>
+ *              <artifactId>cache-api</artifactId>
+ *              <version>0.3</version>
+ *          </dependency>
+ *
+ * AutoProxyRegistrar {@link AutoProxyRegistrar}
+ *      继承 ImportBeanDefinitionRegistrar，所以解析@Import时会回调 {@link AutoProxyRegistrar#registerBeanDefinitions(AnnotationMetadata, BeanDefinitionRegistry)}
+ *      该方法会执行 {@link AopConfigUtils#registerAutoProxyCreatorIfNecessary(BeanDefinitionRegistry)} 也就是会注册
+ *      `InfrastructureAdvisorAutoProxyCreator` 到容器中。而这个类主要是拿到容器中 Advisor 类型的bean，且 Role 是 {@link BeanDefinition#ROLE_INFRASTRUCTURE} 才作为 Advisor，
+ *      然后遍历Advisor 判断处理的bean是否符合条件，符合就创建代理对象。
+ *      总结：就是注册InfrastructureAdvisorAutoProxyCreator,这个东西是BeanPostProcessor 在实例化前、提前AOP、初始后 会判断bean，是否要进行代理
+ *
+ * ProxyCachingConfiguration {@link ProxyCachingConfiguration}
+ *      继承 AbstractCachingConfiguration
+ *          1. 会依赖注入 {@link CachingConfigurer}，这个是用来配置缓存相关组件的：CacheManager、CacheResolver、KeyGenerator、CacheErrorHandler
+ *          2. 会通过@Bean注册 {@link TransactionalEventListenerFactory}，用于处理 @TransactionalEventListener 标注的方法，将方法构造成事件监听器，注册到事件广播器中
+ *
+ *      ProxyCachingConfiguration 通过@Bean 注册 Advisor、Advisor的Advice 和 AnnotationCacheOperationSource
+ *          Advisor {@link BeanFactoryCacheOperationSourceAdvisor}
+ *              实现 PointcutAdvisor 接口，所以是否要进行代理得看 {@link PointcutAdvisor#getPointcut()}，其Pointcut 是 CacheOperationSourcePointcut
+ *
+ *          Advice {@link CacheInterceptor}
+ *              缓存增强逻辑，就是靠这个实现的
+ *
+ *          AnnotationCacheOperationSource  {@link AnnotationCacheOperationSource}
+ *              Advisor和Advice都依赖这个bean，用来查找、解析@Cacheable、@CacheEvict、@CachePut、@Caching。方法上找、类上找
+ **/
+```
+### CacheOperationSourcePointcut
+```java
+/**
+ * CacheOperationSourcePointcut
+ *
+ * 类匹配和方法匹配是使用 AnnotationCacheOperationSource 来解析注解的
+ *      - ClassFilter {@link CacheOperationSourcePointcut.CacheOperationSourceClassFilter}
+ *          是 CacheManager 就是false，表示不匹配
+ *          类不是java包下的 不是 Ordered类 就是匹配
+ *
+ *      - MethodMatcher {@link CacheOperationSourcePointcut#matches(Method, Class)}
+ *          查找 被代理方法->被代理类->代理方法->代理类 有 @Cacheable | @CacheEvict | @CachePut | @Caching 就是匹配，会将注解解析成 CacheOperation 对象
+ *          注：
+ *              - 如果方法不是public的直接就是不匹配
+ *              - 注解是可以重复标注的，所以解析的结果是 List<CacheOperation>
+ *              - @Caching 的解析是拿到其三个属性值 按照 @Caching、@Cacheable、@CacheEvict、@CachePut 挨个解析
+ *              - 查找注解的优先级：
+ *                  - 方法：方法有匹配的注解、方法的接口方法有匹配的注解、父类方法有匹配的注解 已最小维度为准，返回的是方法上匹配的注解
+ *                  - 类：类有匹配的注解、类的父类有匹配的注解、类的接口有匹配的注解 已最小维度为准，返回的是类上匹配的注解
+ * */
+```
+### AnnotationCacheOperationSource
+```java
+/**
+ * AnnotationCacheOperationSource
+ *  功能很简单，就是解析 @Cacheable、@CacheEvict、@CachePut、@Caching 注解成 CacheOperation 对象,设置 CacheOperation 对象属性时，会获取类上的 @CacheConfig 的值
+ *  设置给 CacheOperation 作为默认值
+ *
+ *  用处： CacheOperationSourcePointcut 的 {@link CacheOperationSourcePointcut#matches(Method, Class)} 是执行下面的方法，返回值 !CollectionUtils.isEmpty 就是匹配
+ *
+ * 执行父类的方法
+ * {@link AbstractFallbackCacheOperationSource#getCacheOperations(Method, Class)}
+ * {@link AbstractFallbackCacheOperationSource#computeCacheOperations(Method, Class)}
+ *
+ *  1. 方法不是public
+ *      return null
+ *
+ *  2. 执行 findCacheOperations(方法)
+ *      不为null，就return
+ *
+ *  3. 执行 findCacheOperations(方法声明类)
+ *      不为null，就return
+ *
+ *  4. 执行 findCacheOperations(代理对象的方法)
+ *      不为null，就return
+ *
+ *  5. 执行 findCacheOperations(代理对象)
+ *      不为null，就return
+ *
+ * findCacheOperations 最终会执行这个
+ * {@link AnnotationCacheOperationSource#determineCacheOperations(AnnotationCacheOperationSource.CacheOperationProvider)}
+ *  1. 初始化变量 `Collection<CacheOperation> ops = null;`
+ *
+ *  1. 遍历 CacheAnnotationParser 进行解析，默认就只有 SpringCacheAnnotationParser
+ *      {@link SpringCacheAnnotationParser#parseCacheAnnotations(Method)}
+ *      {@link SpringCacheAnnotationParser#parseCacheAnnotations(Class)}
+ *
+ *  2. 解析结果不为null
+ *          汇总每个 CacheAnnotationParser 的解析结果 Collection<CacheOperation>
+ *      ops = new ArrayList<>();
+ *      ops.addAll(解析结果); // 因为一个方法上是可以写多个 @Cacheable、@CacheEvict、@CachePut、@Caching,所以每个parser解析结构是集合
+ *
+ *  3. 返回 ops
+ *
+ *
+ * 解析Cache注解
+ * {@link SpringCacheAnnotationParser#parseCacheAnnotations(SpringCacheAnnotationParser.DefaultCacheConfig, AnnotatedElement, boolean)}
+ *  逻辑很简单，从方法或者类上 找 @Cacheable、@CacheEvict、@CachePut、@Caching 每个都会解析成 CacheOperation 对象，
+ *      比如：
+ *           - 方法：方法有匹配的注解、方法的接口方法有匹配的注解、父类方法有匹配的注解 已最小维度为准，返回的是方法上匹配的注解
+ *           - 类：类有匹配的注解、类的父类有匹配的注解、类的接口有匹配的注解 已最小维度为准，返回的是类上匹配的注解
+ *
+ *  1. 查找 @Cacheable、@CacheEvict、@CachePut、@Caching 存到 `Collection<? extends Annotation> anns`
+ *
+ *  2. `anns.isEmpty()`
+ *      return null
+ *
+ *  3. 分成四种 @Cacheable、@CacheEvict、@CachePut、@Caching 分批处理
+ *      @Cacheable      ---> CacheableOperation
+ *      @CacheEvict     ---> CacheEvictOperation
+ *      @CachePut       ---> CachePutOperation
+ *      @Caching        这个是拿到三个属性值，分别遍历三个属性值，和上面的解析是一样的。
+ *
+ *      注：解析就是将注解的属性值设置到 CacheOperation 对象中，在映射属性值完成后，都会执行 `applyDefault` 应用默认属性
+ *
+ * 应用默认属性
+ * {@link SpringCacheAnnotationParser.DefaultCacheConfig#applyDefault(CacheOperation.Builder)}
+ *  1. 拿到类上的 @CacheConfig 注解，获取其属性值
+ *
+ *  2. CacheOperation 没有设置 cacheNames，而 @CacheConfig 有 cacheNames
+ *      将 @CacheConfig 的 cacheNames 设置给 CacheOperation对象
+ *
+ *  3. CacheOperation 没有设置 key和keyGenerator，而 @CacheConfig 有 keyGenerator
+ *      将 @CacheConfig 的 keyGenerator 设置给 CacheOperation对象
+ *
+ *  4. CacheOperation 没有设置 cacheResolver，而 @CacheConfig 有 cacheResolver
+ *     将 @CacheConfig 的 cacheResolver 设置给 CacheOperation对象
+ *
+ *  5. CacheOperation 没有设置 cacheManager，而 @CacheConfig 有 cacheManager
+ *     将 @CacheConfig 的 cacheManager 设置给 CacheOperation对象
+ * */
+```
+### CacheInterceptor#invoke
+```java
+/**
+ * 拦截器方法的执行
+ * {@link CacheInterceptor#invoke(MethodInvocation)}
+ * {@link CacheAspectSupport#execute(CacheOperationInvoker, Object, Method, Object[])}
+ *
+ *      1. 使用 AnnotationCacheOperationSource 拿到 方法、类中缓存注解的解析结果
+ *          `Collection<CacheOperation> operations = cacheOperationSource.getCacheOperations(method, targetClass);`
+ *          {@link AbstractFallbackCacheOperationSource#getCacheOperations(Method, Class)}
+ *
+ *      2. operations 是空
+ *          `return invocation.proceed();` 直接放行方法
+ *
+ *      3. operations 不是空
+ *
+ *      4. 将 operations、方法、方法参数、执行方法的对象和执行方法的类型 装饰成 CacheOperationContexts 对象
+ *          `CacheOperationContexts cocs = new CacheOperationContexts(operations, method, args, target, targetClass)`
+ *          {@link CacheAspectSupport.CacheOperationContexts}
+ *
+ *      5. 执行方法
+ *          `return execute(invoker, method,cocs);`
+ *          {@link CacheAspectSupport#execute(CacheOperationInvoker, Method, CacheAspectSupport.CacheOperationContexts)}
+ * */
+```
+### CacheOperationContexts
+```java
+/**
+ * List<CacheOperation> 装饰成 CacheOperationContexts
+ * {@link CacheAspectSupport.CacheOperationContexts}
+ *  这个类就两个属性：
+ *      - private final MultiValueMap<Class<? extends CacheOperation>, CacheOperationContext> contexts;
+ *      - private final boolean sync;
+ *
+ *  1. 遍历 operations，将 CacheOperation 转成 CacheOperationContext，存到 contexts 中
+ *      `this.contexts.add(op.getClass(), getOperationContext(op, method, args, target, targetClass));`
+ *      {@link CacheAspectSupport#getOperationContext(CacheOperation, Method, Object[], Object, Class)}
+ *
+ *  2. 推断是否同步，设置给 sync 属性
+ *  `this.sync = determineSyncFlag(method);`
+ *  {@link CacheAspectSupport.CacheOperationContexts#determineSyncFlag(Method)}
+ *      是对 @Cacheable(sync=true) 的重重校验：
+ *      1. 没有 @Cacheable(sync=true) 就 `return false`
+ *      2. 有`sync=true`的情况
+ *          2.1 只允许写一个缓存注解
+ * 	        2.2 cacheNames 属性，只能写一个name
+ * 	        2.3 unless 属性，不能设置
+ * 	        注：不满足这三点就直接报错 `throw new IllegalStateException`
+ * */
+```
+### CacheOperationContext
+```java
+/**
+ * CacheOperation 装饰成 CacheOperationContext
+ * {@link CacheAspectSupport#getOperationContext(CacheOperation, Method, Object[], Object, Class)}
+ *
+ *  1. 将 CacheOperation 装饰成 CacheOperationMetadata 对象。
+ *      `CacheOperationMetadata metadata = getCacheOperationMetadata(operation, method, targetClass);`
+ *          1. 获取 KeyGenerator 实例
+ *              获取的优先级：
+ *                  - 缓存注解设置了 keyGenerator 属性，就根据属性名 getBean()
+ *                  - 通过 CachingConfigurer 类型的bean设置的
+ *                      {@link CachingConfigurer#keyGenerator()}
+ *                  - new SimpleKeyGenerator()
+ *
+ *          2. 获取 CacheResolver 实例
+ *              获取的优先级：
+ *                  - 缓存注解设置了 cacheResolver 属性，就根据属性名 getBean()
+ *                  - 缓存注解设置了 cacheManager 属性，就根据属性名 getBean(),然后装饰成 `new SimpleCacheResolver(cacheManager)`
+ *                  - 通过 CachingConfigurer 类型的bean设置的，如果设置了 cacheResolver 就返回，没有就判断有cacheManager，就装饰成SimpleCacheResolver返回
+ *                      {@link CachingConfigurer#cacheResolver()}
+ *                      {@link CachingConfigurer#cacheManager()}
+ *                      Tips：也就是说CachingConfigurer必须得设置 CacheResolver或者CacheManager 其中一个，否则这里拿不到
+ *
+ *          3. CacheResolver 非空校验，为null就报错
+ *
+ *          4. 设置给 CacheOperationMetadata 对象
+ *
+ *          5. 缓存起来，key是 method+targetClass+CacheOperation 生成的
+ *              `this.metadataCache.put(cacheKey, metadata);`
+ *
+ *          注：CacheOperationMetadata 的关键属性：KeyGenerator、CacheResolver、CacheOperation、method、targetClass，
+ *              而CacheResolver里面组合了CacheManager，是用来获取Cache实例的
+ *
+ *  2. 装饰成 CacheOperationContext `return new CacheOperationContext(metadata, args, target);`
+ *      2.1 提取参数 `this.args = extractArgs(metadata.method, args);`
+ *          {@link CacheAspectSupport.CacheOperationContext#extractArgs(Method, Object[])}
+ *          目的是处理方法的最后一个参数是可变参数的情况。若是可变参数，就拿到最后一个参数，将其铺平，和其它参数放在一块
+ *
+ *      2.2 获取 Caches `this.caches = CacheAspectSupport.this.getCaches(this, metadata.cacheResolver);`
+ *          {@link CacheAspectSupport#getCaches(CacheOperationInvocationContext, CacheResolver)}
+ *           1. 使用 CacheResolver 解析得到Cache `Collection<? extends Cache> caches = cacheResolver.resolveCaches(context);`
+ *               {@link CacheResolver#resolveCaches(CacheOperationInvocationContext)}
+ *               以 SimpleCacheResolver 为例 {@link AbstractCacheResolver#resolveCaches(CacheOperationInvocationContext)}
+ *                   - 拿到注解中的name，比如：@Cacheable(cacheNames = {"a", "b"})
+ *                   - 属性是空 `return Collections.emptyList();`
+ *                   - 遍历 cacheNames，使用 CacheManager获取Cache实例，返回的实例是null就报错
+ *                       {@link CacheManager#getCache(String)}
+ *                       注：常用的CacheManager都支持，没有预设Cache就在getCache的时候创建，所以我们不提前在CacheManager中预设cacheName的键值对也没事
+ *                       ConcurrentMapCacheManager、CaffeineCacheManager 都支持
+ *                   - 返回所有Cache实例
+ *
+ *           2. caches.isEmpty() 就报错，也就是说，我们的缓存注解必须设置 cacheNames 属性
+ *
+ *           3. 返回 caches
+ *
+ *      2.3 记录在 CacheOperationContext 的属性中
+ *          this.metadata
+ *          this.args
+ *          this.target
+ *          this.caches
+ *          this.cacheNames
+ *
+ * Tips：在判断是否 是否需要缓存、更新缓存、情况缓存 就是通过 CacheOperationContext 拿到所有需要的信息
+ * */
+```
+### CacheAspectSupport#execute
+```java
+/**
+ * 执行，这就是三个缓存注解生效的地方了，都是在这里判断的
+ * {@link CacheAspectSupport#execute(CacheOperationInvoker, Method, CacheAspectSupport.CacheOperationContexts)}
+ *
+ *  1. 是同步的 `CacheOperationContexts.isSynchronized`
+ *
+ *      1.1 同步的方法上只允许有一个缓存注解，所以拿第一个就行了
+ *          `CacheOperationContext context = contexts.get(CacheableOperation.class).iterator().next();`
+ *
+ *      1.2 条件不通过 `! isConditionPassing`
+ *          直接return放行方法 `return invokeOperation(invoker);`
+ *
+ *      1.3 条件通过 `isConditionPassing`。
+ *          生成key。这个就是将结果存入Cache实例的key
+ *              `Object key = generateKey(context, CacheOperationExpressionEvaluator.NO_RESULT);`
+ *          同步的方法上只允许有一个 缓存注解，所以拿第一个Cache实例就行了
+ *              `Cache cache = context.getCaches().iterator().next();`
+ *
+ *      1.4 返回结果 `return wrapCacheValue(method, handleSynchronizedGet(invoker, key, cache));`
+ *          handleSynchronizedGet 就是 使用 key从Cache中获取，获取不到就invoke方法获取值，会将方法返回值值存到 Cache 中。
+ *          存入Cache的细节：
+ *            1. 如果方法返回值是Optional类型的，会 {@link Optional#get()} 存到缓存
+ *            2. 如果Cache配了序列化器，会将值序列化在存到缓存中，获取的时候也会判断是否有序列化器 有就反序列化值
+ *          wrapCacheValue 就是如果方法的返回值是 Optional 类型的，就包装一下
+ *
+ *          注：这里并没有看到具体的同步操作，这个同步的实现得看具体的Cache实例来实现的
+ *
+ *  2. 不是同步的
+ *
+ *  3. 处理 @CacheEvict(beforeInvocation = true)
+ *      `processCacheEvicts(contexts.get(CacheEvictOperation.class), true,CacheOperationExpressionEvaluator.NO_RESULT);`
+ *
+ *      3.1 拿到CacheEvictOperation的注解信息，`CacheOperationContext.get(CacheEvictOperation.class)`
+ *      3.2 遍历 List<CacheOperationContext>, 是`beforeInvocation = true` 且 isConditionPassing
+ *          清空缓存 `performCacheEvict(context, operation, result);`
+ *          就是遍历 CacheOperationContext.getCaches()，清除缓存，
+ *          就看是根据key删除 还是直接清空整个Cache，比如 @CacheEvict(allEntries = true) 就是清空整个缓存
+ *
+ *  4. 获取缓存 `Cache.ValueWrapper cacheHit = findCachedItem(contexts.get(CacheableOperation.class));`
+ *      4.1 拿到 CacheableOperation 的注解信息，`CacheOperationContext.get(CacheableOperation.class)`
+ *      4.2 遍历 List<CacheOperationContext>, 是 isConditionPassing
+ *          就是遍历 CacheOperationContext.getCaches() ，使用生成的key从Cache中获取值，值不是null，就return
+ *
+ *  5. 生成局部变量`List<CachePutRequest> cachePutRequests = new ArrayList<>();`
+ *      该属性是记录符合条件的 @CachePut + @Cacheable，后面需要更新的，更新的时候会进行 unless 判断
+ *
+ *  6. 没有命中缓存 `cacheHit == null`
+ *      6.1 拿到 CacheableOperation 的注解信息，`CacheOperationContext.get(CacheableOperation.class)`
+ *      6.2 遍历 List<CacheOperationContext>, 是 isConditionPassing
+ *          构造成 CachePutRequest 对象，存到 cachePutRequests 中
+ *          `putRequests.add(new CachePutRequest(CacheOperationContext, key));`
+ *
+ *  7. if (有缓存 且 没有符合条件的的@CachePut)
+ *      就是不需要更新，那就直接拿缓存的值就行了
+ *      cacheValue = cacheHit.get();
+ *      returnValue = wrapCacheValue(method, cacheValue);
+ *
+ *  8. else , 放行方法，拿到返回值
+ *      returnValue = invokeOperation(invoker);
+ *      cacheValue = unwrapReturnValue(returnValue);
+ *
+ *  9. 收集符合条件的@CachePut，存到 cachePutRequests 属性中
+ *      9.1 拿到 CacheableOperation 的注解信息，`CacheOperationContext.get(CachePutOperation.class)`
+ *      9.2 遍历 List<CacheOperationContext>, 是 isConditionPassing
+ *          构造成 CachePutRequest 对象，存到 cachePutRequests 中
+ *          `putRequests.add(new CachePutRequest(CacheOperationContext, key));`
+ *
+ *  10. 遍历 cachePutRequests，设置缓存值到 Cache 中
+ *      `cachePutRequest.apply(cacheValue);`
+ *      {@link CacheAspectSupport.CachePutRequest#apply(Object)}
+ *      1. 指定了unless属性，就执行SpEL，结果是false 才可以设置缓存。
+ *          `@Cacheable(unless = "#result != null ")`
+ *      2. 没有指定unless属性，就是可以设置缓存
+ *
+ *      3. 若可以设置缓存，就是遍历 CacheOperationContext.getCaches() 根据key设置缓存
+ *
+ *  11. 处理 @CacheEvict(beforeInvocation = false)
+ *      `processCacheEvicts(contexts.get(CacheEvictOperation.class), false, cacheValue);`
+ *
+ *      11.1 拿到CacheEvictOperation的注解信息，`CacheOperationContext.get(CacheEvictOperation.class)`
+ *      11.2 遍历 List<CacheOperationContext>, 是`beforeInvocation = false` 且 isConditionPassing
+ *          清空缓存 `performCacheEvict(context, operation, result);`
+ *          就是遍历 CacheOperationContext.getCaches()，清除缓存，
+ *          就看是根据key删除 还是直接清空整个Cache，比如 @CacheEvict(allEntries = true) 就是清空整个缓存
+ * */
+```
+### @Cacheable、@CachePut、@CacheEvict 的执行顺序和特点
+```java
+/**
+ * 总结：@Cacheable、@CachePut、@CacheEvict 的执行顺序
+ *
+ *  三个缓存的执行顺序，和是否能拿到返回值做SpEL判断：
+ *      @CacheEvict(beforeInvocation = true) 的条件判断拿不到方法的返回值，是在方法执行前 判断
+ *
+ *      @Cacheable 的条件判断得分成两种：
+ *          - condition：是在方法执行前判断，拿不到方法的返回值
+ *          - unless：是在方法执行后判断,或者命中了缓存，可以拿不到方法的返回值或者是缓存的值
+ *
+ *      @CachePut 的条件判断得分成两种:
+ *          - condition：是在方法执行前判断，拿不到方法的返回值
+ *          - unless：是在方法执行后判断,或者命中了缓存，可以拿不到方法的返回值或者是缓存的值
+ *
+ *      @CacheEvict(beforeInvocation = false) 的条件判断可以拿到方法的返回值，是在方法执行后 判断
+ *
+ * */
+```
+### condition、key、unless的校验
+```java
+/**
+ * condition、key和unless的校验
+ *
+ *     `@Cacheable(key = "#a1", condition = "#a1 != null", unless = "#a1 == null")`
+ *
+ *     key  {@link CacheAspectSupport.CacheOperationContext#generateKey(Object)}
+ *          缓存注解设置 key 属性，就解析SpEL表达式，缓存的key = SpEL表达式的值+targetClass+targetMethod
+ *          没有key，就使用 KeyGenerator 生成key {@link KeyGenerator#generate(Object, Method, Object...)}
+ *
+ *          注：解析SpEL表达式是拿不到方法返回值的。很好理解 如果是根据返回值来生成key，不执行方法就拿不到返回值就生成不了key，就不能使用key从Cache中获取缓存值，
+ *          这是不合理的呀，这就导致每次都得执行方法才能解析SpEL表达式，那还缓存个蛋蛋
+ *
+ *          Tips：若是设置了key，那么缓存的key是根据 SpEL表达式的值+targetClass+targetMethod 生成的，也就是说多例bean执行缓存方法 也是能实现缓存一次的效果的，因为是按照类型来生成缓存key的，虽然是多例bean但是都是同一个类
+ *                若是没有设置key，那就会使用 KeyGenerator生成key，其接口参数包含了执行方法的实例对象，若是自定义生成key方法用上了实例对象，那么多例bean执行缓存方法 是可以实现按照 实例对象来区分缓存的
+ *
+ *
+ *     condition {@link CacheAspectSupport.CacheOperationContext#isConditionPassing(Object)}
+ *          缓存注解设置 condition 属性，就解析SpEL表达式，返回 true 或者 false
+ *          没有设置 condition，返回 true
+ *          注：解析SpEL表达式是拿不到方法返回值的
+ *
+ *     unless {@link CacheAspectSupport.CacheOperationContext#canPutToCache(Object)}
+ *          缓存注解设置 unless 属性，就解析SpEL表达式，返回 true 表示排除，也就是不可更新缓存，返回false表示不排除，表示可更新缓存
+ *          没有设置 unless，返回 true
+ *          注：解析SpEL表达式可以拿到方法返回值
+ *
+ *
+ * 很简单，就是将 方法的入参和一些固定参数(method、target、targetClass、args、caches) 构造出 EvaluationContext 然后使用 SpelExpressionParser 解析 SpEL表达式
+ * 可以看SpEL的简单使用
+ * */
+```
+[简单模拟Cache注解SpEL解析](#MethodSpELTest)
+
+### CacheOperationExpressionEvaluator#createEvaluationContext
+
+```java
+/**
+ * {@link CacheOperationExpressionEvaluator#createEvaluationContext(Collection, Method, Object[], Object, Class, Method, Object, BeanFactory)}
+ *
+ *  1.  构造 SpEL 的根对象
+ *      `CacheExpressionRootObject rootObject = new CacheExpressionRootObject(caches, method, args, target, targetClass);`
+ *
+ *  2. 构造 解析 SpEL 表达式的上下文
+ *      `CacheEvaluationContext evaluationContext = new CacheEvaluationContext(rootObject, targetMethod, args, getParameterNameDiscoverer());`
+ *      CacheEvaluationContext 主要是重写了 {@link StandardEvaluationContext#lookupVariable(String)}
+ *      目的是自定义获取变量的逻辑，重写方法获取变量的逻辑就是 将方法参数名称,p1,a1 设置到变量中
+ *             {@link MethodBasedEvaluationContext#lookupVariable(String)}
+ *      这也就是为啥 @Cacheable、@CacheEvict、@CachePut 能使用 #p1,@a1,@参数名 来引用方法入参的原理
+ *
+ *  3. 单独设置 result 变量
+ *      if result == RESULT_UNAVAILABLE
+ *          evaluationContext.addUnavailableVariable(RESULT_VARIABLE); // 记录不可用变量
+ *      else if result != NO_RESULT
+ *          evaluationContext.setVariable(RESULT_VARIABLE, result); // 设置变量
+ *          只有这三种的解析才会有方法的返回值(缓存值)
+ *              - @CachePut(unless="")
+ *              - @Cacheable(unless="")
+ *              - @CacheEvict(beforeInvocation = false,condition="")
+ *
+ *  5. 设置BeanResolver，就是SpEL语法 @bean 引用BeanFactory中的bean，是使用这个解析的
+ *      `evaluationContext.setBeanResolver(new BeanFactoryResolver(beanFactory));`
+ *
+ *  6. 返回构造好的 计算上下文
+ *      `return evaluationContext;`
+ *
+ * Tips: addUnavailableVariable 用于记录不可用变量，不是SpEL提供的，是CacheEvaluationContext维护的一个集合，在使用变量是这个的时候，直接报错。
+ *      但是目前没啥用处，因为目前就有一个地方引用了，引用的地方直接把异常捕获了没有做任何处理
+ *      {@link CacheAspectSupport#hasCachePut(CacheAspectSupport.CacheOperationContexts)}
+ *
+ * */
+```
+
+### MethodBasedEvaluationContext#lookupVariable
+```java
+/**
+ * CacheEvaluationContext 的变量解析过程，这就是为啥注解中写的SpEL表达式能用 #p1 #a1 #name 引用方法入参的原理
+ * CacheEvaluationContext 继承 MethodBasedEvaluationContext
+ * {@link MethodBasedEvaluationContext#lookupVariable(String)}
+ *  1. 执行父类方法获取变量 `Object variable = super.lookupVariable(name);`
+ *      variable 不为 null 就返回
+ *
+ *  2. 还未加载过 `!this.argumentsLoaded)`
+ *      2.1 加载参数   `lazyLoadArguments();`
+ *      2.2 标记已加载 `this.argumentsLoaded = true;`
+ *      2.3 再次执行父类方法拿到变量`variable = super.lookupVariable(name);`
+ *
+ *  3. 返回变量的值 `return variable`
+ *
+ *
+ * 懒加载参数
+ * {@link MethodBasedEvaluationContext#lazyLoadArguments()}
+ * 很简单，就是遍历方法的参数个数，一个参数会设置成3个变量
+ *  for (int i = 0; i < paramCount; i++) {
+ *      setVariable("a" + i, value);
+ *      setVariable("p" + i, value);
+ *      setVariable(paramNames[i], value);
+ *  }
+ *
+ *  所以说，@Cacheable、@CachePut、@CacheEvict 的 key、condition、unless 中可以使用  #p1,#a1,#name 表示方法的入参
+ *
+ *  Tips：若方法的最后一个参数是可变参数，会将可变参数收集成数组作为最后一个参数变量的值
+ * */
+```
+### Cache支持的SpEL变量说明
+
+[官网说明](https://docs.spring.io/spring-framework/docs/current/reference/html/integration.html#cache-spel-context)
+
+[看这里就知道为啥能用这些鬼东西了](#CacheOperationExpressionEvaluator#createEvaluationContext)
+
+| Name          | Location           | Description              | Example                |
+| :------------ | :----------------- | :----------------------- | :--------------------- |
+| `methodName`  | Root object        | 正在调用的方法的名称     | `#root.methodName`     |
+| `method`      | Root object        | 正在调用的方法的名称     | `#root.method.name`    |
+| `target`      | Root object        | 正在调用的方法的对象     | `#root.target`         |
+| `targetClass` | Root object        | 正在调用的方法的对象的类 | `#root.targetClass`    |
+| `args`        | Root object        | 当前调用的参数列表       | `#root.args[0]`        |
+| `caches`      | Root object        | 当前方法使用的Cache列表  | `#root.caches[0].name` |
+| Argument name | Evaluation context | 当前调用方法参数的变量   | #name \| #a1 \| #p1    |
+| `result`      | Evaluation context | 方法执行的返回值         | `#result`              |
+
+注：还可以使用 `@beanName` 引用BeanFactory中的bean对象
+
 ## @Lookup
 
 ### 有啥用？
@@ -4383,7 +5506,6 @@ class MyBeanDefinitionRegistryPostProcessor implements BeanDefinitionRegistryPos
  *
  * */
 ```
-
 ## @DependsOn
 
 `@DependsOn` 表示依赖关系，在获取当前bean的时候会先获取`@DependsOn`的值。比如：在getBean(A) 的时候，会获取`@DependsOn` 的值，遍历注解的值 getBean(b)
@@ -4418,7 +5540,6 @@ class B {
  *      创建bean {@link AbstractBeanFactory#createBean(String, RootBeanDefinition, Object[])}
  * */
 ```
-
 ## @Lazy
 
 ```java
@@ -4465,7 +5586,6 @@ class X {
  * 将解析的属性值设置到bean中 {@link AbstractAutowireCapableBeanFactory#applyPropertyValues(String, BeanDefinition, BeanWrapper, PropertyValues)}
  * */
 ```
-
 ## @EventListener
 
 源码解析：
@@ -4550,7 +5670,6 @@ class DemoEvent extends ApplicationEvent {
 }
 
 ```
-
 ## 注册事件监听器的两种方式
 
 注册`ApplicationListener`的两种方式：
@@ -4644,7 +5763,6 @@ class SingleObject implements InitializingBean {
     }
 }
 ```
-
 ## @Bean 如何解析的
 
 ```java
@@ -4668,24 +5786,27 @@ class SingleObject implements InitializingBean {
  * @see org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsForBeanMethod(org.springframework.context.annotation.BeanMethod)
  * */
 ```
-
 ## @Conditional
-
-> ClassPathBeanDefinitionScanner 在扫描bean 注册到BeanFactory的时候会进行判断：ExcludeFile -> IncludeFilter -> @Conditional 的判断
->
-> ```java
-> /**
->  * 注意：
->  * {@link ClassPathScanningCandidateComponentProvider#isConditionMatch(MetadataReader)}
->  * {@link ClassPathScanningCandidateComponentProvider#isConditionMatch(MetadataReader)}
->  * {@link ConditionEvaluator#shouldSkip(AnnotatedTypeMetadata, *  ConfigurationCondition.ConfigurationPhase)}
->  * {@link Condition#matches(ConditionContext, AnnotatedTypeMetadata)}
->  *      第一个参数是当前的BeanFactory，此时的BeanFactory并不完整，要想保证 @Conditional 能正确判断，应当保证 bean 注册到 BeanFactory 的先后顺序
->  */
-> ```
->
-> 扩展知识：SpringBoot的自动转配用到了很多 @Conditional。而SpringBoot是通过@Import(DeferredImportSelector.class) 延时bean注册到BeanFactory中，从而尽可能的保证 @Conditional 判断的准确性
-
+```java
+/**
+ * @Conditional 的判断时机：
+ *      1. 扫描类的时候，要将扫描结果注册到 BeanDefinitionMap 时
+ *          {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(MetadataReader)}
+ *      2. 解析完配置类了，判断配置类是否应该跳过
+ *          {@link ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsForConfigurationClass(ConfigurationClass, ConfigurationClassBeanDefinitionReader.TrackedConditionEvaluator)}
+ *      3. 解析完配置类了，配置类不应该跳过，遍历配置类的beanMethods属性(这个就是@Bean标注的方法) 是否需要跳过
+ *          {@link ConfigurationClassBeanDefinitionReader#loadBeanDefinitionsForBeanMethod(BeanMethod)}
+ * */
+```
+> @Conditional 会被解析成 Condition 对象，其匹配方法如下
+```java
+ /**
+  * {@link Condition#matches(ConditionContext, AnnotatedTypeMetadata)}
+  *  第一个参数是当前的BeanFactory，此时的BeanFactory并不完整，要想保证 @Conditional 能正确判断，应当保证 bean 注册到 BeanFactory 的先后顺序
+ *  
+ *  Tips: SpringBoot的自动转配用到了很多 @Conditional。而SpringBoot是通过@Import(DeferredImportSelector.class) 延时bean注册到BeanFactory中，从而尽可能的保证 @Conditional 判断的准确性
+  */
+```
 ```java
 @FunctionalInterface
 public interface Condition {
@@ -4719,11 +5840,8 @@ public class Test {
     }
 }
 ```
-
 ## @Aspect
-
 注：如何解析的看`@EnableAspectJAutoProxy`
-
 > 1. 单独使用 `@Aspect` 是没用的，得使用`@EnableAspectJAutoProxy` 才会解析`@Aspect`的bean
 >
 > 2. 同一个`@Aspect`里面的增强才会有序执行
@@ -4749,7 +5867,6 @@ public class Test {
 >     *    会发现不支持 @Aspect("percflow(xxx")、@Aspect("percflowbelow(xxx") 这种
 >     * */
 >    ```
-
 ### @Around、@Before、@After、@AfterReturning、@AfterThrowing
 
 > `@Around`支持 ProceedingJoinPoint、JoinPoint、JoinPoint.StaticPart 作为增强方法的第一个参数
@@ -4828,7 +5945,6 @@ public class AopTest {
 
 }
 ```
-
 ### @Aspect的执行顺序
 
 > 因为解析`@Aspect`的过程是
@@ -4893,7 +6009,6 @@ public class AopTest2 {
 
 }
 ```
-
 ### @DeclareParents
 
 > `@DeclareParents(value = "cn.haitaoss.javaconfig.aop.AopTest3.AopDemo", defaultImpl = MyIntroductionImpl.class)`
@@ -4951,7 +6066,6 @@ public class AopTest3 {
     }
 }
 ```
-
 ### IntroductionAdvisor
 
 ```java
@@ -5006,9 +6120,6 @@ public class AopTest4 {
     }
 }
 ```
-
-
-
 ## @Scope
 
 > 使用：

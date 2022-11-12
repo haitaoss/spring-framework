@@ -39,33 +39,40 @@ import org.springframework.context.annotation.Role;
 @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
 public class ProxyCachingConfiguration extends AbstractCachingConfiguration {
 
-	@Bean(name = CacheManagementConfigUtils.CACHE_ADVISOR_BEAN_NAME)
-	@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-	public BeanFactoryCacheOperationSourceAdvisor cacheAdvisor(
-			CacheOperationSource cacheOperationSource, CacheInterceptor cacheInterceptor) {
+    @Bean(name = CacheManagementConfigUtils.CACHE_ADVISOR_BEAN_NAME)
+    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+    public BeanFactoryCacheOperationSourceAdvisor cacheAdvisor(
+            CacheOperationSource cacheOperationSource, CacheInterceptor cacheInterceptor) {
+        // 就是增强器咯
+        BeanFactoryCacheOperationSourceAdvisor advisor = new BeanFactoryCacheOperationSourceAdvisor();
+        // 用来解析注解的，通过解析注解从而知道是否需要代理
+        advisor.setCacheOperationSource(cacheOperationSource);
+        // 增强逻辑
+        advisor.setAdvice(cacheInterceptor);
+        if (this.enableCaching != null) {
+            advisor.setOrder(this.enableCaching.<Integer>getNumber("order"));
+        }
+        return advisor;
+    }
 
-		BeanFactoryCacheOperationSourceAdvisor advisor = new BeanFactoryCacheOperationSourceAdvisor();
-		advisor.setCacheOperationSource(cacheOperationSource);
-		advisor.setAdvice(cacheInterceptor);
-		if (this.enableCaching != null) {
-			advisor.setOrder(this.enableCaching.<Integer>getNumber("order"));
-		}
-		return advisor;
-	}
+    @Bean
+    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+    public CacheOperationSource cacheOperationSource() {
+        /**
+         * 用来解析 方法->类 上 @Caching、@Cacheable、@CacheEvict、@CachePut、@CacheConfig 的
+         * */
+        return new AnnotationCacheOperationSource();
+    }
 
-	@Bean
-	@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-	public CacheOperationSource cacheOperationSource() {
-		return new AnnotationCacheOperationSource();
-	}
-
-	@Bean
-	@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
-	public CacheInterceptor cacheInterceptor(CacheOperationSource cacheOperationSource) {
-		CacheInterceptor interceptor = new CacheInterceptor();
-		interceptor.configure(this.errorHandler, this.keyGenerator, this.cacheResolver, this.cacheManager);
-		interceptor.setCacheOperationSource(cacheOperationSource);
-		return interceptor;
-	}
+    @Bean
+    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+    public CacheInterceptor cacheInterceptor(CacheOperationSource cacheOperationSource) {
+        CacheInterceptor interceptor = new CacheInterceptor();
+        // 配置
+        interceptor.configure(this.errorHandler, this.keyGenerator, this.cacheResolver, this.cacheManager);
+        // 用来解析 @Caching、@Cacheable、@CacheEvict、@CachePut 的
+        interceptor.setCacheOperationSource(cacheOperationSource);
+        return interceptor;
+    }
 
 }

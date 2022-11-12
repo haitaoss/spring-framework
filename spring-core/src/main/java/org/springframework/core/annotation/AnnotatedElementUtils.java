@@ -16,6 +16,12 @@
 
 package org.springframework.core.annotation;
 
+import org.springframework.core.BridgeMethodResolver;
+import org.springframework.core.annotation.MergedAnnotation.Adapt;
+import org.springframework.core.annotation.MergedAnnotations.SearchStrategy;
+import org.springframework.lang.Nullable;
+import org.springframework.util.MultiValueMap;
+
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.util.Collections;
@@ -23,12 +29,6 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import org.springframework.core.BridgeMethodResolver;
-import org.springframework.core.annotation.MergedAnnotation.Adapt;
-import org.springframework.core.annotation.MergedAnnotations.SearchStrategy;
-import org.springframework.lang.Nullable;
-import org.springframework.util.MultiValueMap;
 
 /**
  * General utility methods for finding annotations, meta-annotations, and
@@ -367,6 +367,8 @@ public abstract class AnnotatedElementUtils {
 	}
 
 	/**
+	 * Method--> 只查找当前方法，不会查找其接口、或者父类上的注解
+	 * Class--> 当前类上的注解
 	 * Get <strong>all</strong> annotations of the specified {@code annotationTypes}
 	 * within the annotation hierarchy <em>above</em> the supplied {@code element};
 	 * and for each annotation found, merge that annotation's attributes with
@@ -660,6 +662,8 @@ public abstract class AnnotatedElementUtils {
 	}
 
 	/**
+	 * Method--> 查找当前方法 + 其接口方法 + 父类方法
+	 * Class-->  查找类 + 类的父类 + 类的接口
 	 * Find <strong>all</strong> annotations of the specified {@code annotationTypes}
 	 * within the annotation hierarchy <em>above</em> the supplied {@code element};
 	 * and for each annotation found, merge that annotation's attributes with

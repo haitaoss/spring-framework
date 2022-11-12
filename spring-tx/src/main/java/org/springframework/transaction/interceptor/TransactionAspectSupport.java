@@ -798,8 +798,9 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
         private final String joinpointIdentification;
 
         /**
-         * 事务状态：比如事务对象、资源(ConnectionHolder)
-         *
+         * 事务状态：比如事务对象、资源(ConnectionHolder)、suspendedResources(被暂停事务的信息)
+         * 这个是最重要的东西，事务管理器开启事务其实就是创建这个对象
+         * {@link PlatformTransactionManager#getTransaction(TransactionDefinition)}
          * {@link DefaultTransactionStatus}
          */
         @Nullable

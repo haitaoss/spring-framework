@@ -77,6 +77,7 @@ class ConditionEvaluator {
      * @return if the item should be skipped
      */
     public boolean shouldSkip(@Nullable AnnotatedTypeMetadata metadata, @Nullable ConfigurationPhase phase) {
+        // 没有 @Conditional 那就不需要判断，直接 return false，表示不应该跳过
         if (metadata == null || !metadata.isAnnotated(Conditional.class.getName())) {
             return false;
         }
@@ -84,19 +85,26 @@ class ConditionEvaluator {
         if (phase == null) {
             if (metadata instanceof AnnotationMetadata
                 && ConfigurationClassUtils.isConfigurationCandidate((AnnotationMetadata) metadata)) {
+                // 配置类阶段
                 return shouldSkip(metadata, ConfigurationPhase.PARSE_CONFIGURATION);
             }
+            // 注册bean阶段
             return shouldSkip(metadata, ConfigurationPhase.REGISTER_BEAN);
         }
 
         List<Condition> conditions = new ArrayList<>();
+        // 遍历 @Conditional
         for (String[] conditionClasses : getConditionClasses(metadata)) {
+            // 遍历一个@Conditional 里面的值
             for (String conditionClass : conditionClasses) {
+                // 实例化出 Condition 实例
                 Condition condition = getCondition(conditionClass, this.context.getClassLoader());
+                // 记录起来
                 conditions.add(condition);
             }
         }
 
+        // 生序排序
         AnnotationAwareOrderComparator.sort(conditions);
 
         for (Condition condition : conditions) {
@@ -104,11 +112,12 @@ class ConditionEvaluator {
             if (condition instanceof ConfigurationCondition) {
                 requiredPhase = ((ConfigurationCondition) condition).getConfigurationPhase();
             }
+            // 进行 condition 条件判断
             if ((requiredPhase == null || requiredPhase == phase) && !condition.matches(this.context, metadata)) {
                 return true;
             }
         }
-
+        // 到这里说明，condition 都通过了，return false 表示 不应该跳过，也就是可以注册
         return false;
     }
 

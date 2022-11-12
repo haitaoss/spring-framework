@@ -22,6 +22,7 @@ import org.springframework.core.Constants;
 import org.springframework.lang.Nullable;
 import org.springframework.transaction.*;
 
+import javax.sql.DataSource;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
@@ -106,6 +107,10 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 
     protected transient Log logger = LogFactory.getLog(getClass());
 
+    /**
+     * 事务同步，会在准备事务状态的时候，使用这个值
+     * {@link AbstractPlatformTransactionManager#handleExistingTransaction(TransactionDefinition, Object, boolean)}
+     */
     private int transactionSynchronization = SYNCHRONIZATION_ALWAYS;
 
     private int defaultTimeout = TransactionDefinition.TIMEOUT_DEFAULT;
@@ -342,7 +347,9 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
         TransactionDefinition def = (definition != null ? definition : TransactionDefinition.withDefaults());
 
         /**
-         * 其实就是创建事务对象，获取的意思是从 resource中拿到资源设置给事务对象
+         * 其实就是创建事务对象，获取的意思是从 resources 中拿到资源设置给事务对象
+         * 这个资源并不一定是开启事务时创建的连接，比如空事务情况下，使用 {@link org.springframework.jdbc.datasource.DataSourceUtils#doGetConnection(DataSource)} 获取连接
+         * 这个连接也会存到 resources 中，目的是在事务方法内能重复使用
          *
          * 比如：{@link org.springframework.jdbc.datasource.DataSourceTransactionManager#doGetTransaction()}
          *      会创建这个对象 DataSourceTransactionObject
@@ -360,6 +367,8 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
          *      {@link org.springframework.jdbc.datasource.DataSourceTransactionManager#isExistingTransaction(Object)}
          *      `txObject.hasConnectionHolder() && txObject.getConnectionHolder().isTransactionActive()`
          *      就是事务对象有连接 且 连接是活动的事务 才是true
+         *
+         * 空事务不算存在事务，因为其 isTransactionActive 是false
          * */
         if (isExistingTransaction(transaction)) {
             /**
@@ -429,8 +438,10 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
      */
     private TransactionStatus startTransaction(TransactionDefinition definition, Object transaction,
                                                boolean debugEnabled, @Nullable SuspendedResourcesHolder suspendedResources) {
-
-        boolean newSynchronization = (getTransactionSynchronization() != SYNCHRONIZATION_NEVER); // 不是从不同步，这个值是根据事务传播行为设置的？？
+        /**
+         * 不是从不同步。这个值是看你用的啥事务管理，是事务管理器的属性
+         * */
+        boolean newSynchronization = (getTransactionSynchronization() != SYNCHRONIZATION_NEVER);
         // new DefaultTransactionStatus 对象
         DefaultTransactionStatus status = newTransactionStatus(
                 definition, transaction, true, newSynchronization, debugEnabled, suspendedResources);
@@ -546,7 +557,6 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
                 return startTransaction(definition, transaction, debugEnabled, null);
             }
         }
-
         // Assumably PROPAGATION_SUPPORTS or PROPAGATION_REQUIRED.
         if (debugEnabled) {
             logger.debug("Participating in existing transaction");
@@ -601,9 +611,13 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
             boolean newSynchronization, boolean debug, @Nullable Object suspendedResources) {
 
         /**
-         * newSynchronization 且 不是同步激活状态(简单理解就是进入了事务方法？？？)
+         * newSynchronization 且 不是同步激活状态  就是 真的新同步
          *
-         * 不是同步激活状态：只有开启新事务这个属性才是
+         * 同步激活状态：
+         *      - true：简单来说就是Java虚拟机栈中存在@Transactional的方法
+         *      - false：暂停当前事务、完成当前事务(rollback或者commit)
+         *
+         * 结论：当前线程在 TransactionSynchronizationManager 没有记录信息， actualNewSynchronization 就是true
          * */
         boolean actualNewSynchronization = newSynchronization &&
                 !TransactionSynchronizationManager.isSynchronizationActive();
@@ -621,7 +635,9 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
          * 是新的同步，才记录这些信息（注：空事务也算的）
          * */
         if (status.isNewSynchronization()) {
-            // 真的活动的事务
+            /**
+             * 真的活动的事务。就是得有事务，且事务是新的才是true
+             * */
             TransactionSynchronizationManager.setActualTransactionActive(status.hasTransaction());
             // 记录事务隔离级别
             TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(
@@ -631,7 +647,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
             TransactionSynchronizationManager.setCurrentTransactionReadOnly(definition.isReadOnly());
             // 事务的name
             TransactionSynchronizationManager.setCurrentTransactionName(definition.getName());
-            // 属性初始化，会根据这个属性是否为null判断 是不是 isNewSynchronization
+            // 同步属性初始化，会根据这个属性是否为null判断 是不是 isNewSynchronization
             TransactionSynchronizationManager.initSynchronization();
         }
     }
@@ -666,10 +682,15 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
      */
     @Nullable
     protected final SuspendedResourcesHolder suspend(@Nullable Object transaction) throws TransactionException {
-        // 是活动的事务（表示当前线程存在开启的事务）
+        /**
+         * 是活动的事务。
+         * 可以这里理解，只要Java虚拟机栈中存在@Transactional的方法，这个判断就是true
+         *      1. 暂停当前事务
+         *      2. 完成当前事务(rollback或者commit)
+         * */
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             /**
-             * 暂停事对象的同步资源。
+             * 暂停事对象的同步资源。暂停了 TransactionSynchronizationManager.isSynchronizationActive() 就是 false了
              *
              * 就是拿到 {@link TransactionSynchronizationManager#synchronizations}，遍历执行 {@link TransactionSynchronization#suspend()}
              * */

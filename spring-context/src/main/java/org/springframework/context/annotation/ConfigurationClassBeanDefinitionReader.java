@@ -126,6 +126,7 @@ class ConfigurationClassBeanDefinitionReader {
     private void loadBeanDefinitionsForConfigurationClass(
             ConfigurationClass configClass, TrackedConditionEvaluator trackedConditionEvaluator) {
 
+        // 会进行 @Conditional 校验，应该跳过 就不注册到BeanDefinitionMap了
         if (trackedConditionEvaluator.shouldSkip(configClass)) {
             String beanName = configClass.getBeanName();
             if (StringUtils.hasLength(beanName) && this.registry.containsBeanDefinition(beanName)) {
@@ -137,6 +138,9 @@ class ConfigurationClassBeanDefinitionReader {
 
         // 是通过 @Import 导入的类,或者是成员内部类是配置类的情况
         if (configClass.isImported()) {
+            /**
+             * 这些配置类比较特殊，还没有注册到BeanFactory中，所以这一步是将这种配置到注册到BeanFactory
+             * */
             registerBeanDefinitionForImportedConfigurationClass(configClass);
         }
         for (BeanMethod beanMethod : configClass.getBeanMethods()) {
@@ -171,10 +175,12 @@ class ConfigurationClassBeanDefinitionReader {
         ScopeMetadata scopeMetadata = scopeMetadataResolver.resolveScopeMetadata(configBeanDef);
         configBeanDef.setScope(scopeMetadata.getScopeName());
         String configBeanName = this.importBeanNameGenerator.generateBeanName(configBeanDef, this.registry);
+        // 就是将通用的注解值 设置到 BeanDefinition中
         AnnotationConfigUtils.processCommonDefinitionAnnotations(configBeanDef, metadata);
 
         BeanDefinitionHolder definitionHolder = new BeanDefinitionHolder(configBeanDef, configBeanName);
         definitionHolder = AnnotationConfigUtils.applyScopedProxyMode(scopeMetadata, definitionHolder, this.registry);
+        // 注册
         this.registry.registerBeanDefinition(definitionHolder.getBeanName(), definitionHolder.getBeanDefinition());
         configClass.setBeanName(configBeanName);
 
@@ -193,6 +199,7 @@ class ConfigurationClassBeanDefinitionReader {
         MethodMetadata metadata = beanMethod.getMetadata();
         String methodName = metadata.getMethodName();
 
+        // 会进行 @Conditional 校验，应该跳过，就 return 也就是不会注册到 BeanDefinitionMap了
         // Do we need to mark the bean as skipped by its condition?
         if (this.conditionEvaluator.shouldSkip(metadata, ConfigurationPhase.REGISTER_BEAN)) {
             configClass.skippedBeanMethods.add(methodName);
@@ -481,20 +488,38 @@ class ConfigurationClassBeanDefinitionReader {
             if (skip == null) {
                 if (configClass.isImported()) {
                     boolean allSkipped = true;
+                    /**
+                     * importedBy 指的是 导入 configClass 的类。
+                     *
+                     * 举例：configClass 是 B；importedBy 是 [A,C]
+                     *  @Import(B.class)
+                     *  class A {}
+                     *
+                     *  @Component
+                     *  class C {
+                     *      @Component
+                     *      public class B {}
+                     *  }
+                     * */
                     for (ConfigurationClass importedBy : configClass.getImportedBy()) {
+                        // 只要有一个不应该跳过，那就是需要判断当前 configClass 是否应该跳过
                         if (!shouldSkip(importedBy)) {
                             allSkipped = false;
                             break;
                         }
                     }
+                    // 导入 configClass 的类，都跳过了，configClass 也就没必要判断了 直接就是要跳过
                     if (allSkipped) {
                         // The config classes that imported this one were all skipped, therefore we are skipped...
                         skip = true;
                     }
                 }
+                // 没有值，说明需要判断一下
                 if (skip == null) {
+                    // 进行 @Conditional 校验
                     skip = conditionEvaluator.shouldSkip(configClass.getMetadata(), ConfigurationPhase.REGISTER_BEAN);
                 }
+                // 记录值
                 this.skipped.put(configClass, skip);
             }
             return skip;

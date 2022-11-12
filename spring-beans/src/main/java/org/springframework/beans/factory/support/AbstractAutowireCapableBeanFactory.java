@@ -674,7 +674,9 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
         // Register bean as disposable.
         try {
-            // 注册一次性bean 的销毁接口
+            /**
+             * 注册一次性bean 的销毁接口
+             * */
             registerDisposableBeanIfNecessary(beanName, bean, mbd);
         } catch (BeanDefinitionValidationException ex) {
             throw new BeanCreationException(mbd.getResourceDescription(), beanName, "Invalid destruction signature", ex);

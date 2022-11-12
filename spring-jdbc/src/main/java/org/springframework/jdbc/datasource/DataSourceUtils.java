@@ -102,6 +102,16 @@ public abstract class DataSourceUtils {
          * 会使用 DataSource 作为key从 resources 中查询资源，找到就返回。
          * */
         ConnectionHolder conHolder = (ConnectionHolder) TransactionSynchronizationManager.getResource(dataSource);
+        /**
+         * 存在连接 且 连接是事务的同步资源 就返回这个连接，不需要创建
+         *
+         * 事务的同步资源：指的是在事务内创建的连接，目的就是为了在一个事务内能重复使用。
+         *      1. 开始事务时，创建的连接就会设置这个属性为true
+         *          {@link DataSourceTransactionManager#doBegin(Object, TransactionDefinition)}
+         *
+         *      2. 当前方法(doGetConnection)，创建了新的连接，线程开启了事务(空事务也算是事务)，会设置这个属性为true
+         *          {@link DataSourceUtils#doGetConnection(DataSource)}
+         * */
         if (conHolder != null && (conHolder.hasConnection() || conHolder.isSynchronizedWithTransaction())) {
             conHolder.requested();
             if (!conHolder.hasConnection()) {

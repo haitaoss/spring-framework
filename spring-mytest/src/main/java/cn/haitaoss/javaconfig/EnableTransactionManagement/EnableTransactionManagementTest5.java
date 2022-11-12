@@ -51,6 +51,28 @@ public class EnableTransactionManagementTest5 {
         currentDB.remove();
     }
 
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void test_show_db2(Propagation propagation) {
+        showDB();
+        EnableTransactionManagementTest5 currentProxy = (EnableTransactionManagementTest5) AopContext.currentProxy();
+        currentDB.set("db2");
+        switch (propagation.value()) {
+            case TransactionDefinition.PROPAGATION_NESTED:
+                currentProxy.nested();
+                break;
+            case TransactionDefinition.PROPAGATION_REQUIRES_NEW:
+                currentProxy.requires_new();
+                break;
+            case TransactionDefinition.PROPAGATION_REQUIRED:
+                currentProxy.required();
+                break;
+            case TransactionDefinition.PROPAGATION_NOT_SUPPORTED:
+                currentProxy.not_supported();
+                break;
+        }
+        currentDB.remove();
+    }
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void not_supported() {
         showDB();
@@ -78,13 +100,14 @@ public class EnableTransactionManagementTest5 {
     public static void main(String[] args) throws Exception {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(EnableTransactionManagementTest5.class);
         EnableTransactionManagementTest5 bean = context.getBean(EnableTransactionManagementTest5.class);
-        System.out.println("---->NESTED");
+    /*    System.out.println("---->NESTED");
         bean.test_show_db(Propagation.NESTED); // 不可以
         System.out.println("---->REQUIRES_NEW");
         bean.test_show_db(Propagation.REQUIRES_NEW); // 可以
         System.out.println("---->REQUIRED");
         bean.test_show_db(Propagation.REQUIRED); // 不可以
         System.out.println("---->NOT_SUPPORTED");
-        bean.test_show_db(Propagation.NOT_SUPPORTED); // 可以
+        bean.test_show_db(Propagation.NOT_SUPPORTED); // 可以*/
+        bean.test_show_db2(Propagation.NOT_SUPPORTED);
     }
 }

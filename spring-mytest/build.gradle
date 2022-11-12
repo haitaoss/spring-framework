@@ -13,6 +13,7 @@ dependencies {
     implementation project(":spring-context")
     implementation project(":spring-web")
     implementation project(":spring-jdbc")
+    implementation project(":spring-context-support")
 
 
     // 导入 mybatis 整合 spring的jar包，实现原理和之前的基本一致
@@ -35,6 +36,9 @@ dependencies {
 
     optional("org.apache.tomcat.embed:tomcat-embed-core")
     implementation "org.aspectj:aspectjweaver"
+
+//    optional 'com.github.ben-manes.caffeine:caffeine:2.9.1'
+    optional 'com.github.ben-manes.caffeine:caffeine:2.8.0'
 }
 test {
     useJUnitPlatform()

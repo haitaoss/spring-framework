@@ -293,8 +293,10 @@ class ConfigurationClassParser {
     @Nullable
     protected final SourceClass doProcessConfigurationClass(ConfigurationClass configClass, SourceClass sourceClass, Predicate<String> filter) throws IOException {
 
+        // 配置类有 @Component
         if (configClass.getMetadata()
                 .isAnnotated(Component.class.getName())) {
+            // 处理内部类 是否有配置类
             // Recursively process any member (nested) classes first
             processMemberClasses(configClass, sourceClass, filter);
         }
@@ -313,7 +315,7 @@ class ConfigurationClassParser {
         // Process any @ComponentScan annotations
         Set<AnnotationAttributes> componentScans = AnnotationConfigUtils.attributesForRepeatable(sourceClass.getMetadata(), ComponentScans.class, ComponentScan.class);
         if (!componentScans.isEmpty()
-                && !this.conditionEvaluator.shouldSkip(sourceClass.getMetadata(), ConfigurationPhase.REGISTER_BEAN)) {
+            && !this.conditionEvaluator.shouldSkip(sourceClass.getMetadata(), ConfigurationPhase.REGISTER_BEAN)) {
             for (AnnotationAttributes componentScan : componentScans) {
                 // 这里就会进行扫描，得到的 BeanDefinition会注册到 Spring容器中
                 // The config class is annotated with @ComponentScan -> perform the scan immediately
@@ -365,7 +367,9 @@ class ConfigurationClassParser {
         for (MethodMetadata methodMetadata : beanMethods) {
             configClass.addBeanMethod(new BeanMethod(methodMetadata, configClass));
         }
-
+        /**
+         * 就是将 sourceClass 的接口递归拿到 @Bean的方法，将方法信息记录到 configClass 中
+         * */
         // Process default methods on interfaces
         processInterfaces(configClass, sourceClass);
 
@@ -379,8 +383,9 @@ class ConfigurationClassParser {
             String superclass = sourceClass.getMetadata()
                     .getSuperClassName();
             if (superclass != null && !superclass.startsWith("java")
-                    && !this.knownSuperclasses.containsKey(superclass)) {
+                && !this.knownSuperclasses.containsKey(superclass)) {
                 this.knownSuperclasses.put(superclass, configClass);
+                // 返回父类 递归解析
                 // Superclass found, return its annotation metadata and recurse
                 return sourceClass.getSuperClass();
             }
@@ -399,11 +404,13 @@ class ConfigurationClassParser {
         if (!memberClasses.isEmpty()) {
             List<SourceClass> candidates = new ArrayList<>(memberClasses.size());
             for (SourceClass memberClass : memberClasses) {
+                // 内部类 是 配置类
                 if (ConfigurationClassUtils.isConfigurationCandidate(memberClass.getMetadata())
-                        && !memberClass.getMetadata()
+                    && !memberClass.getMetadata()
                         .getClassName()
                         .equals(configClass.getMetadata()
                                 .getClassName())) {
+                    // 记录一下
                     candidates.add(memberClass);
                 }
             }
@@ -414,6 +421,10 @@ class ConfigurationClassParser {
                 } else {
                     this.importStack.push(configClass);
                     try {
+                        /**
+                         * 解析配置类。
+                         * 记录信息：candidate 的 {@link ConfigurationClass#importedBy} 是  configClass
+                         * */
                         processConfigurationClass(candidate.asConfigClass(configClass), filter);
                     } finally {
                         this.importStack.pop();
@@ -427,14 +438,18 @@ class ConfigurationClassParser {
      * Register default methods on interfaces implemented by the configuration class.
      */
     private void processInterfaces(ConfigurationClass configClass, SourceClass sourceClass) throws IOException {
+        // 遍历接口
         for (SourceClass ifc : sourceClass.getInterfaces()) {
+            // 接口中有@Bean的方法
             Set<MethodMetadata> beanMethods = retrieveBeanMethodMetadata(ifc);
             for (MethodMetadata methodMetadata : beanMethods) {
+                // 不是抽象方法，才记录到 configClass 中
                 if (!methodMetadata.isAbstract()) {
                     // A default method or other concrete method on a Java 8+ interface...
                     configClass.addBeanMethod(new BeanMethod(methodMetadata, configClass));
                 }
             }
+            // 递归处理接口的接口
             processInterfaces(configClass, ifc);
         }
     }
@@ -499,7 +514,7 @@ class ConfigurationClassParser {
 
         Class<? extends PropertySourceFactory> factoryClass = propertySource.getClass("factory");
         PropertySourceFactory factory = (factoryClass
-                == PropertySourceFactory.class ? DEFAULT_PROPERTY_SOURCE_FACTORY : BeanUtils.instantiateClass(factoryClass));
+                                         == PropertySourceFactory.class ? DEFAULT_PROPERTY_SOURCE_FACTORY : BeanUtils.instantiateClass(factoryClass));
 
         for (String location : locations) {
             try {
@@ -640,6 +655,10 @@ class ConfigurationClassParser {
                         // process it as an @Configuration class
                         this.importStack.registerImport(currentSourceClass.getMetadata(), candidate.getMetadata()
                                 .getClassName());
+                        /**
+                         * 解析配置类。
+                         * 记录信息：candidate 的 {@link ConfigurationClass#importedBy} 是  configClass
+                         * */
                         processConfigurationClass(candidate.asConfigClass(configClass), exclusionFilter);
                     }
                 }
@@ -851,7 +870,7 @@ class ConfigurationClassParser {
             Class<? extends Group> group = deferredImport.getImportSelector()
                     .getImportGroup();
             DeferredImportSelectorGrouping grouping = this.groupings.computeIfAbsent((group
-                    != null ? group : deferredImport), key -> new DeferredImportSelectorGrouping(createGroup(group)));
+                                                                                      != null ? group : deferredImport), key -> new DeferredImportSelectorGrouping(createGroup(group)));
             grouping.add(deferredImport);
             this.configurationClasses.put(deferredImport.getConfigurationClass()
                     .getMetadata(), deferredImport.getConfigurationClass());
@@ -870,7 +889,7 @@ class ConfigurationClassParser {
                             } catch (Throwable ex) {
                                 throw new BeanDefinitionStoreException(
                                         "Failed to process import candidates for configuration class ["
-                                                + configurationClass.getMetadata()
+                                        + configurationClass.getMetadata()
                                                 .getClassName() + "]", ex);
                             }
                         });
@@ -1046,7 +1065,7 @@ class ConfigurationClassParser {
                     // Let's skip it if it's not resolvable - we're just looking for candidates
                     if (logger.isDebugEnabled()) {
                         logger.debug("Failed to resolve member class [" + memberClassName
-                                + "] - not considering it as a configuration class candidate");
+                                     + "] - not considering it as a configuration class candidate");
                     }
                 }
             }
@@ -1162,8 +1181,8 @@ class ConfigurationClassParser {
 
         public CircularImportProblem(ConfigurationClass attemptedImport, Deque<ConfigurationClass> importStack) {
             super(String.format("A circular @Import has been detected: "
-                    + "Illegal attempt by @Configuration class '%s' to import class '%s' as '%s' is "
-                    + "already present in the current import stack %s", importStack.element()
+                                + "Illegal attempt by @Configuration class '%s' to import class '%s' as '%s' is "
+                                + "already present in the current import stack %s", importStack.element()
                     .getSimpleName(), attemptedImport.getSimpleName(), attemptedImport.getSimpleName(), importStack), new Location(importStack.element()
                     .getResource(), attemptedImport.getMetadata()));
         }

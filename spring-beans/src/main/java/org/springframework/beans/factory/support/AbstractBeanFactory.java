@@ -253,7 +253,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
             if (logger.isTraceEnabled()) {
                 if (isSingletonCurrentlyInCreation(beanName)) {
                     logger.trace("Returning eagerly cached instance of singleton bean '" + beanName
-                            + "' that is not fully initialized yet - a consequence of a circular reference");
+                                 + "' that is not fully initialized yet - a consequence of a circular reference");
                 } else {
                     logger.trace("Returning cached instance of singleton bean '" + beanName + "'");
                 }
@@ -457,7 +457,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
             } catch (TypeMismatchException ex) {
                 if (logger.isTraceEnabled()) {
                     logger.trace("Failed to convert bean '" + name + "' to required type '"
-                            + ClassUtils.getQualifiedName(requiredType) + "'", ex);
+                                 + ClassUtils.getQualifiedName(requiredType) + "'", ex);
                 }
                 throw new BeanNotOfRequiredTypeException(name, requiredType, bean.getClass());
             }
@@ -568,7 +568,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
             if (System.getSecurityManager() != null) {
                 return AccessController.doPrivileged((PrivilegedAction<Boolean>) () -> (
                         (fb instanceof SmartFactoryBean && ((SmartFactoryBean<?>) fb).isPrototype())
-                                || !fb.isSingleton()), getAccessControlContext());
+                        || !fb.isSingleton()), getAccessControlContext());
             } else {
                 return ((fb instanceof SmartFactoryBean && ((SmartFactoryBean<?>) fb).isPrototype())
                         || !fb.isSingleton());
@@ -686,7 +686,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
             classToMatch = FactoryBean.class;
         }
         Class<?>[] typesToMatch = (FactoryBean.class
-                == classToMatch ? new Class<?>[]{classToMatch} : new Class<?>[]{FactoryBean.class, classToMatch});
+                                   == classToMatch ? new Class<?>[]{classToMatch} : new Class<?>[]{FactoryBean.class, classToMatch});
 
 
         // Attempt to predict the bean type
@@ -1296,7 +1296,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
     protected boolean isPrototypeCurrentlyInCreation(String beanName) {
         Object curVal = this.prototypesCurrentlyInCreation.get();
         return (curVal != null && (curVal.equals(beanName) || (curVal instanceof Set
-                && ((Set<?>) curVal).contains(beanName))));
+                                                               && ((Set<?>) curVal).contains(beanName))));
     }
 
     /**
@@ -1460,7 +1460,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
                             if (logger.isDebugEnabled()) {
                                 logger.debug("PropertyEditorRegistrar [" + registrar.getClass()
                                         .getName() + "] failed because it tried to obtain currently created bean '"
-                                        + ex.getBeanName() + "': " + ex.getMessage());
+                                             + ex.getBeanName() + "': " + ex.getMessage());
                             }
                             onSuppressedException(ex);
                             continue;
@@ -1553,7 +1553,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
                             } else {
                                 throw new NoSuchBeanDefinitionException(parentBeanName,
                                         "Parent name '" + parentBeanName + "' is equal to bean name '" + beanName
-                                                + "': cannot be resolved without a ConfigurableBeanFactory parent");
+                                        + "': cannot be resolved without a ConfigurableBeanFactory parent");
                             }
                         }
                     } catch (NoSuchBeanDefinitionException ex) {
@@ -1593,8 +1593,8 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 
     private void copyRelevantMergedBeanDefinitionCaches(RootBeanDefinition previous, RootBeanDefinition mbd) {
         if (ObjectUtils.nullSafeEquals(mbd.getBeanClassName(), previous.getBeanClassName())
-                && ObjectUtils.nullSafeEquals(mbd.getFactoryBeanName(), previous.getFactoryBeanName())
-                && ObjectUtils.nullSafeEquals(mbd.getFactoryMethodName(), previous.getFactoryMethodName())) {
+            && ObjectUtils.nullSafeEquals(mbd.getFactoryBeanName(), previous.getFactoryBeanName())
+            && ObjectUtils.nullSafeEquals(mbd.getFactoryMethodName(), previous.getFactoryMethodName())) {
             ResolvableType targetType = mbd.targetType;
             ResolvableType previousTargetType = previous.targetType;
             if (targetType == null || targetType.equals(previousTargetType)) {
@@ -2064,7 +2064,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
     protected boolean requiresDestruction(Object bean, RootBeanDefinition mbd) {
         return (bean.getClass() != NullBean.class && (DisposableBeanAdapter.hasDestroyMethod(bean, mbd) || (
                 hasDestructionAwareBeanPostProcessors()
-                        && DisposableBeanAdapter.hasApplicableProcessors(bean, getBeanPostProcessorCache().destructionAware))));
+                && DisposableBeanAdapter.hasApplicableProcessors(bean, getBeanPostProcessorCache().destructionAware))));
     }
 
     /**
@@ -2082,18 +2082,29 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
      */
     protected void registerDisposableBeanIfNecessary(String beanName, Object bean, RootBeanDefinition mbd) {
         AccessControlContext acc = (System.getSecurityManager() != null ? getAccessControlContext() : null);
+        /**
+         * 不是原型bean 且 有符合的DestructionAwareBeanPostProcessor {@link DestructionAwareBeanPostProcessor#requiresDestruction(Object)}
+         * */
         if (!mbd.isPrototype() && requiresDestruction(bean, mbd)) {
+            // 是单例的
             if (mbd.isSingleton()) {
+                /**
+                 * 就是存到这个属性中 {@link DefaultSingletonBeanRegistry#disposableBeans}
+                 * */
                 // Register a DisposableBean implementation that performs all destruction
                 // work for the given bean: DestructionAwareBeanPostProcessors,
                 // DisposableBean interface, custom destroy method.
                 registerDisposableBean(beanName, new DisposableBeanAdapter(bean, beanName, mbd, getBeanPostProcessorCache().destructionAware, acc));
             } else {
+                // scope 的
                 // A bean with a custom scope...
                 Scope scope = this.scopes.get(mbd.getScope());
                 if (scope == null) {
                     throw new IllegalStateException("No Scope registered for scope name '" + mbd.getScope() + "'");
                 }
+                /**
+                 * 就是存到这个属性中 {@link DefaultSingletonBeanRegistry#disposableBeans}
+                 * */
                 scope.registerDestructionCallback(beanName, new DisposableBeanAdapter(bean, beanName, mbd, getBeanPostProcessorCache().destructionAware, acc));
             }
         }
