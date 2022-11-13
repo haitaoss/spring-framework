@@ -2900,9 +2900,36 @@ public class EnableAsyncTest {
  * */
 ```
 ## @EnableTransactionManagement
-> [文档](https://docs.spring.io/spring-framework/docs/current/reference/html/data-access.html#transaction-declarative-annotations)
+
+### 简单说说Spring事务
+
+> [官方文档](https://docs.spring.io/spring-framework/docs/current/reference/html/data-access.html#transaction-declarative-annotations)
 >
 > 前置知识：Connection是支持设置 事务隔离级别、是否只读的 ，是否自动提交事务
+>
+> ### 对Spring事务的理解
+>
+> 简单来说 **一个事务**就是**一个数据库连接**，因为连接支持设置 **事务隔离级别**、**是否只读的** ，**是否自动提交**。所以`@Transactional`才支持设置是否只读和事务隔离级别的。
+>
+> Spring事务就是使用**事务管理器**配置的`DataSource`获取一个数据库连接，获取连接之后**将连接设置成非自动提交、再根据`@Transactional`的信息设置是否只读、隔离级别**，然后在事务内使用**这个连接**执行sql，就能保证执行的sql是同一事物的。
+>
+> 那就引出一个问题，用户如何拿到Spring事务创建的连接？
+>
+> 很简单，将连接存到一个地方：[事务资源( resources )](#扩展: TransactionSynchronizationManager)，你从里面取就行了。又为了保证每个线程的共享数据问题，Spring是将连接存到ThreadLocal中的，又因为在事务内可能会使用不同的`DataSource`获取连接，所以是使用Map来存储，key是`DataSource`,value是连接。
+>
+> **一个事务**就是**一个数据库连接**，而事务管理器只能配置一个`DataSource`，也就是说只能使用事务管理器配置的`DataSource`才能从ThreadLocal中取到**经过事务管理加工过的数据库连接**，如果用户使用**与事务管理器不一致的**`DataSource`从ThreadLocal是拿不到的，拿不到那就只能使用`DataSource`**创建一个新的连接**，这个连接是直接通过`DataSource`获取的，具体的参数就看`DataSource`的配置，所以使用这个连接执行 与 事务管理器创建的连接都**不是同一个连接(事务)**，这就会导致使用这个连接执行SQL会发生Spring事务失效。
+>
+> 然后呢，为了第三方能快速的对接Spring事务，说人话就是能拿到Spring事务管理创建的连接。Spring提供了一个工具类
+>
+> [DataSourceUtils](#扩展: DataSourceUtils)`,作用就是根据传入的`DataSource返回连接。
+>
+> ### [事务连接与事务内连接](#扩展: ResourceHolderSupport&ConnectionHolder)
+>
+> 注：这个是我根据自己的理解，瞎叫的。
+>
+> **事务连接**只能有一个，**事务内连接**有多个(事务内创建的连接)，事务连接属于事务内创建的连接，而事务内创建的连接不一定是事务连接。
+>
+> 使用事务管理器开启(`DataSourceTransactionManager#doBegin`) 的连接 才是 **事务连接**，在事务内使用`DataSourceUtils`获取连接，参数`DataSource`从`resources`中取不到，就创建连接，并把连接标记成**事务内连接**，并存到**事务同步资源(synchronizations)**和**事务资源(resources)**中，存到`synchronizations`的目的是在事务暂停、完成时会回调，存到`resources`的目的是再使用`DataSource`获取连接，就能拿到之前创建的事务内连接
 >
 > #### 事务注解的使用
 >
