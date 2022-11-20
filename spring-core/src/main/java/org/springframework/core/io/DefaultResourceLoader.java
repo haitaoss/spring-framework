@@ -151,23 +151,41 @@ public class DefaultResourceLoader implements ResourceLoader {
     public Resource getResource(String location) {
         Assert.notNull(location, "Location must not be null");
 
+        // 遍历 ProtocolResolver
         for (ProtocolResolver protocolResolver : getProtocolResolvers()) {
+            // 解析
             Resource resource = protocolResolver.resolve(location, this);
+            // 能解析就返回
             if (resource != null) {
                 return resource;
             }
         }
-
+        // 处理 / 开头
         if (location.startsWith("/")) {
+            /**
+             * 会移除开头的 /，和路径中特殊的符号(比如 \\ 换成 /)
+             * 然后使用 ClassLoader 获取资源 {@link ClassLoader#getResource(String)}
+             * */
             return getResourceByPath(location);
         } else if (location.startsWith(CLASSPATH_URL_PREFIX)) {
+            /**
+             * 移除 classpath: 前缀，移除开头的 /，和路径中特殊的符号(比如 \\ 换成 /)
+             * 然后使用 ClassLoader 获取资源 {@link ClassLoader#getResource(String)}
+             * */
             return new ClassPathResource(location.substring(CLASSPATH_URL_PREFIX.length()), getClassLoader());
         } else {
             try {
+                /**
+                 * 尝试解析成 URL
+                 *
+                 * file:///Users/haitao/1.txt
+                 * https://www.baidu.com
+                 * */
                 // Try to parse the location as a URL...
                 URL url = new URL(location);
                 return (ResourceUtils.isFileURL(url) ? new FileUrlResource(url) : new UrlResource(url));
             } catch (MalformedURLException ex) {
+                // 不是 URL 就按照 资源路径解析
                 // No URL -> resolve as resource path.
                 return getResourceByPath(location);
             }

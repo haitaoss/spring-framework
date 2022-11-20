@@ -91,6 +91,10 @@ public class StandardEnvironment extends AbstractEnvironment {
 	 */
 	@Override
 	protected void customizePropertySources(MutablePropertySources propertySources) {
+		/**
+		 * addLast 就是往后面加，也就是获取属性的顺序是：getSystemProperties -> getSystemEnvironment
+		 * {@link PropertySourcesPropertyResolver#getProperty(String, Class, boolean)}
+		 * */
 		propertySources.addLast(
 				new PropertiesPropertySource(SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME, getSystemProperties()));
 		propertySources.addLast(

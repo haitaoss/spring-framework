@@ -1,0 +1,10 @@
+yml_name: hello yml
+map1:
+  key1: value1
+  key2: value2
+
+list1:
+  - v1
+  - v2
+
+list2: [ v1,v2 ]

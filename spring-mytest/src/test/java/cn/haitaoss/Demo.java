@@ -19,8 +19,11 @@ import org.springframework.expression.spel.support.StandardEvaluationContext;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.StringTokenizer;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -38,6 +41,28 @@ public class Demo {
 
     private String name;
 
+    public void dynamic_args(String... args) {
+        System.out.println("args = " + args);
+    }
+
+    @Test
+    public void test_dynamic_args(){
+        dynamic_args("1");
+        dynamic_args("1");
+    }
+    @Test
+    public void test_StringTokenizer() {
+        String expression = "(11 1)&(bbb)|c2|!axx";
+        StringTokenizer tokens = new StringTokenizer(expression, "()&|!", true);
+
+        while (tokens.hasMoreTokens()) {
+            // 返回的是 分隔符 分隔符之间的内容
+            String token = tokens.nextToken().trim();
+            System.out.println("token = " + token);
+        }
+        System.out.println("=====================================");
+        System.out.println(Arrays.toString(expression.split("(|)|!|&|\\|")));
+    }
 
     public static void x() {
         System.out.println("execute x...");

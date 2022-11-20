@@ -886,7 +886,13 @@ public abstract class CacheAspectSupport extends AbstractCacheInvoker
 
         public CacheOperationContext(CacheOperationMetadata metadata, Object[] args, Object target) {
             this.metadata = metadata;
-            // 目的是处理方法的最后一个参数是可变参数的情况。若是可变参数，就拿到最后一个参数，将其铺平，和其它参数放在一块
+            /**
+             * 处理方法的最后一个参数是可变参数的情况。若是可变参数，就拿到最后一个参数，将其铺平，和其它参数放在一块
+             *
+             * 目的是：在生成缓存key时会根据方法参数来生成，方法的入参相同应当是同一个key。
+             *        但是动态参数的入参每次都是new数组来存储，这就导致方法的参数是一样的，但是动态参数是不同的对象，
+             *        所以这里需要将动态参数给铺平
+             * */
             this.args = extractArgs(metadata.method, args);
             this.target = target;
             /**

@@ -1,0 +1,187 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+class DefaultPropertySourceFactory {
+  + createPropertySource(String?, EncodedResource): PropertySource<?>
+}
+class AbstractEnvironment {
+  - defaultProfiles: Set<String>
+  - activeProfiles: Set<String>
+  - propertySources: MutablePropertySources
+  - propertyResolver: ConfigurablePropertyResolver
+  # isProfileActive(String): boolean
+  + resolvePlaceholders(String): String
+  # createPropertyResolver(MutablePropertySources): ConfigurablePropertyResolver
+  # customizePropertySources(MutablePropertySources): void
+  + getProperty(String): String?
+   conversionService: ConfigurableConversionService
+   propertyResolver: ConfigurablePropertyResolver
+   propertySources: MutablePropertySources
+}
+
+interface Environment << interface >> {
+  + acceptsProfiles(String[]): boolean
+  + acceptsProfiles(Profiles): boolean
+   activeProfiles: String[]
+   defaultProfiles: String[]
+}
+class MutablePropertySources {
+  + iterator(): Iterator<PropertySource<?>>
+  + addFirst(PropertySource<?>): void
+  + addBefore(String, PropertySource<?>): void
+  + get(String): PropertySource<?>?
+  # removeIfPresent(PropertySource<?>): void
+  + remove(String): PropertySource<?>?
+  + replace(String, PropertySource<?>): void
+  + addAfter(String, PropertySource<?>): void
+  - addAtIndex(int, PropertySource<?>): void
+  + addLast(PropertySource<?>): void
+  + contains(String): boolean
+}
+class Properties {
+  + loadFromXML(InputStream): void
+  + load(InputStream): void
+  + load(Reader): void
+  + remove(Object): Object
+  + getProperty(String): String
+}
+class PropertiesLoaderUtils {
+  + loadAllProperties(String, ClassLoader?): Properties
+  + fillProperties(Properties, EncodedResource): void
+  ~ fillProperties(Properties, EncodedResource, PropertiesPersister): void
+  + loadProperties(EncodedResource): Properties
+  + fillProperties(Properties, Resource): void
+  + loadAllProperties(String): Properties
+  + loadProperties(Resource): Properties
+}
+class PropertiesPropertySource {
+   propertyNames: String[]
+}
+class PropertySource<T> {
+  # source: T
+  # name: String
+  + toString(): String
+  + equals(Object?): boolean
+  + hashCode(): int
+  + getProperty(String): Object?
+  + containsProperty(String): boolean
+  + named(String): PropertySource<?>
+   name: String
+   source: T
+}
+interface PropertySourceFactory << interface >> {
+  + createPropertySource(String?, EncodedResource): PropertySource<?>
+}
+interface Resource << interface >> {
+  + isFile(): boolean
+  + exists(): boolean
+  + readableChannel(): ReadableByteChannel
+  + createRelative(String): Resource
+  + lastModified(): long
+  + contentLength(): long
+   file: File
+   description: String
+   URI: URI
+   URL: URL
+   filename: String?
+   readable: boolean
+   open: boolean
+}
+interface ResourceLoader << interface >> {
+  + getResource(String): Resource
+   classLoader: ClassLoader?
+}
+class ResourcePropertySource {
+  + withResourceName(): ResourcePropertySource
+  - getNameForResource(Resource): String
+  + withName(String): ResourcePropertySource
+}
+class StandardEnvironment {
+  # customizePropertySources(MutablePropertySources): void
+}
+class YamlPropertiesFactoryBean {
+  - singleton: boolean
+  # createProperties(): Properties
+  + afterPropertiesSet(): void
+   singleton: boolean
+   objectType: Class<?>?
+   object: Properties?
+}
+class AbstractPropertyResolver {
+  + resolveRequiredPlaceholders(String): String
+  # convertValueIfNecessary(Object, Class<T>?): T?
+  - doResolvePlaceholders(String, PropertyPlaceholderHelper): String
+  + setIgnoreUnresolvableNestedPlaceholders(boolean): void
+  + containsProperty(String): boolean
+  + getRequiredProperty(String, Class<T>): T
+  + getProperty(String, String): String
+  # resolveNestedPlaceholders(String): String
+  + resolvePlaceholders(String): String
+  + setValueSeparator(String?): void
+  + setPlaceholderSuffix(String): void
+  + validateRequiredProperties(): void
+  + setConversionService(ConfigurableConversionService): void
+  + setRequiredProperties(String[]): void
+  + getProperty(String, Class<T>, T): T
+  # getPropertyAsRawString(String): String?
+  + getConversionService(): ConfigurableConversionService
+  + setPlaceholderPrefix(String): void
+  - createPlaceholderHelper(boolean): PropertyPlaceholderHelper
+  + getProperty(String): String?
+  + getRequiredProperty(String): String
+}
+interface ConfigurablePropertyResolver << interface >> {
+  + setPlaceholderPrefix(String): void
+  + setConversionService(ConfigurableConversionService): void
+  + setValueSeparator(String?): void
+  + setIgnoreUnresolvableNestedPlaceholders(boolean): void
+  + setPlaceholderSuffix(String): void
+  + setRequiredProperties(String[]): void
+  + getConversionService(): ConfigurableConversionService
+  + validateRequiredProperties(): void
+}
+interface PropertyResolver << interface >> {
+  + getProperty(String, Class<T>, T): T
+  + getProperty(String, String): String
+  + getProperty(String, Class<T>): T?
+  + containsProperty(String): boolean
+  + getRequiredProperty(String): String
+  + resolvePlaceholders(String): String
+  + getProperty(String): String?
+  + resolveRequiredPlaceholders(String): String
+  + getRequiredProperty(String, Class<T>): T
+}
+class PropertySourcesPropertyResolver {
+  # getProperty(String, Class<T>, boolean): T?
+  + getProperty(String, Class<T>): T?
+  # logKeyFound(String, PropertySource<?>, Object): void
+  # getPropertyAsRawString(String): String?
+  + containsProperty(String): boolean
+  + getProperty(String): String?
+}
+YamlPropertiesFactoryBean *-- Properties
+PropertiesLoaderUtils   *-- Properties
+DefaultPropertySourceFactory *-- PropertiesLoaderUtils
+PropertySource *-- Properties
+MutablePropertySources *-- PropertySource
+AbstractEnvironment *-- MutablePropertySources
+ResourceLoader *-- Resource
+ResourcePropertySource *-- ResourceLoader
+
+
+AbstractPropertyResolver         -[#008200,dashed]-^  ConfigurablePropertyResolver
+ConfigurablePropertyResolver     -[#008200,plain]-^  PropertyResolver
+PropertySourcesPropertyResolver  -[#000082,plain]-^  AbstractPropertyResolver
+
+
+AbstractEnvironment           -[#008200,dashed]-^  Environment
+DefaultPropertySourceFactory  -[#008200,dashed]-^  PropertySourceFactory
+PropertiesPropertySource      -[#000082,plain]-^  PropertySource
+ResourcePropertySource        -[#000082,plain]-^  PropertiesPropertySource
+StandardEnvironment           -[#000082,plain]-^  AbstractEnvironment
+AbstractEnvironment *-- ConfigurablePropertyResolver
+@enduml
+
+

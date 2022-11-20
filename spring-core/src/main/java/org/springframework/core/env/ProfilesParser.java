@@ -16,18 +16,12 @@
 
 package org.springframework.core.env;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.StringTokenizer;
-import java.util.function.Predicate;
-
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
+
+import java.util.*;
+import java.util.function.Predicate;
 
 /**
  * Internal parser used by {@link Profiles#of}.
@@ -61,10 +55,23 @@ final class ProfilesParser {
 		return parseTokens(expression, tokens, Context.NONE);
 	}
 
+	/**
+	 * 没看懂
+	 * @param expression
+	 * @param tokens
+	 * @param context
+	 * @return
+	 */
 	private static Profiles parseTokens(String expression, StringTokenizer tokens, Context context) {
 		List<Profiles> elements = new ArrayList<>();
 		Operator operator = null;
 		while (tokens.hasMoreTokens()) {
+			/**
+			 * 返回的是 按照分隔符切割的字符
+			 *
+			 * 比如：(prof1)|prof2
+			 * 迭代的结果是：( , prof1 , ) , | , prof2
+			 * */
 			String token = tokens.nextToken().trim();
 			if (token.isEmpty()) {
 				continue;
@@ -98,6 +105,7 @@ final class ProfilesParser {
 					operator = null;
 					break;
 				default:
+					// 就是profileName
 					Profiles value = equals(token);
 					if (context == Context.INVERT) {
 						return value;
@@ -161,6 +169,9 @@ final class ProfilesParser {
 
 		@Override
 		public boolean matches(Predicate<String> activeProfiles) {
+			/**
+			 * activeProfiles 是 {@link AbstractEnvironment#isProfileActive(String)}
+			 * */
 			for (Profiles candidate : this.parsed) {
 				if (candidate.matches(activeProfiles)) {
 					return true;

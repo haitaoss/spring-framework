@@ -416,7 +416,9 @@ public class FullConfigClassTest {
  *          为了处理配置类的父类是配置类的情况，采用 do...while 递归解析 保证所有的内容都能解析完
  *              {@link org.springframework.context.annotation.ConfigurationClassParser#doProcessConfigurationClass(org.springframework.context.annotation.ConfigurationClass, org.springframework.context.annotation.ConfigurationClassParser.SourceClass, java.util.function.Predicate)}
  *                  1. 有@Component 注解，解析成员内部类信息 {@link org.springframework.context.annotation.ConfigurationClassParser#processMemberClasses(org.springframework.context.annotation.ConfigurationClass, org.springframework.context.annotation.ConfigurationClassParser.SourceClass, java.util.function.Predicate)}
- *                  2. 解析 @PropertySource
+ *                  2. 解析 @PropertySource。
+ *                      就是将注解对应的资源文件 构造成 PropertySource 类型的对象，并将对象存到 {@link AbstractEnvironment#propertySources} 属性中，
+ *                      使用 `context.getEnvironment().getProperty("name")` 就能读到 资源文件 中定义的内容了。
  *                  3. 对 @ComponentScans、@ComponentScan 解析。
  *                      实例化 Scanner，默认会添加对@Component 解析的 includeFilter {@link ClassPathBeanDefinitionScanner#ClassPathBeanDefinitionScanner(BeanDefinitionRegistry, boolean, Environment, ResourceLoader)}
  *                      {@link org.springframework.context.annotation.ComponentScanAnnotationParser#parse(org.springframework.core.annotation.AnnotationAttributes, java.lang.String)}
@@ -842,425 +844,6 @@ public class MyApplicationListener implements ApplicationListener<MyApplicationE
  * 2. 使用 @Lazy 注解，不要在初始化的时间就从容器中获取bean，而是直接返回一个代理对象
  * 3. 使用 @Lookup 注解，延迟bean的创建，避免出现循环依赖问题
  */
-```
-## `ProxyFactory#getProxy`
-
-### 示例代码
-
-```java
-public class Test{
-  @Test
-  public void 测试ProxyFactory() {
-    ProxyFactory proxyFactory = new ProxyFactory();
-    /**
-     * 会装饰成 setTargetSource(new SingletonTargetSource(target));
-     * 因为代理对象执行的时候是执行 `targetSource.getTart()` 拿到被代理对象的，所以要将 Demo 包装成 TargetSource 类型
-     **/
-    proxyFactory.setTarget(new Demo());
-    // 是否优化，这个也是决定是否使用cglib代理的条件之一
-    proxyFactory.setOptimize(true);
-    // 接口类型，这个也是决定是否使用cglib代理的条件之一，代理接口的时候才需要设置这个
-    proxyFactory.setInterfaces();
-    // 约束是否使用cglib代理。但是这个没吊用，会有其他参数一起判断的，而且有优化机制 会优先选择cglib代理
-    proxyFactory.setProxyTargetClass(true);
-    /**
-     * addAdvice 会被装饰成 Advisor
-     * 这里不能乱写，因为后面解析的时候 要判断是否实现xx接口的
-     * 解析逻辑 {@link DefaultAdvisorAdapterRegistry#getInterceptors(Advisor)}
-     * */
-    proxyFactory.addAdvice(new MethodBeforeAdvice() {
-      @Override
-      public void before(Method method, Object[] args, Object target) throws Throwable {
-        method.invoke(target, args);
-      }
-    });
-    // 设置 Advisor，有点麻烦 还不如直接通过 addAdvice 设置，自动解析成advisor方便
-    proxyFactory.addAdvisor(new DefaultPointcutAdvisor(new MethodBeforeAdvice() {
-      @Override
-      public void before(Method method, Object[] args, Object target) throws Throwable {
-        method.invoke(target, args);
-      }
-    }));
-    proxyFactory.getProxy();
-  }
-}
-```
-
-### 代理逻辑实现原理
-
-> ### CGLIB代理
->
-> ```txt
-> Enhancer enhancer = new Enhancer();
-> enhancer.setCallbacks([DynamicAdvisedInterceptor,...]);
-> ```
->
-> 使用`new DynamicAdvisedInterceptor(this.advised);` 这个callback来实现对被代理对象的增强。this 就是 ObjenesisCglibAopProxy，而其{@link CglibAopProxy#advised}属性 其实就是 ProxyFactory 从而可以拿到Advisors，从而使用Advisor 对方法进行增强
->
-> ### JDK代理
->
-> ` Proxy.newProxyInstance(classLoader, this.proxiedInterfaces, this)`
->
-> 可以知道 第三个参数(InvocationHandler) 是 this，也就是 JdkDynamicAopProxy，而其{@link JdkDynamicAopProxy#advised}属性 其实就是 ProxyFactory从而可以拿到Advisors
->
-> ### DynamicAdvisedInterceptor、JdkDynamicAopProxy
->
-> 这两个拦截器的执行逻辑如下：
->
-> 1. 得到与当前执行的method匹配的interceptor集合 `AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice`
->
-> 2. 创建实例
->
->    1. `new CglibMethodInvocation(interceptor集合)`
->
->       注：其实是ReflectiveMethodInvocation的子类
->
->    2. `new ReflectiveMethodInvocation(interceptor集合)`
->
-> 3. 执行 `ReflectiveMethodInvocation#proceed()`
-
-### 细说`ProxyFactory#getProxy`
-
-```java
-/**
- * 创建代理对象
- *  {@link ProxyFactory#getProxy(ClassLoader)}
- *  {@link ProxyCreatorSupport#createAopProxy()}
- *
- *
- * 创建 AopProxy {@link DefaultAopProxyFactory#createAopProxy(AdvisedSupport)}
- *      - 简单来说，被代理对象 不是接口 且 不是Proxy的子类 且 {@link AdvisedSupport#getProxiedInterfaces()}至多只有一个SpringProxy类型的接口 就创建 `new ObjenesisCglibAopProxy(config);`
- *      - 否则创建 `new JdkDynamicAopProxy(config);`
- *      注：config 参数其实就是 ProxyFactory对象
- *
- * 使用 AopProxy 创建代理对象 {@link AopProxy#getProxy(ClassLoader)}
- *      {@link ObjenesisCglibAopProxy#getProxy(ClassLoader)}
- *      {@link JdkDynamicAopProxy#getProxy(ClassLoader)}
- *
- * ObjenesisCglibAopProxy 增强逻辑实现原理 {@link ObjenesisCglibAopProxy#getProxy(ClassLoader)}
- *      Enhancer enhancer = new Enhancer();
- *      enhancer.setCallbacks({@link CglibAopProxy#getCallbacks(Class)}); // 执行方法会回调callback
- *          注：会设置  `new DynamicAdvisedInterceptor(this.advised);` callback，this 就是 ObjenesisCglibAopProxy，而其{@link CglibAopProxy#advised}属性 其实就是 ProxyFactory 从而可以拿到Advisors
- *      enhancer.setCallbackFilter(ProxyCallbackFilter); 
- *          返回要执行的 callback 的索引。在Cglib生成代理对象的字节码时会调CallbackFilter，来设置好每个方法的Callback是啥
- *          设置这个属性，生成cglib生成的代理对象字节码，一看就知道了。`System.setProperty(DebuggingClassWriter.DEBUG_LOCATION_PROPERTY, "C:\\Users\\RDS\\Desktop\\1");` 
- *
- *      执行代理对象的方式时会执行 {@link CglibAopProxy.ProxyCallbackFilter#accept(Method)}
- *          就是 除了 finalize、equals、hashcode 等，都会执行 DynamicAdvisedInterceptor 这个callback
- *      也就是执行 {@link CglibAopProxy.DynamicAdvisedInterceptor#intercept(Object, Method, Object[], MethodProxy)}
- *          1. exposeProxy 属性是 true，往 ThreadLocal中记录当前代理对象  `oldProxy=AopContext.setCurrentProxy(proxy)`
- *          2. 获取被代理对象 {@link TargetSource#getTarget()}。这里也是很细节，
- *              比如：
- *                  - TargetSource实例是这个类型的 {@link AbstractBeanFactoryBasedTargetSource}，所以每次获取target都是从IOC容器中拿，也就是说 如果bean是多例的，每次执行都会创建出新的对象。(@Lazy就是这么实现的)
- *                  - 而 Spring Aop，使用的是SingletonTargetSource，特点是将容器的对象缓存了，执行 `getTarget` 才能拿到被代理对象
- *
- *          3. 根据method得到对应的拦截器链 {@link AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice(Method, Class)}
- *              拦截器链是空：反射执行
- *              拦截器链不是空：将拦截器链装饰成 CglibMethodInvocation ，然后执行{@link CglibAopProxy.CglibMethodInvocation#proceed()}，其实就是执行其父类 {@link ReflectiveMethodInvocation#proceed()}
- *              注：拦截器链就是 method 匹配到的 advisor 解析的结果，可以看这里 {@link DefaultAdvisorChainFactory#getInterceptorsAndDynamicInterceptionAdvice(Advised, Method, Class)}
- *          4. exposeProxy 属性是 true，恢复之前的值  `AopContext.setCurrentProxy(oldProxy);`
- *
- * JdkDynamicAopProxy 增强逻辑的实现 {@link JdkDynamicAopProxy#getProxy(ClassLoader)}
- *      `Proxy.newProxyInstance(classLoader, this.proxiedInterfaces, this);` 可以知道 第三个参数(InvocationHandler) 是 this，也就是 JdkDynamicAopProxy，而其{@link JdkDynamicAopProxy#advised}属性 其实就是 ProxyFactory从而可以拿到Advisors
- *      所以执行代理对象的方式时会执行 {@link JdkDynamicAopProxy#invoke(Object, Method, Object[])}
- *          1. 是 equals(子类没有重写的情况下)、hashCode(子类没有重写的情况下)、DecoratingProxy.class 的方法、Advised.class 的方法
- *              直接反射执行
- *          2. exposeProxy 属性是 true，往 ThreadLocal中记录当前代理对象  `oldProxy=AopContext.setCurrentProxy(proxy)`
- *          3. 根据method得到对应的拦截器链 {@link AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice(Method, Class)}
- *              拦截器链是空：反射执行
- *              拦截器链不是空：将拦截器链装饰成 ReflectiveMethodInvocation ，然后执行{@link ReflectiveMethodInvocation#proceed()}
- *              注：拦截器链就是 method 匹配到的 advisor 解析的结果，可以看这里 {@link DefaultAdvisorChainFactory#getInterceptorsAndDynamicInterceptionAdvice(Advised, Method, Class)}
- *          4. exposeProxy 属性是 true，恢复之前的值  `AopContext.setCurrentProxy(oldProxy);`
- * */
-```
-
-### 细说`AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice`
-
-```java
-/**
- * {@link AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice(Method, Class)}
- * {@link DefaultAdvisorChainFactory#getInterceptorsAndDynamicInterceptionAdvice(Advised, Method, Class)}
- *      1. 创建AdvisorAdapterRegistry实例 `AdvisorAdapterRegistry registry = GlobalAdvisorAdapterRegistry.getInstance();`
- *      2. 遍历 {@link Advised#getAdvisors()}属性，其实就是 `new ProxyFactory()` 设置的 advice和advisor参数
- *      3. advisor 是 PointcutAdvisor 类型
- *          - 执行 类匹配+AspectJ匹配
- *          - 匹配正确，使用 AdvisorAdapterRegistry 解析 advisor {@link AdvisorAdapterRegistry#getInterceptors(Advisor)} 成 MethodInterceptor
- *              - 需要在执行时匹配 {@link MethodMatcher#isRuntime()}
- *                  将解析的MethodInterceptor和Pointcut的MethodMatcher 装饰成 `new InterceptorAndDynamicMethodMatcher(interceptor, mm)`
- *                  将装饰结果 一个个添加`interceptorList.add`
- *              - 不需要执行时匹配
- *                  直接 `interceptorList.addAll`
- *      4. advisor 是 IntroductionAdvisor 类型
- *          - 执行 类匹配
- *          - 匹配正确，使用 AdvisorAdapterRegistry 解析 advisor {@link AdvisorAdapterRegistry#getInterceptors(Advisor)} 成 MethodInterceptor
- *              直接 `interceptorList.addAll`
- *      5. 使用 AdvisorAdapterRegistry 解析 advisor {@link AdvisorAdapterRegistry#getInterceptors(Advisor)} 成 MethodInterceptor
- *         直接 `interceptorList.addAll`
- *
- * advisor 解析成 MethodInterceptor 的逻辑 {@link DefaultAdvisorAdapterRegistry#getInterceptors(Advisor)}
- *      1. 声明局部变量 `List<MethodInterceptor> interceptors = new ArrayList<>(3);`
- *      2. 拿到具体Advice `Advice advice = advisor.getAdvice();`
- *      3. advice 是 MethodInterceptor 类型
- *          `interceptors.add(advice)`
- *      4. 遍历AdvisorAdapter {@link DefaultAdvisorAdapterRegistry#adapters}
- *         是适配器支持的Advice {@link AdvisorAdapter#supportsAdvice(Advice)}
- *         使用适配器生成 MethodInterceptor {@link AdvisorAdapter#getInterceptor(Advisor)}
- *         `interceptors.add(MethodInterceptor)`
- *      5. interceptors.isEmpty()
- *          抛出异常，说明这个Advice是非法的
- *      6. 返回 interceptors
- *
- *  注：属性{@link DefaultAdvisorAdapterRegistry#adapters}，会在构造器 {@link DefaultAdvisorAdapterRegistry#DefaultAdvisorAdapterRegistry()} 默认设置3个
- *      1. new MethodBeforeAdviceAdapter()
- *      2. new AfterReturningAdviceAdapter()
- *      3. new ThrowsAdviceAdapter()
- *
- *      如果需要扩展AdviceAdapter，可以往IOC容器中注入这个PostProcessor {@link AdvisorAdapterRegistrationManager}
- *      该PostProcessor的功能：发现创建的bean是AdvisorAdapter类型，就往单例bean {@link GlobalAdvisorAdapterRegistry#instance}
- *          设置AdvisorAdapter {@link AdvisorAdapterRegistry#registerAdvisorAdapter(AdvisorAdapter)}，从而实现扩展adapters
- * */
-```
-
-### 细说`ReflectiveMethodInvocation#proceed()`
-
-```java
-/**
- * JDK      {@link JdkDynamicAopProxy#invoke(Object, Method, Object[])}
- * Cglib    {@link CglibAopProxy.DynamicAdvisedInterceptor#intercept(Object, Method, Object[], MethodProxy)}
- * 
- * 需要代理的方法都是执行 ReflectiveMethodInvocation#proceed
- * */
-
-/**
- * {@link ReflectiveMethodInvocation#proceed()}
- *      注：属性{@link ReflectiveMethodInvocation#interceptorsAndDynamicMethodMatchers}(拦截器集合) 是通过这个方法得到的{@link DefaultAdvisorChainFactory#getInterceptorsAndDynamicInterceptionAdvice(Advised, Method, Class)}
- *
- *  1. currentInterceptorIndex(当前拦截器索引) 已经是最后一个了
- *      反射执行被代理对象的方法 {@link ReflectiveMethodInvocation#invokeJoinpoint()}
- *
- *  2. `Object interceptorOrInterceptionAdvice = interceptorsAndDynamicMethodMatchers.get(++currentInterceptorIndex)` 当前拦截器索引自增再取出拦截器集合元素
- *
- *  3. if-else分支处理：
- *
- *  是 interceptorOrInterceptionAdvice instanceof InterceptorAndDynamicMethodMatcher
- *      执行 interceptorOrInterceptionAdvice.methodMatcher#matches
- *          true：执行拦截器的拦截逻辑 `dm.interceptor.invoke(this);`
- *          false：执行 {@link ReflectiveMethodInvocation#proceed()}，也就是跳过当前拦截器，递归执行
- *
- *  否则 `((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(this);`
- *
- *  注：也就是说只支持 InterceptorAndDynamicMethodMatcher、MethodInterceptor 这两种类型的interceptor。 而 InterceptorAndDynamicMethodMatcher 的特点是
- *      执行时会判断当前方法是否匹配，匹配才执行其拦截方法
- * */
-```
-## ClassPathBeanDefinitionScanner
-
-`ClassPathBeanDefinitionScanner` 是用来扫描包路径下的文件，判断是否符合bean的约定，满足就注册到BeanDefinitionMap中
-
-两种扫描机制：
-
-- 索引扫描：文件`META-INF/spring.components`内写上索引，只扫描索引里面的bean
-
-  ```shell
-  # key 是要注册的bean
-  # value 是includefilter所能解析的注解,可以写多个默认按照`,`分割
-  # 会在实例化 ClassPathBeanDefinitionScanner 的时候，解析 META-INF/spring.components 内容解析到 CandidateComponentsIndex 属性中 
-  cn.haitaoss.service.UserService=org.springframework.stereotype.Component
-  ```
-
-- 包扫描：扫描包下面所有`.class`文件
-
-注：包扫描，默认是扫描包下所有的`.class`文件，你可以搞花活，重写匹配文件的规则
-
-### 原理分析
-
-> 简单描述：
->
-> 1. @ComponentScan 注解
-> 2. 构造扫描器 ClassPathBeanDefinitionScanner
-> 3. 根据 @ComponentScan 注解的属性配置扫描器
-> 4. 扫描: 两种扫描方式
->    - 扫描指定的类：工具目录配置了 `resources/META-INF/spring.components` 内容，就只会扫描里面定义的类。这是Spring扫描的优化机制
->    - 扫描指定包下的所有类：获得扫描路径下所有的class文件（Resource对象）
-> 5. 利用 ASM 技术读取class文件信息
-> 6. ExcludeFile + IncludeFilter + @Conditional 的判断
-> 7. 进行独立类、接口、抽象类 @Lookup的判断  `isCandidateComponent`
-> 8. 判断生成的BeanDefinition是否重复
-> 9. 添加到BeanDefinitionMap容器中
-
-```java
-/**
- * 构造器 {@link ClassPathBeanDefinitionScanner#ClassPathBeanDefinitionScanner(BeanDefinitionRegistry)}
- *      构造器会设置这些属性：
- *      1. this.registry = registry; 因为需要将解析的结果注册到IOC容器中，所以必须要得给个IOC容器
- *      2. 如果参数 useDefaultFilters == true，那么就设置添加默认的(识别@Component注解的) includeFilter {@link ClassPathScanningCandidateComponentProvider#registerDefaultFilters()}
- *          useDefaultFilters 默认就是true
- *      3. setEnvironment(environment); 就是用来读取系统属性和环境变量的
- *      4. setResourceLoader(resourceLoader); 这个很关键，扫描优化机制  {@link ClassPathScanningCandidateComponentProvider#setResourceLoader(ResourceLoader)}
- *          会设置这个属性 componentsIndex，该属性的实例化是执行 {@link CandidateComponentsIndexLoader#loadIndex(ClassLoader)}
- *              然后执行 {@link CandidateComponentsIndexLoader#doLoadIndex(ClassLoader)}
- *              就是会读取ClassLoader里面所有的 META-INF/spring.components 文件 {@link CandidateComponentsIndexLoader#COMPONENTS_RESOURCE_LOCATION}
- *              解析的结果存到 CandidateComponentsIndex 的 LinkedMultiValueMap<String, Entry> 属性中。数据格式： key:注解的全类名 Entry<bean全类名,包名>
- *
- *                 举例：META-INF/spring.components
- *                 cn.haitaoss.service.UserService=org.springframework.stereotype.Component
- *                 解析的结果就是 < org.springframework.stereotype.Component , Entry(cn.haitaoss.service.UserService,cn.haitaoss.service) >
- *
- *
- * 执行扫描 {@link ClassPathBeanDefinitionScanner#doScan(String...)}
- *      1. 入参就是包名，遍历包路径，查找候选的组件 {@link ClassPathScanningCandidateComponentProvider#findCandidateComponents(String)}
- *          有两种查找机制(会将查找结果返回)：
- *              第一种：属性componentsIndex不为空(也就是存在META-INF/spring.components) 且 所有includeFilter都满足{@link ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilter(TypeFilter)}
- *                     走索引优化策略 {@link ClassPathScanningCandidateComponentProvider#addCandidateComponentsFromIndex(CandidateComponentsIndex, String)}
- *
- *              第二种：扫描包下所有的资源 {@link ClassPathScanningCandidateComponentProvider#scanCandidateComponents(String)}
- *
- *      2. 返回结果，检查容器中是否存在这个 BeanDefinition，{@link ClassPathBeanDefinitionScanner#checkCandidate(String, BeanDefinition)}
- *
- *      3. 返回结果 注册到 BeanDefinitionMap 中 {@link ClassPathBeanDefinitionScanner#registerBeanDefinition(BeanDefinitionHolder, BeanDefinitionRegistry)}
- *
- *
- * 第一种查找机制流程：{@link ClassPathScanningCandidateComponentProvider#addCandidateComponentsFromIndex(CandidateComponentsIndex, String)}
- *      - 遍历includeFilters属性，拿到要扫描的注解值(默认就是@Compoent)，这个就是key {@link ClassPathScanningCandidateComponentProvider#extractStereotype(TypeFilter)}
- *      - key 取 CandidateComponentsIndex#index，拿到的就是 META-INF/spring.components 按照value分组后的key的集合信息
- *             然后判断 META-INF/spring.components 文件内容定义的bean的包名是否满足 扫描的包路径 {@link CandidateComponentsIndex#getCandidateTypes(String, String)}
- *      - 进行 ExcludeFiles + IncludeFilters + @Conditional 判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(MetadataReader)}
- *      - 进行独立类、接口、抽象类 @Lookup的判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(AnnotatedBeanDefinition)}
- *      - 满足条件添加到集合 candidates 中
- *
- * 第二种查找机制：{@link ClassPathScanningCandidateComponentProvider#scanCandidateComponents(String)}
- *      - 拿到包下所有的 class 文件 {@link ClassPathScanningCandidateComponentProvider#DEFAULT_RESOURCE_PATTERN}
- *      - 进行 ExcludeFiles + IncludeFilters + @Conditional 判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(MetadataReader)}
- *      - 进行独立类、接口、抽象类 @Lookup的判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(AnnotatedBeanDefinition)}
- *      - 满足条件添加到集合 candidates 中
- * */
-```
-
-### 索引扫描判断流程
-
-```java
-/**
- * 索引扫描判断流程：
- *
- * 1. 扫描组件 {@link ClassPathScanningCandidateComponentProvider#findCandidateComponents(String)}
- *
- * 2. 判断扫描器的 includeFilters 是否都支持索引扫描 {@link org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilters()}
- *
- * 3. 判断是否支持索引扫描的逻辑{@link ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilter(TypeFilter)}
- *      是这种类型 filter instanceof AnnotationTypeFilter
- *          filter.getAnnotationType() 有@Indexed注解 或者 是javax. 包下的类
- *
- *      是这种类型 filter instanceof AssignableTypeFilter
- *          filter.getTargetType() 有@Indexed注解
- */
-```
-
-### AnnotationTypeFilter 匹配逻辑
-
-```java
-/**
- * {@link AbstractTypeHierarchyTraversingFilter#match(MetadataReader, MetadataReaderFactory)}
- * 
- * 1. 匹配bean是否有注解 {@link AbstractTypeHierarchyTraversingFilter#matchSelf(MetadataReader)}
- *      返回true，就return
- *
- * 2. 属性：considerInherited 为 true(通过构造器设置的)
- *      bean的父类 {@link AbstractTypeHierarchyTraversingFilter#matchSuperClass(String)}
- *          返回true，就return
- *      递归调 {@link AbstractTypeHierarchyTraversingFilter#match(MetadataReader, MetadataReaderFactory)}
- *
- * 3. 属性：considerInterfaces 为 true(通过构造器设置的)
- *      bean的接口 {@link AbstractTypeHierarchyTraversingFilter#matchInterface(String)}
- *          返回true，就return
- *      递归调 {@link AbstractTypeHierarchyTraversingFilter#match(MetadataReader, MetadataReaderFactory)}
- * */
-```
-
-### @ComponentScan
-
-```java
-@ComponentScan(
-        basePackages = "cn", // 扫描包路径
-        useDefaultFilters = true, // 是否注册默认的 includeFilter，默认会注解扫描@Component注解的includeFilter
-        nameGenerator = BeanNameGenerator.class, // beanName 生成器
-    		excludeFilters = {}, // 扫描bean 排除filter。其中一个命中就不能作为bean
-        includeFilters = {@ComponentScan.Filter(type = FilterType.CUSTOM, classes = MyAnnotationTypeFilter.class)} // 扫描bean 包含filter。其中一个命中就能作为bean
-)
-public class A{}
-```
-
-### 索引扫描示例
-
-`META-INF/spring.components` 文件
-
-```properties
-cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$MyAnnotation
-#cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$Haitao
-```
-
-代码：
-
-```java
-@Component
-/*@ComponentScan( 
-        basePackages = "cn",
-        useDefaultFilters = true,
-        nameGenerator = BeanNameGenerator.class,
-        includeFilters = {@ComponentScan.Filter(type = FilterType.CUSTOM, classes = MyAnnotationTypeFilter.class)}, // 这个可以重写 AbstractTypeHierarchyTraversingFilter#match 定制匹配规则
-        excludeFilters = {}
-)*/
-@ComponentScan(includeFilters = {@ComponentScan.Filter(type = FilterType.ANNOTATION, classes = MyAnnotationTypeFilter.Haitao.class)}) // 这个用起来方便，有这个注解 就可以
-public class Test {}
-
-@MyAnnotationTypeFilter.Haitao
-class AService {}
-
-/**
- * 索引扫描判断流程：
- *
- * 1. 扫描组件 {@link org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#findCandidateComponents(String)}
- *
- * 2. 判断扫描器的 includeFilters 是否都支持索引扫描 {@link org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilters()}
- *
- * 3. 判断是否支持索引扫描的逻辑{@link org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilter(TypeFilter)}
- *      是这种类型 filter instanceof AnnotationTypeFilter
- *          filter.getAnnotationType() 有@Indexed注解 或者 是javax. 包下的类
- *
- *      是这种类型 filter instanceof AssignableTypeFilter
- *          filter.getTargetType() 有@Indexed注解
- */
-
-/**
- * 对应的配置文件：META-INF/spring.components
- * - cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$MyAnnotation
- * - cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$Haitao
- * */
-class MyAnnotationTypeFilter extends AnnotationTypeFilter {
-    @Indexed // 这个是必须的，否则无法使用 索引扫描
-    class MyAnnotation implements Annotation {
-        @Override
-        public Class<? extends Annotation> annotationType() {
-            return MyAnnotation.class;
-        }
-    }
-
-    @Target(ElementType.TYPE)
-    @Indexed
-    @Retention(RetentionPolicy.RUNTIME)
-    @interface Haitao {}
-
-    public MyAnnotationTypeFilter() {
-        // super(MyAnnotation.class);
-        super(Haitao.class);
-    }
-
-    @Override
-    public boolean match(MetadataReader metadataReader, MetadataReaderFactory metadataReaderFactory) throws IOException {
-        // 匹配方法
-        return true;
-    }
-}
-
 ```
 ## 依赖注入原理
 > ### Spring依赖注入注解
@@ -1811,449 +1394,6 @@ public class Test {
  * Tips: 具体的转换功能是有 PropertyEditor 和 ConversionService 实现的，而 ConversionService 的具体转换功能是由 GenericConverter 实现的。
  * */
 ```
-## 类型转换
-
-[原理看这里](#细说`TypeConverterSupport#convertIfNecessary` )
-
-> `PropertyEditor` 是JDK提供的，`ConversionService`是Spring提供的。而`TypeConverter`是聚合了这两个东西
->
-> 注入 `CustomEditorConfigurer` 可以扩展`TypeConverter`中的`PropertyEditor`
-
-### `PropertyEditorTest`
-
-```java
-@Component
-public class PropertyEditorTest {
-
-
-    @Bean
-    public A a() {
-        return new A();
-    }
-
-    @Data
-    public static class A {
-        private String name;
-
-        @Autowired
-        public void x(@Value("hello world!!!") A a) {
-            System.out.println(a);
-        }
-    }
-
-    @Bean
-    public CustomEditorConfigurer myCustomEditorConfigurer() {
-        CustomEditorConfigurer customEditorConfigurer = new CustomEditorConfigurer();
-
-        Map<Class<?>, Class<? extends PropertyEditor>> customEditors = new HashMap<>();
-        customEditors.put(A.class, MyPropertyEditor.class);
-        customEditorConfigurer.setCustomEditors(customEditors);
-
-        customEditorConfigurer.setPropertyEditorRegistrars(new PropertyEditorRegistrar[]{new PropertyEditorRegistrar() {
-            @Override
-            public void registerCustomEditors(PropertyEditorRegistry registry) {
-                registry.registerCustomEditor(A.class, new MyPropertyEditor());
-                registry.registerCustomEditor(A.class, null, new MyPropertyEditor());
-                if (registry instanceof SimpleTypeConverter) {
-                    SimpleTypeConverter.class.cast(registry).overrideDefaultEditor(A.class, new MyPropertyEditor());
-                }
-            }
-        }});
-
-        return customEditorConfigurer;
-    }
-
-    public static class MyPropertyEditor extends PropertyEditorSupport {
-        @Override
-        public void setValue(Object value) {
-            if (value instanceof String) {
-                A a = new A();
-                a.setName((String) value);
-            }
-            super.setValue(value);
-        }
-
-        @Override
-        public void setAsText(String text) throws IllegalArgumentException {
-            A a = new A();
-            a.setName(text);
-            this.setValue(a);
-        }
-
-        public static void main(String[] args) {
-            /**
-             * 使用就是 setValue(Object) setAsText(String) 设置转换值
-             * getValue() 就是拿到转换的结果
-             * */
-            MyPropertyEditor myPropertyEditor = new MyPropertyEditor();
-            //        myPropertyEditor.setAsText("hah");
-            myPropertyEditor.setValue("hah");
-            System.out.println(myPropertyEditor.getValue());
-        }
-    }
-
-    public static void main(String[] args) throws Exception {
-        new AnnotationConfigApplicationContext(PropertyEditorTest.class);
-    }
-
-}
-```
-
-### `ConversionServiceTest`
-
-```java
-@Component
-public class ConversionServiceTest {
-
-
-    @Bean
-    public A a() {
-        return new A();
-    }
-
-    @Data
-    public static class A {
-        private String name;
-
-        @Value("2022-08-11")
-        @DateTimeFormat(pattern = "yyyy-MM-dd")
-        private Date date = new Date();
-
-        @Value("101.11")
-        @NumberFormat(pattern = "#")
-        private Integer money;
-
-        @Value("code,play")
-        private String[] jobs;
-
-        @Autowired
-        public void x(@Value("hello world!!!") A a) {
-            System.out.println(a);
-        }
-    }
-
-    @Bean// 名字必须是 conversionService 因为在依赖注入的时候是通过这个名字拿的
-    public static ConversionService conversionService() {
-        // DefaultFormattingConversionService 功能强大： 类型转换 + 格式化
-        DefaultFormattingConversionService defaultFormattingConversionService = new DefaultFormattingConversionService();
-        defaultFormattingConversionService.addConverter((Converter<String, A>) source -> {
-            A a = new A();
-            a.setName(source);
-            return a;
-        });
-
-        return defaultFormattingConversionService;
-    }
-
-    public static void main(String[] args) throws Exception {
-        new AnnotationConfigApplicationContext(ConversionServiceTest.class);
-    }
-
-}
-```
-
-### `TypeConverterTest`
-
-```java
-public class TypeConverterTest {
-    @Data
-    public static class A {
-        private String name;
-    }
-
-    public static void main(String[] args) {
-        SimpleTypeConverter simpleTypeConverter = new SimpleTypeConverter();
-
-        simpleTypeConverter.registerCustomEditor(A.class, new PropertyEditorSupport() {
-            @Override
-            public void setAsText(String text) throws IllegalArgumentException {
-                A a = new A();
-                a.setName(text);
-                super.setValue(a);
-            }
-        });
-        /*DefaultConversionService conversionService = new DefaultConversionService();
-        conversionService.addConverter(new Converter<String, A>() {
-            @Override
-            public A convert(String source) {
-                A a = new A();
-                a.setName(source);
-                return a;
-            }
-        });
-        simpleTypeConverter.setConversionService(conversionService);*/
-        System.out.println(simpleTypeConverter.convertIfNecessary("123", A.class));
-    }
-}
-```
-## SpEL
-
-> [Spring官方文档](https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#expressions)
-
-### SpEL_Simple_Demo
-
-```java
-@Data
-public class SpEL_Simple_Demo {
-    private String name;
-
-    public static void main(String[] args) {
-        // 构造器参数就是根对象
-        StandardEvaluationContext context = new StandardEvaluationContext(new SpEL_Simple_Demo());
-        context.setVariable("newName", "Mike Tesla");
-
-        ExpressionParser parser = new SpelExpressionParser();
-        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
-        // 字符串
-        System.out.println(consumer.apply("'a'"));
-        // 运算
-        System.out.println(consumer.apply("1+1"));
-        // 给root对象的属性赋值
-        System.out.println(consumer.apply("name = #newName"));
-        // 给变量赋值
-        System.out.println(consumer.apply("#newName = 'haitao'"));
-
-        System.out.println(consumer.apply("#newName2")); // 没有这个变量也不会报错，就是null而已
-
-    }
-}
-```
-
-### SpEL_root
-
-```java
-public class SpEL_root {
-    public String name;
-
-    public static void main(String[] args) {
-        // 构造器参数就是根对象
-        StandardEvaluationContext context = new StandardEvaluationContext(new SpEL_root()) {
-            @Override
-            public Object lookupVariable(String name) {
-                /**
-                 * 访问变量会执行这个
-                 * 就是 "#a" 才会执行
-                 * 注："#root" 这个比较特殊，不是回调该方法获取的
-                 * */
-                System.out.print("lookupVariable--->" + name + "===>");
-                return super.lookupVariable(name);
-            }
-        };
-        ExpressionParser parser = new SpelExpressionParser();
-        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
-
-        /**
-         * #root.name 访问根对象的属性
-         * 访问root对象的属性，可以简化成 name
-         * #root 是访问根对象，因为root是关键字，不会回调 lookupVariable 获取变量
-         * */
-        System.out.println(consumer.apply("name"));
-        System.out.println(consumer.apply("#root"));
-        System.out.println(consumer.apply("#root.name"));
-
-    }
-}
-
-```
-
-### SpEL_PropertyAccessor
-
-```java
-public class SpEL_PropertyAccessor {
-    public String name;
-
-    public static void main(String[] args) {
-        StandardEvaluationContext context = new StandardEvaluationContext(new SpEL_PropertyAccessor());
-        ExpressionParser parser = new SpelExpressionParser();
-        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
-
-        /**
-         * PropertyAccessor 用来解析属性是怎么取值的
-         *
-         * 就是 "a" 才会执行
-         * */
-        context.addPropertyAccessor(new PropertyAccessor() {
-            @Override
-            public Class<?>[] getSpecificTargetClasses() {
-                //                return new Class[0];
-                /**
-                 * 返回 null，表示都满足
-                 * 不会null，就会匹配 EvaluationContext 类型，匹配了才会使用这个 PropertyAccessor
-                 * {@link PropertyOrFieldReference#readProperty(TypedValue, EvaluationContext, String)}
-                 *  {@link PropertyOrFieldReference#getPropertyAccessorsToTry(Object, List)}
-                 * */
-                return null;
-            }
-
-            @Override
-            public boolean canRead(EvaluationContext context, Object target, String name) throws AccessException {
-                System.out.print("canRead...." + name + "\t");
-                return true;
-            }
-
-            @Override
-            public TypedValue read(EvaluationContext context, Object target, String name) throws AccessException {
-                System.out.print("read...." + name + "\t");
-                return new TypedValue(name);
-            }
-
-            @Override
-            public boolean canWrite(EvaluationContext context, Object target, String name) throws AccessException {
-                return false;
-            }
-
-            @Override
-            public void write(EvaluationContext context, Object target, String name, Object newValue) throws AccessException {
-
-            }
-        });
-
-        System.out.println(consumer.apply("name"));
-        System.out.println(consumer.apply("x"));
-        System.out.println(consumer.apply("#variable"));
-    }
-}
-```
-
-### SpEL_ParserContext
-
-```java
-public class SpEL_ParserContext {
-    public static void main(String[] args) {
-        StandardEvaluationContext context = new StandardEvaluationContext();
-        ExpressionParser parser = new SpelExpressionParser();
-
-        // 模板解析上下文，就是可以去掉模板字符
-        System.out.println(parser.parseExpression("#{#variable}",
-                new TemplateParserContext()).getValue(context));
-    }
-}
-```
-
-### SpEL_lookupVariable
-
-```java
-public class SpEL_lookupVariable {
-    public static void main(String[] args) {
-        StandardEvaluationContext context = new StandardEvaluationContext() {
-            @Override
-            public Object lookupVariable(String name) {
-                /**
-                 * 访问变量会执行这个
-                 * 就是 "#a" 才会执行
-                 * 注："#root" 这个比较特殊，不是回调该方法获取的
-                 * */
-                System.out.print("lookupVariable--->" + name + "===>");
-                return super.lookupVariable(name);
-            }
-        };
-        // 设置变量
-        context.setVariable("newName", "Mike Tesla");
-
-        ExpressionParser parser = new SpelExpressionParser();
-        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
-
-        /**
-         * name变量的值，这样子写就是访问属性。
-         *
-         * root对象的访问方式：
-         *  1. name
-         *  2. #name
-         *  3. #root.name
-         *
-         * 普通变量的访问方式：
-         *  1. #newName
-         * */
-        System.out.println(consumer.apply("#name"));
-        System.out.println(consumer.apply("#root"));
-        System.out.println(consumer.apply("#newName"));
-
-    }
-}
-```
-
-### SpEL_BeanResolver
-
-```java
-public class SpEL_BeanResolver {
-
-    public static void main(String[] args) {
-        StandardEvaluationContext context = new StandardEvaluationContext();
-        ExpressionParser parser = new SpelExpressionParser();
-        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
-
-        /**
-         * 设置BeanResolver,就是 @ 开头的会通过这个解析值
-         * */
-        context.setBeanResolver(new BeanResolver() {
-            @Override
-            public Object resolve(EvaluationContext context, String beanName) throws AccessException {
-                return "通过BeanResolver解析的值-->" + beanName;
-            }
-        });
-        // 会使用BeanResolver 解析
-        System.out.println(consumer.apply("@a"));
-        // 模板解析上下文，就是可以去掉模板字符
-        System.out.println(parser.parseExpression("#{@x}",
-                new TemplateParserContext()).getValue(context));
-    }
-}
-```
-
-### MethodSpELTest
-
-```java
-public class MethodSpELTest {
-    public static class MyStandardEvaluationContext extends StandardEvaluationContext {
-        private Object[] methodArgs;
-        private boolean resolved;
-
-        public void setMethodArgs(Object[] methodArgs) {
-            this.methodArgs = methodArgs;
-        }
-
-        @Override
-        public Object lookupVariable(String name) {
-            if (!resolved) {
-                resolvedMethodArgs();
-            }
-            return super.lookupVariable(name);
-        }
-
-        private void resolvedMethodArgs() {
-            for (int i = 0; i < methodArgs.length; i++) {
-                setVariable("p" + i, methodArgs[i]);
-                setVariable("a" + i, methodArgs[i]);
-            }
-            resolved = true;
-        }
-    }
-
-    public static void method(String a, Object object) {
-    }
-
-    public static void main(String[] args) throws Exception {
-        // 执行方法
-        Class<MethodSpELTest> methodSpELTestClass = MethodSpELTest.class;
-        Method method = methodSpELTestClass.getMethod("method", String.class, Object.class);
-        Object[] methodArgs = {"hello SpEL", new Object()};
-        method.invoke(null, methodArgs);
-
-        // 讲方法的入参 传入 构造 StandardEvaluationContext
-        ExpressionParser parser = new SpelExpressionParser();
-        MyStandardEvaluationContext evaluationContext = new MyStandardEvaluationContext();
-        evaluationContext.setMethodArgs(methodArgs);
-        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(evaluationContext);
-
-        // 进行表达式解析时 就能用到我们设置的变量了
-        System.out.println(consumer.apply("#a0.contains('SpEL')"));
-        System.out.println(consumer.apply("#a0.contains('haitao')"));
-    }
-}
-```
-
-
-
 ## @EnableAspectJAutoProxy
 
 > [示例代码](#@Aspect)
@@ -5126,7 +4266,10 @@ public class EnableCachingTest {
  *  2. 装饰成 CacheOperationContext `return new CacheOperationContext(metadata, args, target);`
  *      2.1 提取参数 `this.args = extractArgs(metadata.method, args);`
  *          {@link CacheAspectSupport.CacheOperationContext#extractArgs(Method, Object[])}
- *          目的是处理方法的最后一个参数是可变参数的情况。若是可变参数，就拿到最后一个参数，将其铺平，和其它参数放在一块
+ *          处理方法的最后一个参数是可变参数的情况。若是可变参数，就拿到最后一个参数，将其铺平，和其它参数放在一块
+ *          目的是：在生成缓存key时会根据方法参数来生成，方法的入参相同应当是同一个key。
+ *                  但是动态参数的入参每次都是new数组来存储，这就导致方法的参数是一样的，但是动态参数是不同的对象，          
+ *                  所以这里需要将动态参数给铺平
  *
  *      2.2 获取 Caches `this.caches = CacheAspectSupport.this.getCaches(this, metadata.cacheResolver);`
  *          {@link CacheAspectSupport#getCaches(CacheOperationInvocationContext, CacheResolver)}
@@ -6237,13 +5380,1594 @@ public class Test {
 }
 ```
 
-## @Qualifier
-
-## @Value
-
-## @Autowired
-
 ## @PropertySource
+
+> [@PropertySource官方文档](https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#beans-using-propertysource)
+>
+> `@PropertySource`得标注在配置类上。会将其资源文件解析成Properties对象，然后装饰成PropertySource对象，再存到Environment中，然后在使用Environment获取属性时，就能读到配置文件的内容了。
+>
+> 用处：
+>
+> 1. 解析占位符 [`@Value("${name}")`](#AbstractEnvironment#resolvePlaceholders)
+> 2. 获取属性 [context.getEnvironment().getProperty("name")](#AbstractEnvironment.getProperty)
+>
+
+### 示例代码
+
+#### @PropertySource的使用
+
+```java
+/**
+ * @author haitao.chen
+ * email haitaoss@aliyun.com
+ * date 2022-11-18 11:31
+ * 基本用法
+ */
+@PropertySource(
+        // 这四种写法没有区别，都是会移除前缀 classpath: ，移除路径开头的 / ，然后使用 ClassLoader 获取资源
+        // value = {"classpath:properties/My.properties", "classpath:properties/My2.properties"}
+        // value = {"classpath:/properties/My.properties", "classpath:/properties/My2.properties"}
+        // value = {"/properties/My.properties", "/properties/My2.properties"}
+        value = {"properties/My.properties", "properties/My2.properties", "properties/My3.properties"}
+
+        // 可以写占位符，占位符的值是资源文件的路径
+        //        value = "${config_file}"
+
+        // 不支持 classpath* 因为用的资源解析器是解析单个的
+        //        value = {"classpath*:properties/My.properties", "classpath*:properties/My2.properties"}
+)
+//@PropertySources(value = {@PropertySource("")})
+@Component
+public class PropertySourceTest {
+    @Value("${namexxx:default_name}") // 占位符的值，就是通过属性获取的
+    public String name;
+
+    public static void main(String[] args) throws IOException {
+        ApplicationContext context = new AnnotationConfigApplicationContext(PropertySourceTest.class);
+        System.out.println(context.getBean(PropertySourceTest.class).name);
+        Environment environment = context.getEnvironment();
+        // 获取属性
+        System.out.println(environment.getProperty("name"));
+        // 解析占位符
+        System.out.println(environment.resolvePlaceholders("${name}"));
+    }
+}
+```
+
+#### 注册Yml内容的属性文件
+
+```java
+/**
+ * @author haitao.chen
+ * email haitaoss@aliyun.com
+ * date 2022-11-18 11:31
+ * 使用 PropertySourceFactory 解析yml格式的文件
+ */
+@PropertySource(value = {
+        "properties/My3.properties",
+        "properties/My4.yaml",
+        "properties/My5.yml"},
+        factory = PropertySourceFactoryTest.MyPropertySourceFactory.class)
+@Component
+public class PropertySourceFactoryTest {
+    public static class MyPropertySourceFactory extends DefaultPropertySourceFactory {
+        @Override
+        public org.springframework.core.env.PropertySource<?> createPropertySource(String name, EncodedResource resource) throws IOException {
+            String filename = resource.getResource().getFilename();
+            if (filename.endsWith(".yml") || filename.endsWith(".yaml")) {
+                // 解析 yml 的工具类
+                YamlPropertiesFactoryBean yamlPropertiesFactoryBean = new YamlPropertiesFactoryBean();
+                yamlPropertiesFactoryBean.setResources(resource.getResource());
+                Properties yamlPropertiesFactoryBeanObject = yamlPropertiesFactoryBean.getObject();
+
+                // 将 Properties 构造成 ProperSource 对象
+                return new PropertiesPropertySource(StringUtils.hasText(name) ? name : filename,
+                        yamlPropertiesFactoryBeanObject);
+            }
+            // 解析 properties 文件
+            return super.createPropertySource(name, resource);
+        }
+    }
+
+    public static void main(String[] args) throws IOException {
+        ApplicationContext context = new AnnotationConfigApplicationContext(PropertySourceFactoryTest.class);
+        System.out.println(context.getEnvironment().getProperty("name"));
+        System.out.println(context.getEnvironment().getProperty("yml_name"));
+        System.out.println(context.getEnvironment().getProperty("yaml_name"));
+    }
+}
+```
+
+#### 模拟配置中心1
+
+```java
+
+/**
+ * @author haitao.chen
+ * email haitaoss@aliyun.com
+ * date 2022-11-18 11:31
+ * 模拟配置中心：重写 AbstractApplicationContext#initPropertySources 的方式
+ */
+@Component
+@Data
+public class Config_Center_Test {
+    @Value("${name}")
+    private String configCenterName;
+
+    public static void main(String[] args) throws IOException {
+        GenericApplicationContext context = new AnnotationConfigApplicationContext(Config_Center_Test.class) {
+            @Override
+            protected void initPropertySources() {
+                // 会初始化environment属性，默认是这个类型的 StandardEnvironment
+                ConfigurableEnvironment environment = getEnvironment();
+
+                // 设置必要的属性，在refresh阶段校验 environment 不存在这些属性，就直接报错
+                environment.setRequiredProperties("name");
+
+                // 拿到 environment 存储属性的对象
+                MutablePropertySources propertySources = environment.getPropertySources();
+
+                try {
+                    System.out.println("模拟从配置中心读取配置文件");
+                    // 加载资源文件。改成url就能实现配置中心的效果
+                    Resource resource = getResource("file:///Users/haitao/Desktop/spring-framework/spring-mytest/src/main/resources/properties/My.properties");
+                    ResourcePropertySource resourcePropertySource = new ResourcePropertySource(resource);
+                    propertySources.addLast(resourcePropertySource);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
+        System.out.println("context.getBean(Config_Center_Test.class).getConfigCenterName() = " + context.getBean(Config_Center_Test.class).getConfigCenterName());
+
+        // 获取属性
+        System.out.println(context.getEnvironment().getProperty("name"));
+    }
+}
+```
+
+#### 模拟配置中心2
+
+```java
+
+/**
+ * @author haitao.chen
+ * email haitaoss@aliyun.com
+ * date 2022-11-18 11:31
+ * 模拟配置中心：通过Bean的回调方法
+ */
+@Component
+@Data
+public class Config_Center_Test2 {
+
+    @Component
+    public static class MyBeanDefinitionRegistryPostProcessor implements BeanDefinitionRegistryPostProcessor, ApplicationContextAware {
+
+        private ApplicationContext context;
+
+        @Override
+        public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
+            // 扩展自定义的 PropertySource
+            MutablePropertySources propertySources = ((ConfigurableEnvironment) context.getEnvironment()).getPropertySources();
+
+            try {
+                System.out.println("模拟从配置中心读取配置文件");
+                // 加载资源文件。改成url就能实现配置中心的效果
+                Resource resource = context.getResource("file:///Users/haitao/Desktop/spring-framework/spring-mytest/src/main/resources/properties/My.properties");
+                ResourcePropertySource resourcePropertySource = new ResourcePropertySource(resource);
+                propertySources.addLast(resourcePropertySource);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Override
+        public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
+
+        }
+
+        @Override
+        public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+            this.context = applicationContext;
+        }
+    }
+
+    @Value("${name}")
+    private String configCenterName;
+
+    public static void main(String[] args) throws IOException {
+        GenericApplicationContext context = new AnnotationConfigApplicationContext(Config_Center_Test2.class);
+        System.out.println("getConfigCenterName() = " + context.getBean(Config_Center_Test2.class).getConfigCenterName());
+
+        // 获取属性
+        System.out.println(context.getEnvironment().getProperty("name"));
+    }
+}
+```
+
+### ConfigurationClassParser#processPropertySource
+
+```java
+/**
+ * @PropertySources和@PropertySource 是在解析配置类的时候，会处理配置类上的 @PropertySources、@PropertySource 注解,所以要想生效，就得标注在配置类上。
+ *
+ * 作用：就是将注解要加载的文件解析成 ProperSource 类型的对象，存到 environment 中。而 environment 是在解析占位符的时候会用到 @Value,@Scheduler(cron="")，获取属性 等等地方会用到
+ *
+ * 解析配置类 {@link ConfigurationClassParser#doProcessConfigurationClass(ConfigurationClass, ConfigurationClassParser.SourceClass, Predicate)}
+ * 从配置类上找到 @PropertySource、PropertySources 注解，然后遍历进行处理 {@link ConfigurationClassParser#processPropertySource(AnnotationAttributes)}
+ *
+ * 解析 @PropertySource 注解。
+ * {@link ConfigurationClassParser#processPropertySource(AnnotationAttributes)}
+ *      1. name `String name = propertySource.getString("name");`
+ *          是空字符串，就设置为null
+ *
+ *      2. 文件编码 `String encoding = propertySource.getString("encoding");`
+ *          是空字符串，就设置为null
+ *
+ *      3. 资源文件 `String[] locations = propertySource.getStringArray("value");`
+ *          没有设置，就报错。所以至少得有一个
+ *
+ *      4. 拿到 PropertySourceFactory 实例
+ *         Class factoryClass = propertySource.getClass("factory"); // 默认值 PropertySourceFactory.class
+ *         PropertySourceFactory factory = (factoryClass == PropertySourceFactory.class
+ *                  ? DEFAULT_PROPERTY_SOURCE_FACTORY : BeanUtils.instantiateClass(factoryClass));
+ *
+ *          注：默认是 DefaultPropertySourceFactory ，否则就反射实例化得到 PropertySourceFactory 。
+ *              DefaultPropertySourceFactory 不支持解析yml格式的内容，所以要想导入 yml 格式的内容需要自定义，
+ *              {@link YamlPropertiesFactoryBean#getObject()} 这个是Spring提供的，可解析yml内容成Properties对象，有了Properties对象
+ *              就可以构造出 PropertySource 对象
+ *
+ *      5. 遍历 locations
+ *          5.1 解析占位符 `String resolvedLocation = this.environment.resolveRequiredPlaceholders(location);`
+ *              注：默认是解析 ${xx} 占位符
+ *
+ *          5.2 获取资源文件  `Resource resource = this.resourceLoader.getResource(resolvedLocation);`
+ *              注：默认使用的是 DefaultResourceLoader
+ *
+ *          5.3 添加  `addPropertySource(factory.createPropertySource(name, new EncodedResource(resource, encoding)));`
+ *              注：就是使用 PropertySourceFactory 对象将 Resource 对象加工成 PropertySource 对象，然后将 PropertySource 存到起来
+ *
+ * */
+
+```
+
+### ConfigurationClassParser#addPropertySource
+
+```java
+/**
+ * 添加 PropertySource 对象
+ * {@link ConfigurationClassParser#addPropertySource(org.springframework.core.env.PropertySource)}
+ *      1. 拿到name，默认就是文件的路径 `String name = propertySource.getName();`
+ *
+ *      2. 拿到MutablePropertySources `MutablePropertySources propertySources = ((ConfigurableEnvironment) this.environment).getPropertySources();`
+ *
+ *      3. 已经添加过了 `if this.propertySourceNames.contains(name) `
+ *              3.1 拿到存在的值 `PropertySource<?> existing = propertySources.get(name);`
+ *
+ *              3.2 存在的是 if existing instanceof CompositePropertySource
+ *                  将新添加的 PropertySource 追加进去。PropertySource 放到集合的前面，从而保证优先使用
+ *                  `((CompositePropertySource) existing).addFirstPropertySource(PropertySource);`
+ *
+ *              3.3 不是 CompositePropertySource 类型
+ *                  构造新对象
+ *                      `CompositePropertySource composite = new CompositePropertySource(name);`
+ *                  将新的值和存在的值 添加到 composite 中
+ *                      `composite.addPropertySource(newSource);`
+ *                      `composite.addPropertySource(existing);`
+ *                  替换存在的值
+ *                      `propertySources.replace(name, composite);`
+ *
+ *              3.4 return
+ *
+ *              注：只有 existing 不是 null，才会惊喜扩展或者替换
+ *
+ *      4. 没有添加过的情况
+ *          4.1 添加
+ *              拿到最后一个的name `String firstProcessed = this.propertySourceNames.get(this.propertySourceNames.size() - 1);`
+ *              放到最后一个之前 `propertySources.addBefore(firstProcessed, propertySource);`
+ *              注：也就是使用@PropertySource注册属性文件，后添加的会先生效
+ *
+ *          4.2 记录添加过了 `this.propertySourceNames.add(name);`
+ *
+ *  Tips：说白了就是将 @PropertySource 解析结果 PropertySource 对象，存到 {@link ConfigurableEnvironment#getPropertySources()} 属性中
+ * */
+```
+## @Profile
+
+> ### @Profile说明
+>
+> - `@Profile`可以标注在类或者方法上，其作用是 决定bean是否注册到BeanFactory中，看代码就知道是通过[@Conditional](#@Conditional)实现的
+> - 与`@Profile`比较的值是读取属性(系统属性、环境变量、[@PropertySource](#@PropertySource))`spring.profiles.default`或者`spring.profiles.active`得到的。
+> - IOC容器读取属性的工具类 `AbstractEnvironment`
+>
+> ### `@Profile`支持的特殊符号： !、&、|、()
+>
+> 注意：不适用括号就不能混合使用 `& |` 比如
+>  *      “production & us-east | eu-central” 是不支持的，会解析报错
+>  *      ”production & (us-east | eu-central)“ 这样子才可以
+>
+> [@Profile官方文档](https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#beans-definition-profiles-java) 
+
+### 示例代码
+
+```java
+@Component
+@Profile("haitao|haitao2|(haitao&haitao)") //支持的特殊符号： !、&、|、()
+public class ProfileTest {
+    
+    @Bean
+    @Profile("haitao")
+    public static Object object() {
+        return new Object();
+    }
+    
+    public static void main(String[] args) {
+        // 1. 系统环境变量设置激活的Profile：export SPRING_PROFILES_ACTIVE=profile1,
+        // 2. JVM系统参数设置激活的Profile： -Dspring.profiles.active="profile1,profile2"
+        // 3. Java代码设置激活的Profile
+        // System.setProperty("spring.profiles.active", "hait  ao,haitao1,    haitao2"); // 会移除空格 + 支持使用','分割
+        // System.setProperty("spring.profiles.default", "haitao");
+        System.setProperty("spring.profiles.active", "haitao"); // default 和 active 同时设置，只会使用 active的值进行@Profile的匹配
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(ProfileTest.class);
+        System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
+
+        // 设置激活的 profile
+        // context.getEnvironment().setActiveProfiles("development");
+    }
+}
+```
+
+### 原理
+
+```java
+/**
+ * @Profile 就是通过 @Condition 实现的，就这么简单。难的是表达式的解析
+ * @Conditional(ProfileCondition.class)
+ *
+ * 匹配方法 {@link ProfileCondition#matches(ConditionContext, AnnotatedTypeMetadata)}
+ *
+ * 具体的匹配逻辑，入参是ProfilesParser解析@Profile的值  {@link AbstractEnvironment#isProfileActive(String)}
+ *      return `(currentActiveProfiles.contains(profile) ||
+ * 				(currentActiveProfiles.isEmpty() && doGetDefaultProfiles().contains(profile)));`
+ *
+ *      是激活的profile 或者 ( 没有激活的profile && 是默认的profile )
+ *      注：
+ * 	        - currentActiveProfiles 是读取环境变量 "spring.profiles.active" 的值，对值进行去空格并按照','分割成集合
+ * 	        - doGetDefaultProfiles 是读取环境变量 "spring.profiles.default" 的值，对值进行去空格并按照','分割成集合
+ * */
+
+/**
+ * 读取顺序是：系统属性 -> 环境变量 -> @PropertySource
+ * 注：读到就返回，这也就是为啥 系统属性 大于 环境变量 大于 @PropertySource
+ * 为啥是这样看：Spring是如何解析环境变量的就知道了 `context.getEnvironment().getProperty("name")`
+ * */
+```
+
+[context.getEnvironment().getProperty("name")](#AbstractEnvironment.getProperty)
+
+# Spring好用的工具类
+
+## StandardEnvironment
+
+> 1. Spring默认是使用 StandardEnvironment
+> 2. StandardEnvironment 的实例化会往 MutablePropertySources 添加两个 PropertySource，分别是 `System.getProperties() 、 System.getenv();`
+> 3. StandardEnvironment 聚合了 MutablePropertySources、ConfigurablePropertyResolver
+> 4. 而 MutablePropertySources 聚合了 PropertySource
+> 5. 而 @PropertySource 就是解析成 PropertySource 添加到 MutablePropertySources 中
+> 6. 而 PropertySource 聚合了 Properties
+> 7. 而 Properties 就是属性文件的解析结果(.yaml  .properties 格式的文件)
+> 8. 读取文件可使用 ResourceLoader 这个工具类。支持读取本地文件、网络资源、ClassLoader里面的文件
+> 9. `AbstractEnvironment.getProperty("key")` 是执行`ConfigurablePropertyResolver.getProperty`，其实现是拿到 MutablePropertySources 遍历其 PropertySource，能读到就返回。也就是说 属性的读取是有优先级的。获取到属性值会使用`ConfigurablePropertyResolver`来解析占位符，也就是说支持属性文件中使用`${name}`引用其他属性。
+> 10. `AbstractEnvironment.resolvePlaceholders("text")`解析占位符，是使用`ConfigurablePropertyResolver`来解析，默认识别的占位符是`${}`
+
+![PropertySource类图](.README_imgs/PropertySource类图.png)
+
+### 示例代码
+
+#### JDK获取属性的API
+
+```java
+public class JDK_API_property {
+    public static void main(String[] args) {
+        /**
+         * 测试 JDK API,Spring读取属性 会使用到下面两个API来获取系统设置的属性信息
+         * */
+        // 环境变量
+        Map<String, String> envMap = System.getenv();
+        System.out.println("envMap = " + envMap);
+
+        System.out.println("========================================");
+
+        // 系统变量
+        Properties properties = System.getProperties();
+        System.out.println("properties = " + properties);
+
+    }
+}
+```
+
+#### Environment 的使用
+
+```java
+public class Spring_API_Environment {
+
+    public static void main(String[] args) throws IOException {
+        ApplicationContext context = new AnnotationConfigApplicationContext(Spring_API_Environment.class);
+
+        Environment environment = context.getEnvironment();
+        System.out.println(environment.getProperty("name"));
+        System.out.println(environment.getProperty("${xx:default_xx}")); // 不支持的，这个API是用来读取属性的
+        System.out.println(environment.resolvePlaceholders("${name:default}"));
+        System.out.println(environment.resolvePlaceholders("name")); // 不支持，没有占位符就直接返回
+    }
+}
+```
+
+#### PropertyPlaceholderHelper
+
+> 解析表达式中占位符的工具，可以占位符替换成属性值
+
+```java
+public class Spring_API_PropertyPlaceholderHelper {
+
+    public static void main(String[] args) {
+        /**
+         * 使用 PropertyPlaceholderHelper 解析占位符
+         *
+         * Spring默认的占位符的前缀是${ ，后缀是 }，默认值分隔符是 :
+         * 比如使用@Value("${name:xx}") 表示获取属性的意思，没有找到name属性就使用:后面的值作为默认值
+         * */
+        PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${",
+                "}",
+                ":",
+                true);
+
+        PropertyPlaceholderHelper.PlaceholderResolver placeholderResolver = new PropertyPlaceholderHelper.PlaceholderResolver() {
+            Map<String, String> map = new HashMap();
+
+            {
+                map.put("name1", "real_name1");
+                map.put("name2", "${name3}");
+                map.put("name3", "real_name3");
+            }
+
+            @Override
+            public String resolvePlaceholder(String placeholderName) {
+                return map.get(placeholderName);
+                /**
+                 *  方法的实现使用 {@link PropertySourcesPropertyResolver#getPropertyAsRawString(String)}
+                 *  就能对接上Spring的存储环境变量的工具类了
+                 * */
+                // return context.getEnvironment().getProperty(placeholderName);
+            }
+        };
+        String s = placeholderHelper.replacePlaceholders("${name1}--->${name2}--->${not_value:default_value}", placeholderResolver);
+        System.out.println("s = " + s);
+    }
+}
+```
+
+### StandardEnvironment的实例化
+```java
+/**
+ * StandardEnvironment 的实例化
+ *
+ * IOC容器执行 {@link AbstractApplicationContext#createEnvironment()} 为 {@link AbstractApplicationContext#environment} 属性进行实例化
+ * 而 `createEnvironment` 很简单 `new StandardEnvironment();`
+ *
+ *
+ * StandardEnvironment 继承 AbstractEnvironment，所以会执行AbstractEnvironment的无参构造器
+ *      // 记录属性
+ *      this.propertySources = new MutablePropertySources();
+ *      // 构造 ConfigurablePropertyResolver , 这个属性很关键，这是真正获取属性的工具(获取属性值，占位符的解析)
+ * 		this.propertyResolver = createPropertyResolver(this.propertySources);
+ * 	    // 模板方法，子类可以重新该方法来 扩展 propertySources
+ * 		customizePropertySources(propertySources);
+ *
+ * 所以实例化时会执行这个方法
+ * {@link StandardEnvironment#customizePropertySources(MutablePropertySources)}
+ *      执行{@link MutablePropertySources#addLast(PropertySource)}扩展PropertySource，
+ *      先加入 `System.getProperties()` 再加入 `System.getenv()`
+ *
+ *      注：addLast 就是往后面加，也就是获取属性的顺序是：getSystemProperties -> getSystemEnvironment
+ *
+ *
+ * 很简单就是返回 PropertySourcesPropertyResolver 
+ * {@link AbstractEnvironment#createPropertyResolver(MutablePropertySources)}
+ *      `return new PropertySourcesPropertyResolver(propertySources);`
+ * */
+```
+### AbstractEnvironment.getProperty
+```java
+/**
+ * 获取属性。这是代理模式
+ * {@link AbstractEnvironment#getProperty(String)}
+ *   `return this.propertyResolver.getProperty(key);`
+ *   Tips： propertyResolver 是在实例化的时候设置的，是这个类型 PropertySourcesPropertyResolver
+ *
+ *
+ * {@link PropertySourcesPropertyResolver#getProperty(String)}
+ *  1. 遍历 {@link MutablePropertySources#propertySourceList}，遍历出来的就是 PropertySource
+ *  2. 读取属性 {@link PropertySource#getProperty(String)}
+ *      `Object value = propertySource.getProperty(key);`
+ *  3. 值不为空 `value != null`
+ *      解析占位符 `value = resolveNestedPlaceholders((String) value);`
+ *          Tips: 也就是说属性文件(yml、properties)中的value可以使用占位符。默认的占位符是 ${name:default_value}，: 表示读不到属性就返回默认值
+ *      打印日志`logKeyFound(key, propertySource, value);`
+ *      转换值再返回`return convertValueIfNecessary(value, targetValueType);`
+ *
+ * 解析嵌套占位符
+ * {@link AbstractPropertyResolver#resolveNestedPlaceholders(String)}
+ *      {@link AbstractPropertyResolver#resolvePlaceholders(String)}
+ * */
+```
+### AbstractEnvironment#resolvePlaceholders
+```java
+/**
+ * 解析占位符。这是代理模式
+ * {@link AbstractEnvironment#resolvePlaceholders(String)}
+ *      `return this.propertyResolver.resolvePlaceholders(text);`
+ *      Tips： propertyResolver 是在实例化的时候设置的，是这个类型 PropertySourcesPropertyResolver
+ *
+ *
+ * 真正解析占位符的逻辑
+ * {@link AbstractPropertyResolver#resolvePlaceholders(String)}
+ *      1. 创建属性占位符助理
+ *          `nonStrictHelper = PropertyPlaceholderHelper(this.placeholderPrefix, this.placeholderSuffix,
+ * 				this.valueSeparator, ignoreUnresolvablePlaceholders);`
+ * 			注：
+ * 		   	    - 前缀是 ${
+ * 		   	    - 后缀是 }
+ * 		   	    - 值分隔符是 :
+ *
+ *      2. 开始解析 `doResolvePlaceholders(text, this.nonStrictHelper);`
+ *
+ * 开始解析，这也是代理模式
+ * {@link AbstractPropertyResolver#doResolvePlaceholders(String, PropertyPlaceholderHelper)}
+ *      `return helper.replacePlaceholders(text, this::getPropertyAsRawString);`
+ *      注：传入 `this::getPropertyAsRawString` 这个的目的，是为了访问属性
+ * */
+```
+### AbstractPropertyResolver#doResolvePlaceholders
+```java
+/**
+ * 替换占位符
+ * {@link PropertyPlaceholderHelper#replacePlaceholders(String, PropertyPlaceholderHelper.PlaceholderResolver)}
+ * {@link PropertyPlaceholderHelper#parseStringValue(String, PropertyPlaceholderHelper.PlaceholderResolver, Set)}
+ *      1. 查找前缀 `int startIndex = value.indexOf(this.placeholderPrefix);`
+ *
+ *      2. 没有前缀直接返回 if startIndex == -1
+ *          return value;
+ *
+ *      3. 初始化局部变量 `StringBuilder result = new StringBuilder(value);`
+ *
+ *      4. 循环替换占位符 `while (startIndex != -1)`
+ *          4.1 返回最近后缀的索引 `int endIndex = findPlaceholderEndIndex(result, startIndex);`
+ *
+ *          4.2 不存在后缀，结束循环 `endIndex == -1`
+ *              break
+ *
+ *          4.3 拿到最近前缀后缀中间的值 `String placeholder = result.substring(startIndex + this.placeholderPrefix.length(), endIndex);`
+ *
+ *          4.4 递归解析，拿到占位符的值。`placeholder = parseStringValue(placeholder, placeholderResolver, visitedPlaceholders);`
+ *              Tips：比如 ${name},拿到的是name对应的属性值，也就是支持 属性文件(yml、properties) 中支持使用占位符引用属性
+ *
+ *          4.5 获取属性值 `String propVal = placeholderResolver.resolvePlaceholder(placeholder);`
+ *
+ *          4.6 解析的值为null 且 设置了值分隔符 `if propVal == null && this.valueSeparator != null`
+ *              拿到值分割符的下表 `int separatorIndex = placeholder.indexOf(this.valueSeparator);`
+ *              `separatorIndex != -1` 表示占位符中存在值分隔符(默认是 : )
+ *                  拿到属性名 `String actualPlaceholder = placeholder.substring(0, separatorIndex);`
+ *                  拿到默认值 `String defaultValue = placeholder.substring(separatorIndex + this.valueSeparator.length());`
+ *                  获取属性值 `propVal = placeholderResolver.resolvePlaceholder(actualPlaceholder);`
+ *                  获取不到属性值，就使用默认值作为其值 `propVal = (propVal == null ? defaultValue : propVal)`
+ *
+ *              Tips: 说明可能是 ${name:default_name} 这种写法, 所以要按照 : 分割后，使用name再次获取属性值
+ *
+ *          4.6 propVal != null
+ *              递归解析,拿到占位符的值。也就是支持属性值也是占位符的情况 `propVal = parseStringValue(propVal, placeholderResolver, visitedPlaceholders);`
+ *              从原有字符串中替换掉占位符 `result.replace(startIndex, endIndex + this.placeholderSuffix.length(), propVal);`
+ *              拿到下一个占位符的下标 `startIndex = result.indexOf(this.placeholderPrefix, startIndex + propVal.length());`
+ *                  接着循环了
+ * */
+```
+## ResourceLoader
+
+> DefaultResourceLoader 支持读取本地文件、网络资源、ClassLoader里面的文件。
+>
+> PathMatchingResourcePatternResolver 支持使用Ant风格的路径符，返回匹配的资源。而且聚合了`DefaultResourceLoader`
+>
+> 直接使用这个功能最多
+
+
+
+### 示例代码
+
+#### JDK获取资源的API
+
+```java
+public class JDK_API_Resource {
+    public static void main(String[] args) throws IOException {
+        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        
+        // 使用ClassLoader 获取一个资源
+        contextClassLoader.getResource("classpath:db.sql"); // 不支持
+        contextClassLoader.getResource("classpath*:db.sql"); // 不支持
+        contextClassLoader.getResource("/db.sql"); // 不支持
+        contextClassLoader.getResource("db.sql");
+        contextClassLoader.getResource("db.sql");
+        contextClassLoader.getResource("META-INF");
+
+        // 使用ClassLoader 获取多个资源
+        contextClassLoader.getResources("META-INF"); // 返回全部，就是会找到依赖的jar里面的所有资源
+
+    }
+}
+```
+
+#### ResourceLoader
+
+```java
+public class Spring_API_ResourceLoader {
+
+    /**
+     * {@link PathMatchingResourcePatternResolver#getResources(String)}
+     * */
+    public static void main(String[] args) throws IOException {
+
+        /*ApplicationContext context = new AnnotationConfigApplicationContext();
+        context.getResource("classpath:demo.xml");
+        context.getResources("classpath*:demo.xml");*/
+
+        ResourceLoader resourceLoader = new DefaultResourceLoader();
+        Function<String, Resource> fun = resourceLoader::getResource;
+
+        /**
+         * 读类路径下的文件(就是通过ClassLoader获取文件)
+         *
+         * 注：
+         *  1. 都是利用 ClassLoader 加载文件
+         *  2. 写不写 classpath: 都一样，写了就会除去 classpath: 前缀，然后在使用ClassLoader加载文件
+         *  3. 前缀 / 会被移除，因为 {@link ClassLoader#getResource(String)} 不支持
+         * */
+        System.out.println(fun.apply("classpath:db.sql").exists());
+        System.out.println(fun.apply("classpath:/db.sql").exists());
+        System.out.println(fun.apply("db.sql").exists());
+        System.out.println(fun.apply("/db.sql").exists());
+        System.out.println(fun.apply("classpath*:db.sql").exists()); // 不支持
+
+        // 网络资源
+        System.out.println(fun.apply("https://www.baidu.com/").exists());
+        // 读本地文件
+        System.out.println(fun.apply("file:///Users/haitao/Desktop/1.md").exists()); // 找系统文件
+
+        // 是 ResourceLoader 的实现类，支持写Ant分隔的路径符 返回匹配的资源数组
+        PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+        /**
+         *  很简单，使用JDK API {@link ClassLoader#getResources(String)} 所以能获取到依赖jar里面的资源
+         * */
+        Resource[] resources = resolver.getResources("classpath*:org/springframework/core/io/sup*/*.class");
+        System.out.println("resources = " + resources.length);
+
+        // 其实就是使用 DefaultResourceLoader 实现的
+        System.out.println(resolver.getResource("classpath:db.sql").exists());
+    }
+}
+```
+
+### ResourceLoader#getResource
+```java
+/**
+ * 获取资源，参数是描述资源位置的字符串
+ * {@link DefaultResourceLoader#getResource(String)}
+ *      1. 遍历 ProtocolResolver,能解析就返回解析的结果
+ *          注：并没有看到Spring相关的实现类
+ *
+ *      2. 处理 / 开头 if `location.startsWith("/")`
+ *          `return getResourceByPath(location);`
+ *           会移除开头的 /，和路径中特殊的符号(比如 \\ 换成 /) 然后使用 ClassLoader 获取资源
+ *           {@link ClassLoader#getResource(String)}
+ *
+ *      3. 处理 classpath: 开头 if `location.startsWith("classpath:")`
+ *          `return new ClassPathResource(location.substring(CLASSPATH_URL_PREFIX.length()), getClassLoader());`
+ *
+ *          移除 classpath: 前缀，移除开头的 /，和路径中特殊的符号(比如 \\ 换成 /)
+ *          然后使用 ClassLoader 获取资源 {@link ClassLoader#getResource(String)}
+ *          Tips: 所以说写不写 classpath: 都一样，但在IDEA中写了classpath: 可以定位到资源文件
+ *
+ *      4. 尝试解析成 URL
+ *         `URL url = new URL(location);`
+ *         比如：
+ *          - file:///Users/haitao/1.txt
+ *          - https://www.baidu.com
+ *
+ *      5. 解析成URL失败，那就兜底处理，和第二步一样的逻辑
+ *          `return getResourceByPath(location);`
+ * */
+```
+### PathMatchingResourcePatternResolver#getResources
+```java
+/**
+ * 获取资源，参数是描述资源位置的字符串
+ * {@link PathMatchingResourcePatternResolver#getResources(String)}
+ *      1. 是 classpath*: 开头的 `locationPattern.startsWith("classpath*:")`
+ *          移除前缀之后 进行 Ant 路径匹配 `locationPattern.substring("classpath*:".length())`
+ *              匹配：返回匹配的资源
+ *                  `return findPathMatchingResources(locationPattern);`
+ *              不匹配：返回给定名字的所有资源
+ *                  `return findAllClassPathResources(locationPattern.substring(CLASSPATH_ALL_URL_PREFIX.length()));`
+ *
+ *      2. 兜底处理。
+ *          移除前缀(war:、:)之后 进行 Ant 路径匹配 `locationPattern.substring("classpath*:".length())`
+ *              匹配：返回匹配的资源
+ *                  `return findPathMatchingResources(locationPattern);`
+ *              不匹配：说明没有通配符，那就只查询单个资源就好了
+ *                  `return new Resource[]{getResourceLoader().getResource(locationPattern)};`
+ *
+ * */
+```
+## 类型转换
+
+[原理看这里](#细说`TypeConverterSupport#convertIfNecessary` )
+
+> `PropertyEditor` 是JDK提供的，`ConversionService`是Spring提供的。而`TypeConverter`是聚合了这两个东西
+>
+> 注入 `CustomEditorConfigurer` 可以扩展`TypeConverter`中的`PropertyEditor`
+
+### `PropertyEditorTest`
+
+```java
+@Component
+public class PropertyEditorTest {
+
+
+    @Bean
+    public A a() {
+        return new A();
+    }
+
+    @Data
+    public static class A {
+        private String name;
+
+        @Autowired
+        public void x(@Value("hello world!!!") A a) {
+            System.out.println(a);
+        }
+    }
+
+    @Bean
+    public CustomEditorConfigurer myCustomEditorConfigurer() {
+        CustomEditorConfigurer customEditorConfigurer = new CustomEditorConfigurer();
+
+        Map<Class<?>, Class<? extends PropertyEditor>> customEditors = new HashMap<>();
+        customEditors.put(A.class, MyPropertyEditor.class);
+        customEditorConfigurer.setCustomEditors(customEditors);
+
+        customEditorConfigurer.setPropertyEditorRegistrars(new PropertyEditorRegistrar[]{new PropertyEditorRegistrar() {
+            @Override
+            public void registerCustomEditors(PropertyEditorRegistry registry) {
+                registry.registerCustomEditor(A.class, new MyPropertyEditor());
+                registry.registerCustomEditor(A.class, null, new MyPropertyEditor());
+                if (registry instanceof SimpleTypeConverter) {
+                    SimpleTypeConverter.class.cast(registry).overrideDefaultEditor(A.class, new MyPropertyEditor());
+                }
+            }
+        }});
+
+        return customEditorConfigurer;
+    }
+
+    public static class MyPropertyEditor extends PropertyEditorSupport {
+        @Override
+        public void setValue(Object value) {
+            if (value instanceof String) {
+                A a = new A();
+                a.setName((String) value);
+            }
+            super.setValue(value);
+        }
+
+        @Override
+        public void setAsText(String text) throws IllegalArgumentException {
+            A a = new A();
+            a.setName(text);
+            this.setValue(a);
+        }
+
+        public static void main(String[] args) {
+            /**
+             * 使用就是 setValue(Object) setAsText(String) 设置转换值
+             * getValue() 就是拿到转换的结果
+             * */
+            MyPropertyEditor myPropertyEditor = new MyPropertyEditor();
+            //        myPropertyEditor.setAsText("hah");
+            myPropertyEditor.setValue("hah");
+            System.out.println(myPropertyEditor.getValue());
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        new AnnotationConfigApplicationContext(PropertyEditorTest.class);
+    }
+
+}
+```
+
+### `ConversionServiceTest`
+
+```java
+@Component
+public class ConversionServiceTest {
+
+
+    @Bean
+    public A a() {
+        return new A();
+    }
+
+    @Data
+    public static class A {
+        private String name;
+
+        @Value("2022-08-11")
+        @DateTimeFormat(pattern = "yyyy-MM-dd")
+        private Date date = new Date();
+
+        @Value("101.11")
+        @NumberFormat(pattern = "#")
+        private Integer money;
+
+        @Value("code,play")
+        private String[] jobs;
+
+        @Autowired
+        public void x(@Value("hello world!!!") A a) {
+            System.out.println(a);
+        }
+    }
+
+    @Bean// 名字必须是 conversionService 因为在依赖注入的时候是通过这个名字拿的
+    public static ConversionService conversionService() {
+        // DefaultFormattingConversionService 功能强大： 类型转换 + 格式化
+        DefaultFormattingConversionService defaultFormattingConversionService = new DefaultFormattingConversionService();
+        defaultFormattingConversionService.addConverter((Converter<String, A>) source -> {
+            A a = new A();
+            a.setName(source);
+            return a;
+        });
+
+        return defaultFormattingConversionService;
+    }
+
+    public static void main(String[] args) throws Exception {
+        new AnnotationConfigApplicationContext(ConversionServiceTest.class);
+    }
+
+}
+```
+
+### `TypeConverterTest`
+
+```java
+public class TypeConverterTest {
+    @Data
+    public static class A {
+        private String name;
+    }
+
+    public static void main(String[] args) {
+        SimpleTypeConverter simpleTypeConverter = new SimpleTypeConverter();
+
+        simpleTypeConverter.registerCustomEditor(A.class, new PropertyEditorSupport() {
+            @Override
+            public void setAsText(String text) throws IllegalArgumentException {
+                A a = new A();
+                a.setName(text);
+                super.setValue(a);
+            }
+        });
+        /*DefaultConversionService conversionService = new DefaultConversionService();
+        conversionService.addConverter(new Converter<String, A>() {
+            @Override
+            public A convert(String source) {
+                A a = new A();
+                a.setName(source);
+                return a;
+            }
+        });
+        simpleTypeConverter.setConversionService(conversionService);*/
+        System.out.println(simpleTypeConverter.convertIfNecessary("123", A.class));
+    }
+}
+```
+
+## SpEL
+
+> [Spring官方文档](https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#expressions)
+
+### SpEL_Simple_Demo
+
+```java
+@Data
+public class SpEL_Simple_Demo {
+    private String name;
+
+    public static void main(String[] args) {
+        // 构造器参数就是根对象
+        StandardEvaluationContext context = new StandardEvaluationContext(new SpEL_Simple_Demo());
+        context.setVariable("newName", "Mike Tesla");
+
+        ExpressionParser parser = new SpelExpressionParser();
+        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
+        // 字符串
+        System.out.println(consumer.apply("'a'"));
+        // 运算
+        System.out.println(consumer.apply("1+1"));
+        // 给root对象的属性赋值
+        System.out.println(consumer.apply("name = #newName"));
+        // 给变量赋值
+        System.out.println(consumer.apply("#newName = 'haitao'"));
+
+        System.out.println(consumer.apply("#newName2")); // 没有这个变量也不会报错，就是null而已
+
+    }
+}
+```
+
+### SpEL_root
+
+```java
+public class SpEL_root {
+    public String name;
+
+    public static void main(String[] args) {
+        // 构造器参数就是根对象
+        StandardEvaluationContext context = new StandardEvaluationContext(new SpEL_root()) {
+            @Override
+            public Object lookupVariable(String name) {
+                /**
+                 * 访问变量会执行这个
+                 * 就是 "#a" 才会执行
+                 * 注："#root" 这个比较特殊，不是回调该方法获取的
+                 * */
+                System.out.print("lookupVariable--->" + name + "===>");
+                return super.lookupVariable(name);
+            }
+        };
+        ExpressionParser parser = new SpelExpressionParser();
+        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
+
+        /**
+         * #root.name 访问根对象的属性
+         * 访问root对象的属性，可以简化成 name
+         * #root 是访问根对象，因为root是关键字，不会回调 lookupVariable 获取变量
+         * */
+        System.out.println(consumer.apply("name"));
+        System.out.println(consumer.apply("#root"));
+        System.out.println(consumer.apply("#root.name"));
+
+    }
+}
+
+```
+
+### SpEL_PropertyAccessor
+
+```java
+public class SpEL_PropertyAccessor {
+    public String name;
+
+    public static void main(String[] args) {
+        StandardEvaluationContext context = new StandardEvaluationContext(new SpEL_PropertyAccessor());
+        ExpressionParser parser = new SpelExpressionParser();
+        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
+
+        /**
+         * PropertyAccessor 用来解析属性是怎么取值的
+         *
+         * 就是 "a" 才会执行
+         * */
+        context.addPropertyAccessor(new PropertyAccessor() {
+            @Override
+            public Class<?>[] getSpecificTargetClasses() {
+                //                return new Class[0];
+                /**
+                 * 返回 null，表示都满足
+                 * 不会null，就会匹配 EvaluationContext 类型，匹配了才会使用这个 PropertyAccessor
+                 * {@link PropertyOrFieldReference#readProperty(TypedValue, EvaluationContext, String)}
+                 *  {@link PropertyOrFieldReference#getPropertyAccessorsToTry(Object, List)}
+                 * */
+                return null;
+            }
+
+            @Override
+            public boolean canRead(EvaluationContext context, Object target, String name) throws AccessException {
+                System.out.print("canRead...." + name + "\t");
+                return true;
+            }
+
+            @Override
+            public TypedValue read(EvaluationContext context, Object target, String name) throws AccessException {
+                System.out.print("read...." + name + "\t");
+                return new TypedValue(name);
+            }
+
+            @Override
+            public boolean canWrite(EvaluationContext context, Object target, String name) throws AccessException {
+                return false;
+            }
+
+            @Override
+            public void write(EvaluationContext context, Object target, String name, Object newValue) throws AccessException {
+
+            }
+        });
+
+        System.out.println(consumer.apply("name"));
+        System.out.println(consumer.apply("x"));
+        System.out.println(consumer.apply("#variable"));
+    }
+}
+```
+
+### SpEL_ParserContext
+
+```java
+public class SpEL_ParserContext {
+    public static void main(String[] args) {
+        StandardEvaluationContext context = new StandardEvaluationContext();
+        ExpressionParser parser = new SpelExpressionParser();
+
+        // 模板解析上下文，就是可以去掉模板字符
+        System.out.println(parser.parseExpression("#{#variable}",
+                new TemplateParserContext()).getValue(context));
+    }
+}
+```
+
+### SpEL_lookupVariable
+
+```java
+public class SpEL_lookupVariable {
+    public static void main(String[] args) {
+        StandardEvaluationContext context = new StandardEvaluationContext() {
+            @Override
+            public Object lookupVariable(String name) {
+                /**
+                 * 访问变量会执行这个
+                 * 就是 "#a" 才会执行
+                 * 注："#root" 这个比较特殊，不是回调该方法获取的
+                 * */
+                System.out.print("lookupVariable--->" + name + "===>");
+                return super.lookupVariable(name);
+            }
+        };
+        // 设置变量
+        context.setVariable("newName", "Mike Tesla");
+
+        ExpressionParser parser = new SpelExpressionParser();
+        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
+
+        /**
+         * name变量的值，这样子写就是访问属性。
+         *
+         * root对象的访问方式：
+         *  1. name
+         *  2. #name
+         *  3. #root.name
+         *
+         * 普通变量的访问方式：
+         *  1. #newName
+         * */
+        System.out.println(consumer.apply("#name"));
+        System.out.println(consumer.apply("#root"));
+        System.out.println(consumer.apply("#newName"));
+
+    }
+}
+```
+
+### SpEL_BeanResolver
+
+```java
+public class SpEL_BeanResolver {
+
+    public static void main(String[] args) {
+        StandardEvaluationContext context = new StandardEvaluationContext();
+        ExpressionParser parser = new SpelExpressionParser();
+        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
+
+        /**
+         * 设置BeanResolver,就是 @ 开头的会通过这个解析值
+         * */
+        context.setBeanResolver(new BeanResolver() {
+            @Override
+            public Object resolve(EvaluationContext context, String beanName) throws AccessException {
+                return "通过BeanResolver解析的值-->" + beanName;
+            }
+        });
+        // 会使用BeanResolver 解析
+        System.out.println(consumer.apply("@a"));
+        // 模板解析上下文，就是可以去掉模板字符
+        System.out.println(parser.parseExpression("#{@x}",
+                new TemplateParserContext()).getValue(context));
+    }
+}
+```
+
+### MethodSpELTest
+
+```java
+public class MethodSpELTest {
+    public static class MyStandardEvaluationContext extends StandardEvaluationContext {
+        private Object[] methodArgs;
+        private boolean resolved;
+
+        public void setMethodArgs(Object[] methodArgs) {
+            this.methodArgs = methodArgs;
+        }
+
+        @Override
+        public Object lookupVariable(String name) {
+            if (!resolved) {
+                resolvedMethodArgs();
+            }
+            return super.lookupVariable(name);
+        }
+
+        private void resolvedMethodArgs() {
+            for (int i = 0; i < methodArgs.length; i++) {
+                setVariable("p" + i, methodArgs[i]);
+                setVariable("a" + i, methodArgs[i]);
+            }
+            resolved = true;
+        }
+    }
+
+    public static void method(String a, Object object) {
+    }
+
+    public static void main(String[] args) throws Exception {
+        // 执行方法
+        Class<MethodSpELTest> methodSpELTestClass = MethodSpELTest.class;
+        Method method = methodSpELTestClass.getMethod("method", String.class, Object.class);
+        Object[] methodArgs = {"hello SpEL", new Object()};
+        method.invoke(null, methodArgs);
+
+        // 讲方法的入参 传入 构造 StandardEvaluationContext
+        ExpressionParser parser = new SpelExpressionParser();
+        MyStandardEvaluationContext evaluationContext = new MyStandardEvaluationContext();
+        evaluationContext.setMethodArgs(methodArgs);
+        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(evaluationContext);
+
+        // 进行表达式解析时 就能用到我们设置的变量了
+        System.out.println(consumer.apply("#a0.contains('SpEL')"));
+        System.out.println(consumer.apply("#a0.contains('haitao')"));
+    }
+}
+```
+
+## `ProxyFactory#getProxy`
+
+### 示例代码
+
+```java
+public class Test{
+  @Test
+  public void 测试ProxyFactory() {
+    ProxyFactory proxyFactory = new ProxyFactory();
+    /**
+     * 会装饰成 setTargetSource(new SingletonTargetSource(target));
+     * 因为代理对象执行的时候是执行 `targetSource.getTart()` 拿到被代理对象的，所以要将 Demo 包装成 TargetSource 类型
+     **/
+    proxyFactory.setTarget(new Demo());
+    // 是否优化，这个也是决定是否使用cglib代理的条件之一
+    proxyFactory.setOptimize(true);
+    // 接口类型，这个也是决定是否使用cglib代理的条件之一，代理接口的时候才需要设置这个
+    proxyFactory.setInterfaces();
+    // 约束是否使用cglib代理。但是这个没吊用，会有其他参数一起判断的，而且有优化机制 会优先选择cglib代理
+    proxyFactory.setProxyTargetClass(true);
+    /**
+     * addAdvice 会被装饰成 Advisor
+     * 这里不能乱写，因为后面解析的时候 要判断是否实现xx接口的
+     * 解析逻辑 {@link DefaultAdvisorAdapterRegistry#getInterceptors(Advisor)}
+     * */
+    proxyFactory.addAdvice(new MethodBeforeAdvice() {
+      @Override
+      public void before(Method method, Object[] args, Object target) throws Throwable {
+        method.invoke(target, args);
+      }
+    });
+    // 设置 Advisor，有点麻烦 还不如直接通过 addAdvice 设置，自动解析成advisor方便
+    proxyFactory.addAdvisor(new DefaultPointcutAdvisor(new MethodBeforeAdvice() {
+      @Override
+      public void before(Method method, Object[] args, Object target) throws Throwable {
+        method.invoke(target, args);
+      }
+    }));
+    proxyFactory.getProxy();
+  }
+}
+```
+
+### 代理逻辑实现原理
+
+> ### CGLIB代理
+>
+> ```txt
+> Enhancer enhancer = new Enhancer();
+> enhancer.setCallbacks([DynamicAdvisedInterceptor,...]);
+> ```
+>
+> 使用`new DynamicAdvisedInterceptor(this.advised);` 这个callback来实现对被代理对象的增强。this 就是 ObjenesisCglibAopProxy，而其{@link CglibAopProxy#advised}属性 其实就是 ProxyFactory 从而可以拿到Advisors，从而使用Advisor 对方法进行增强
+>
+> ### JDK代理
+>
+> ` Proxy.newProxyInstance(classLoader, this.proxiedInterfaces, this)`
+>
+> 可以知道 第三个参数(InvocationHandler) 是 this，也就是 JdkDynamicAopProxy，而其{@link JdkDynamicAopProxy#advised}属性 其实就是 ProxyFactory从而可以拿到Advisors
+>
+> ### DynamicAdvisedInterceptor、JdkDynamicAopProxy
+>
+> 这两个拦截器的执行逻辑如下：
+>
+> 1. 得到与当前执行的method匹配的interceptor集合 `AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice`
+>
+> 2. 创建实例
+>
+>    1. `new CglibMethodInvocation(interceptor集合)`
+>
+>       注：其实是ReflectiveMethodInvocation的子类
+>
+>    2. `new ReflectiveMethodInvocation(interceptor集合)`
+>
+> 3. 执行 `ReflectiveMethodInvocation#proceed()`
+
+### 细说`ProxyFactory#getProxy`
+
+```java
+/**
+ * 创建代理对象
+ *  {@link ProxyFactory#getProxy(ClassLoader)}
+ *  {@link ProxyCreatorSupport#createAopProxy()}
+ *
+ *
+ * 创建 AopProxy {@link DefaultAopProxyFactory#createAopProxy(AdvisedSupport)}
+ *      - 简单来说，被代理对象 不是接口 且 不是Proxy的子类 且 {@link AdvisedSupport#getProxiedInterfaces()}至多只有一个SpringProxy类型的接口 就创建 `new ObjenesisCglibAopProxy(config);`
+ *      - 否则创建 `new JdkDynamicAopProxy(config);`
+ *      注：config 参数其实就是 ProxyFactory对象
+ *
+ * 使用 AopProxy 创建代理对象 {@link AopProxy#getProxy(ClassLoader)}
+ *      {@link ObjenesisCglibAopProxy#getProxy(ClassLoader)}
+ *      {@link JdkDynamicAopProxy#getProxy(ClassLoader)}
+ *
+ * ObjenesisCglibAopProxy 增强逻辑实现原理 {@link ObjenesisCglibAopProxy#getProxy(ClassLoader)}
+ *      Enhancer enhancer = new Enhancer();
+ *      enhancer.setCallbacks({@link CglibAopProxy#getCallbacks(Class)}); // 执行方法会回调callback
+ *          注：会设置  `new DynamicAdvisedInterceptor(this.advised);` callback，this 就是 ObjenesisCglibAopProxy，而其{@link CglibAopProxy#advised}属性 其实就是 ProxyFactory 从而可以拿到Advisors
+ *      enhancer.setCallbackFilter(ProxyCallbackFilter); 
+ *          返回要执行的 callback 的索引。在Cglib生成代理对象的字节码时会调CallbackFilter，来设置好每个方法的Callback是啥
+ *          设置这个属性，生成cglib生成的代理对象字节码，一看就知道了。`System.setProperty(DebuggingClassWriter.DEBUG_LOCATION_PROPERTY, "C:\\Users\\RDS\\Desktop\\1");` 
+ *
+ *      执行代理对象的方式时会执行 {@link CglibAopProxy.ProxyCallbackFilter#accept(Method)}
+ *          就是 除了 finalize、equals、hashcode 等，都会执行 DynamicAdvisedInterceptor 这个callback
+ *      也就是执行 {@link CglibAopProxy.DynamicAdvisedInterceptor#intercept(Object, Method, Object[], MethodProxy)}
+ *          1. exposeProxy 属性是 true，往 ThreadLocal中记录当前代理对象  `oldProxy=AopContext.setCurrentProxy(proxy)`
+ *          2. 获取被代理对象 {@link TargetSource#getTarget()}。这里也是很细节，
+ *              比如：
+ *                  - TargetSource实例是这个类型的 {@link AbstractBeanFactoryBasedTargetSource}，所以每次获取target都是从IOC容器中拿，也就是说 如果bean是多例的，每次执行都会创建出新的对象。(@Lazy就是这么实现的)
+ *                  - 而 Spring Aop，使用的是SingletonTargetSource，特点是将容器的对象缓存了，执行 `getTarget` 才能拿到被代理对象
+ *
+ *          3. 根据method得到对应的拦截器链 {@link AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice(Method, Class)}
+ *              拦截器链是空：反射执行
+ *              拦截器链不是空：将拦截器链装饰成 CglibMethodInvocation ，然后执行{@link CglibAopProxy.CglibMethodInvocation#proceed()}，其实就是执行其父类 {@link ReflectiveMethodInvocation#proceed()}
+ *              注：拦截器链就是 method 匹配到的 advisor 解析的结果，可以看这里 {@link DefaultAdvisorChainFactory#getInterceptorsAndDynamicInterceptionAdvice(Advised, Method, Class)}
+ *          4. exposeProxy 属性是 true，恢复之前的值  `AopContext.setCurrentProxy(oldProxy);`
+ *
+ * JdkDynamicAopProxy 增强逻辑的实现 {@link JdkDynamicAopProxy#getProxy(ClassLoader)}
+ *      `Proxy.newProxyInstance(classLoader, this.proxiedInterfaces, this);` 可以知道 第三个参数(InvocationHandler) 是 this，也就是 JdkDynamicAopProxy，而其{@link JdkDynamicAopProxy#advised}属性 其实就是 ProxyFactory从而可以拿到Advisors
+ *      所以执行代理对象的方式时会执行 {@link JdkDynamicAopProxy#invoke(Object, Method, Object[])}
+ *          1. 是 equals(子类没有重写的情况下)、hashCode(子类没有重写的情况下)、DecoratingProxy.class 的方法、Advised.class 的方法
+ *              直接反射执行
+ *          2. exposeProxy 属性是 true，往 ThreadLocal中记录当前代理对象  `oldProxy=AopContext.setCurrentProxy(proxy)`
+ *          3. 根据method得到对应的拦截器链 {@link AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice(Method, Class)}
+ *              拦截器链是空：反射执行
+ *              拦截器链不是空：将拦截器链装饰成 ReflectiveMethodInvocation ，然后执行{@link ReflectiveMethodInvocation#proceed()}
+ *              注：拦截器链就是 method 匹配到的 advisor 解析的结果，可以看这里 {@link DefaultAdvisorChainFactory#getInterceptorsAndDynamicInterceptionAdvice(Advised, Method, Class)}
+ *          4. exposeProxy 属性是 true，恢复之前的值  `AopContext.setCurrentProxy(oldProxy);`
+ * */
+```
+
+### 细说`AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice`
+
+```java
+/**
+ * {@link AdvisedSupport#getInterceptorsAndDynamicInterceptionAdvice(Method, Class)}
+ * {@link DefaultAdvisorChainFactory#getInterceptorsAndDynamicInterceptionAdvice(Advised, Method, Class)}
+ *      1. 创建AdvisorAdapterRegistry实例 `AdvisorAdapterRegistry registry = GlobalAdvisorAdapterRegistry.getInstance();`
+ *      2. 遍历 {@link Advised#getAdvisors()}属性，其实就是 `new ProxyFactory()` 设置的 advice和advisor参数
+ *      3. advisor 是 PointcutAdvisor 类型
+ *          - 执行 类匹配+AspectJ匹配
+ *          - 匹配正确，使用 AdvisorAdapterRegistry 解析 advisor {@link AdvisorAdapterRegistry#getInterceptors(Advisor)} 成 MethodInterceptor
+ *              - 需要在执行时匹配 {@link MethodMatcher#isRuntime()}
+ *                  将解析的MethodInterceptor和Pointcut的MethodMatcher 装饰成 `new InterceptorAndDynamicMethodMatcher(interceptor, mm)`
+ *                  将装饰结果 一个个添加`interceptorList.add`
+ *              - 不需要执行时匹配
+ *                  直接 `interceptorList.addAll`
+ *      4. advisor 是 IntroductionAdvisor 类型
+ *          - 执行 类匹配
+ *          - 匹配正确，使用 AdvisorAdapterRegistry 解析 advisor {@link AdvisorAdapterRegistry#getInterceptors(Advisor)} 成 MethodInterceptor
+ *              直接 `interceptorList.addAll`
+ *      5. 使用 AdvisorAdapterRegistry 解析 advisor {@link AdvisorAdapterRegistry#getInterceptors(Advisor)} 成 MethodInterceptor
+ *         直接 `interceptorList.addAll`
+ *
+ * advisor 解析成 MethodInterceptor 的逻辑 {@link DefaultAdvisorAdapterRegistry#getInterceptors(Advisor)}
+ *      1. 声明局部变量 `List<MethodInterceptor> interceptors = new ArrayList<>(3);`
+ *      2. 拿到具体Advice `Advice advice = advisor.getAdvice();`
+ *      3. advice 是 MethodInterceptor 类型
+ *          `interceptors.add(advice)`
+ *      4. 遍历AdvisorAdapter {@link DefaultAdvisorAdapterRegistry#adapters}
+ *         是适配器支持的Advice {@link AdvisorAdapter#supportsAdvice(Advice)}
+ *         使用适配器生成 MethodInterceptor {@link AdvisorAdapter#getInterceptor(Advisor)}
+ *         `interceptors.add(MethodInterceptor)`
+ *      5. interceptors.isEmpty()
+ *          抛出异常，说明这个Advice是非法的
+ *      6. 返回 interceptors
+ *
+ *  注：属性{@link DefaultAdvisorAdapterRegistry#adapters}，会在构造器 {@link DefaultAdvisorAdapterRegistry#DefaultAdvisorAdapterRegistry()} 默认设置3个
+ *      1. new MethodBeforeAdviceAdapter()
+ *      2. new AfterReturningAdviceAdapter()
+ *      3. new ThrowsAdviceAdapter()
+ *
+ *      如果需要扩展AdviceAdapter，可以往IOC容器中注入这个PostProcessor {@link AdvisorAdapterRegistrationManager}
+ *      该PostProcessor的功能：发现创建的bean是AdvisorAdapter类型，就往单例bean {@link GlobalAdvisorAdapterRegistry#instance}
+ *          设置AdvisorAdapter {@link AdvisorAdapterRegistry#registerAdvisorAdapter(AdvisorAdapter)}，从而实现扩展adapters
+ * */
+```
+
+### 细说`ReflectiveMethodInvocation#proceed()`
+
+```java
+/**
+ * JDK      {@link JdkDynamicAopProxy#invoke(Object, Method, Object[])}
+ * Cglib    {@link CglibAopProxy.DynamicAdvisedInterceptor#intercept(Object, Method, Object[], MethodProxy)}
+ * 
+ * 需要代理的方法都是执行 ReflectiveMethodInvocation#proceed
+ * */
+
+/**
+ * {@link ReflectiveMethodInvocation#proceed()}
+ *      注：属性{@link ReflectiveMethodInvocation#interceptorsAndDynamicMethodMatchers}(拦截器集合) 是通过这个方法得到的{@link DefaultAdvisorChainFactory#getInterceptorsAndDynamicInterceptionAdvice(Advised, Method, Class)}
+ *
+ *  1. currentInterceptorIndex(当前拦截器索引) 已经是最后一个了
+ *      反射执行被代理对象的方法 {@link ReflectiveMethodInvocation#invokeJoinpoint()}
+ *
+ *  2. `Object interceptorOrInterceptionAdvice = interceptorsAndDynamicMethodMatchers.get(++currentInterceptorIndex)` 当前拦截器索引自增再取出拦截器集合元素
+ *
+ *  3. if-else分支处理：
+ *
+ *  是 interceptorOrInterceptionAdvice instanceof InterceptorAndDynamicMethodMatcher
+ *      执行 interceptorOrInterceptionAdvice.methodMatcher#matches
+ *          true：执行拦截器的拦截逻辑 `dm.interceptor.invoke(this);`
+ *          false：执行 {@link ReflectiveMethodInvocation#proceed()}，也就是跳过当前拦截器，递归执行
+ *
+ *  否则 `((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(this);`
+ *
+ *  注：也就是说只支持 InterceptorAndDynamicMethodMatcher、MethodInterceptor 这两种类型的interceptor。 而 InterceptorAndDynamicMethodMatcher 的特点是
+ *      执行时会判断当前方法是否匹配，匹配才执行其拦截方法
+ * */
+```
+
+## ClassPathBeanDefinitionScanner
+
+`ClassPathBeanDefinitionScanner` 是用来扫描包路径下的文件，判断是否符合bean的约定，满足就注册到BeanDefinitionMap中
+
+两种扫描机制：
+
+- 索引扫描：文件`META-INF/spring.components`内写上索引，只扫描索引里面的bean
+
+  ```shell
+  # key 是要注册的bean
+  # value 是includefilter所能解析的注解,可以写多个默认按照`,`分割
+  # 会在实例化 ClassPathBeanDefinitionScanner 的时候，解析 META-INF/spring.components 内容解析到 CandidateComponentsIndex 属性中 
+  cn.haitaoss.service.UserService=org.springframework.stereotype.Component
+  ```
+
+- 包扫描：扫描包下面所有`.class`文件
+
+注：包扫描，默认是扫描包下所有的`.class`文件，你可以搞花活，重写匹配文件的规则
+
+### 原理分析
+
+> 简单描述：
+>
+> 1. @ComponentScan 注解
+> 2. 构造扫描器 ClassPathBeanDefinitionScanner
+> 3. 根据 @ComponentScan 注解的属性配置扫描器
+> 4. 扫描: 两种扫描方式
+>    - 扫描指定的类：工具目录配置了 `resources/META-INF/spring.components` 内容，就只会扫描里面定义的类。这是Spring扫描的优化机制
+>    - 扫描指定包下的所有类：获得扫描路径下所有的class文件（Resource对象）
+> 5. 利用 ASM 技术读取class文件信息
+> 6. ExcludeFile + IncludeFilter + @Conditional 的判断
+> 7. 进行独立类、接口、抽象类 @Lookup的判断  `isCandidateComponent`
+> 8. 判断生成的BeanDefinition是否重复
+> 9. 添加到BeanDefinitionMap容器中
+
+```java
+/**
+ * 构造器 {@link ClassPathBeanDefinitionScanner#ClassPathBeanDefinitionScanner(BeanDefinitionRegistry)}
+ *      构造器会设置这些属性：
+ *      1. this.registry = registry; 因为需要将解析的结果注册到IOC容器中，所以必须要得给个IOC容器
+ *      2. 如果参数 useDefaultFilters == true，那么就设置添加默认的(识别@Component注解的) includeFilter {@link ClassPathScanningCandidateComponentProvider#registerDefaultFilters()}
+ *          useDefaultFilters 默认就是true
+ *      3. setEnvironment(environment); 就是用来读取系统属性和环境变量的
+ *      4. setResourceLoader(resourceLoader); 这个很关键，扫描优化机制  {@link ClassPathScanningCandidateComponentProvider#setResourceLoader(ResourceLoader)}
+ *          会设置这个属性 componentsIndex，该属性的实例化是执行 {@link CandidateComponentsIndexLoader#loadIndex(ClassLoader)}
+ *              然后执行 {@link CandidateComponentsIndexLoader#doLoadIndex(ClassLoader)}
+ *              就是会读取ClassLoader里面所有的 META-INF/spring.components 文件 {@link CandidateComponentsIndexLoader#COMPONENTS_RESOURCE_LOCATION}
+ *              解析的结果存到 CandidateComponentsIndex 的 LinkedMultiValueMap<String, Entry> 属性中。数据格式： key:注解的全类名 Entry<bean全类名,包名>
+ *
+ *                 举例：META-INF/spring.components
+ *                 cn.haitaoss.service.UserService=org.springframework.stereotype.Component
+ *                 解析的结果就是 < org.springframework.stereotype.Component , Entry(cn.haitaoss.service.UserService,cn.haitaoss.service) >
+ *
+ *
+ * 执行扫描 {@link ClassPathBeanDefinitionScanner#doScan(String...)}
+ *      1. 入参就是包名，遍历包路径，查找候选的组件 {@link ClassPathScanningCandidateComponentProvider#findCandidateComponents(String)}
+ *          有两种查找机制(会将查找结果返回)：
+ *              第一种：属性componentsIndex不为空(也就是存在META-INF/spring.components) 且 所有includeFilter都满足{@link ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilter(TypeFilter)}
+ *                     走索引优化策略 {@link ClassPathScanningCandidateComponentProvider#addCandidateComponentsFromIndex(CandidateComponentsIndex, String)}
+ *
+ *              第二种：扫描包下所有的资源 {@link ClassPathScanningCandidateComponentProvider#scanCandidateComponents(String)}
+ *
+ *      2. 返回结果，检查容器中是否存在这个 BeanDefinition，{@link ClassPathBeanDefinitionScanner#checkCandidate(String, BeanDefinition)}
+ *
+ *      3. 返回结果 注册到 BeanDefinitionMap 中 {@link ClassPathBeanDefinitionScanner#registerBeanDefinition(BeanDefinitionHolder, BeanDefinitionRegistry)}
+ *
+ *
+ * 第一种查找机制流程：{@link ClassPathScanningCandidateComponentProvider#addCandidateComponentsFromIndex(CandidateComponentsIndex, String)}
+ *      - 遍历includeFilters属性，拿到要扫描的注解值(默认就是@Compoent)，这个就是key {@link ClassPathScanningCandidateComponentProvider#extractStereotype(TypeFilter)}
+ *      - key 取 CandidateComponentsIndex#index，拿到的就是 META-INF/spring.components 按照value分组后的key的集合信息
+ *             然后判断 META-INF/spring.components 文件内容定义的bean的包名是否满足 扫描的包路径 {@link CandidateComponentsIndex#getCandidateTypes(String, String)}
+ *      - 进行 ExcludeFiles + IncludeFilters + @Conditional 判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(MetadataReader)}
+ *      - 进行独立类、接口、抽象类 @Lookup的判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(AnnotatedBeanDefinition)}
+ *      - 满足条件添加到集合 candidates 中
+ *
+ * 第二种查找机制：{@link ClassPathScanningCandidateComponentProvider#scanCandidateComponents(String)}
+ *      - 拿到包下所有的 class 文件 {@link ClassPathScanningCandidateComponentProvider#DEFAULT_RESOURCE_PATTERN}
+ *      - 进行 ExcludeFiles + IncludeFilters + @Conditional 判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(MetadataReader)}
+ *      - 进行独立类、接口、抽象类 @Lookup的判断 {@link ClassPathScanningCandidateComponentProvider#isCandidateComponent(AnnotatedBeanDefinition)}
+ *      - 满足条件添加到集合 candidates 中
+ * */
+```
+
+### 索引扫描判断流程
+
+```java
+/**
+ * 索引扫描判断流程：
+ *
+ * 1. 扫描组件 {@link ClassPathScanningCandidateComponentProvider#findCandidateComponents(String)}
+ *
+ * 2. 判断扫描器的 includeFilters 是否都支持索引扫描 {@link org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilters()}
+ *
+ * 3. 判断是否支持索引扫描的逻辑{@link ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilter(TypeFilter)}
+ *      是这种类型 filter instanceof AnnotationTypeFilter
+ *          filter.getAnnotationType() 有@Indexed注解 或者 是javax. 包下的类
+ *
+ *      是这种类型 filter instanceof AssignableTypeFilter
+ *          filter.getTargetType() 有@Indexed注解
+ */
+```
+
+### AnnotationTypeFilter 匹配逻辑
+
+```java
+/**
+ * {@link AbstractTypeHierarchyTraversingFilter#match(MetadataReader, MetadataReaderFactory)}
+ * 
+ * 1. 匹配bean是否有注解 {@link AbstractTypeHierarchyTraversingFilter#matchSelf(MetadataReader)}
+ *      返回true，就return
+ *
+ * 2. 属性：considerInherited 为 true(通过构造器设置的)
+ *      bean的父类 {@link AbstractTypeHierarchyTraversingFilter#matchSuperClass(String)}
+ *          返回true，就return
+ *      递归调 {@link AbstractTypeHierarchyTraversingFilter#match(MetadataReader, MetadataReaderFactory)}
+ *
+ * 3. 属性：considerInterfaces 为 true(通过构造器设置的)
+ *      bean的接口 {@link AbstractTypeHierarchyTraversingFilter#matchInterface(String)}
+ *          返回true，就return
+ *      递归调 {@link AbstractTypeHierarchyTraversingFilter#match(MetadataReader, MetadataReaderFactory)}
+ * */
+```
+
+### @ComponentScan
+
+```java
+@ComponentScan(
+        basePackages = "cn", // 扫描包路径
+        useDefaultFilters = true, // 是否注册默认的 includeFilter，默认会注解扫描@Component注解的includeFilter
+        nameGenerator = BeanNameGenerator.class, // beanName 生成器
+    		excludeFilters = {}, // 扫描bean 排除filter。其中一个命中就不能作为bean
+        includeFilters = {@ComponentScan.Filter(type = FilterType.CUSTOM, classes = MyAnnotationTypeFilter.class)} // 扫描bean 包含filter。其中一个命中就能作为bean
+)
+public class A{}
+```
+
+### 索引扫描示例
+
+`META-INF/spring.components` 文件
+
+```properties
+cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$MyAnnotation
+#cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$Haitao
+```
+
+代码：
+
+```java
+@Component
+/*@ComponentScan( 
+        basePackages = "cn",
+        useDefaultFilters = true,
+        nameGenerator = BeanNameGenerator.class,
+        includeFilters = {@ComponentScan.Filter(type = FilterType.CUSTOM, classes = MyAnnotationTypeFilter.class)}, // 这个可以重写 AbstractTypeHierarchyTraversingFilter#match 定制匹配规则
+        excludeFilters = {}
+)*/
+@ComponentScan(includeFilters = {@ComponentScan.Filter(type = FilterType.ANNOTATION, classes = MyAnnotationTypeFilter.Haitao.class)}) // 这个用起来方便，有这个注解 就可以
+public class Test {}
+
+@MyAnnotationTypeFilter.Haitao
+class AService {}
+
+/**
+ * 索引扫描判断流程：
+ *
+ * 1. 扫描组件 {@link org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#findCandidateComponents(String)}
+ *
+ * 2. 判断扫描器的 includeFilters 是否都支持索引扫描 {@link org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilters()}
+ *
+ * 3. 判断是否支持索引扫描的逻辑{@link org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#indexSupportsIncludeFilter(TypeFilter)}
+ *      是这种类型 filter instanceof AnnotationTypeFilter
+ *          filter.getAnnotationType() 有@Indexed注解 或者 是javax. 包下的类
+ *
+ *      是这种类型 filter instanceof AssignableTypeFilter
+ *          filter.getTargetType() 有@Indexed注解
+ */
+
+/**
+ * 对应的配置文件：META-INF/spring.components
+ * - cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$MyAnnotation
+ * - cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.AService=cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.MyAnnotationTypeFilter$Haitao
+ * */
+class MyAnnotationTypeFilter extends AnnotationTypeFilter {
+    @Indexed // 这个是必须的，否则无法使用 索引扫描
+    class MyAnnotation implements Annotation {
+        @Override
+        public Class<? extends Annotation> annotationType() {
+            return MyAnnotation.class;
+        }
+    }
+
+    @Target(ElementType.TYPE)
+    @Indexed
+    @Retention(RetentionPolicy.RUNTIME)
+    @interface Haitao {}
+
+    public MyAnnotationTypeFilter() {
+        // super(MyAnnotation.class);
+        super(Haitao.class);
+    }
+
+    @Override
+    public boolean match(MetadataReader metadataReader, MetadataReaderFactory metadataReaderFactory) throws IOException {
+        // 匹配方法
+        return true;
+    }
+}
+```
+
 # 待整理
 
 ## Spring的Lifecycle

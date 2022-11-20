@@ -23,6 +23,7 @@ import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinitionHolder;
+import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
 import org.springframework.beans.factory.parsing.Location;
 import org.springframework.beans.factory.parsing.Problem;
 import org.springframework.beans.factory.parsing.ProblemReporter;
@@ -32,6 +33,7 @@ import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.BeanNameGenerator;
 import org.springframework.context.annotation.ConfigurationCondition.ConfigurationPhase;
 import org.springframework.context.annotation.DeferredImportSelector.Group;
+import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.core.NestedIOException;
 import org.springframework.core.OrderComparator;
 import org.springframework.core.Ordered;
@@ -40,6 +42,7 @@ import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.env.*;
+import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.core.io.support.DefaultPropertySourceFactory;
@@ -301,9 +304,15 @@ class ConfigurationClassParser {
             processMemberClasses(configClass, sourceClass, filter);
         }
 
+        // 就是拿到 @PropertySources、@PropertySource 注解
         // Process any @PropertySource annotations
         for (AnnotationAttributes propertySource : AnnotationConfigUtils.attributesForRepeatable(sourceClass.getMetadata(), PropertySources.class, org.springframework.context.annotation.PropertySource.class)) {
             if (this.environment instanceof ConfigurableEnvironment) {
+                /**
+                 * 就是将注解对应的资源文件 构造成 PropertySource 类型的对象，并将对象存到 {@link AbstractEnvironment#propertySources} 属性中。
+                 *
+                 * 使用 `context.getEnvironment().getProperty("name")` 就能读到 资源文件 中定义的内容了
+                 * */
                 processPropertySource(propertySource);
             } else {
                 logger.info("Ignoring @PropertySource annotation on [" + sourceClass.getMetadata()
@@ -315,7 +324,7 @@ class ConfigurationClassParser {
         // Process any @ComponentScan annotations
         Set<AnnotationAttributes> componentScans = AnnotationConfigUtils.attributesForRepeatable(sourceClass.getMetadata(), ComponentScans.class, ComponentScan.class);
         if (!componentScans.isEmpty()
-            && !this.conditionEvaluator.shouldSkip(sourceClass.getMetadata(), ConfigurationPhase.REGISTER_BEAN)) {
+                && !this.conditionEvaluator.shouldSkip(sourceClass.getMetadata(), ConfigurationPhase.REGISTER_BEAN)) {
             for (AnnotationAttributes componentScan : componentScans) {
                 // 这里就会进行扫描，得到的 BeanDefinition会注册到 Spring容器中
                 // The config class is annotated with @ComponentScan -> perform the scan immediately
@@ -383,7 +392,7 @@ class ConfigurationClassParser {
             String superclass = sourceClass.getMetadata()
                     .getSuperClassName();
             if (superclass != null && !superclass.startsWith("java")
-                && !this.knownSuperclasses.containsKey(superclass)) {
+                    && !this.knownSuperclasses.containsKey(superclass)) {
                 this.knownSuperclasses.put(superclass, configClass);
                 // 返回父类 递归解析
                 // Superclass found, return its annotation metadata and recurse
@@ -406,7 +415,7 @@ class ConfigurationClassParser {
             for (SourceClass memberClass : memberClasses) {
                 // 内部类 是 配置类
                 if (ConfigurationClassUtils.isConfigurationCandidate(memberClass.getMetadata())
-                    && !memberClass.getMetadata()
+                        && !memberClass.getMetadata()
                         .getClassName()
                         .equals(configClass.getMetadata()
                                 .getClassName())) {
@@ -500,26 +509,55 @@ class ConfigurationClassParser {
      * @throws IOException if loading a property source failed
      */
     private void processPropertySource(AnnotationAttributes propertySource) throws IOException {
+        // name
         String name = propertySource.getString("name");
         if (!StringUtils.hasLength(name)) {
             name = null;
         }
+        // 编码
         String encoding = propertySource.getString("encoding");
         if (!StringUtils.hasLength(encoding)) {
             encoding = null;
         }
+        // 要加载的属性文件
         String[] locations = propertySource.getStringArray("value");
         Assert.isTrue(locations.length > 0, "At least one @PropertySource(value) location is required");
+        // 忽略资源找不到
         boolean ignoreResourceNotFound = propertySource.getBoolean("ignoreResourceNotFound");
 
+        // 拿到 PropertySourceFactory
         Class<? extends PropertySourceFactory> factoryClass = propertySource.getClass("factory");
+        /**
+         * 注：默认是 DefaultPropertySourceFactory ，否则就反射实例化得到 PropertySourceFactory 。
+         *     DefaultPropertySourceFactory 不支持解析yml格式的内容，所以要想导入 yml 格式的内容需要自定义。
+         *
+         * {@link YamlPropertiesFactoryBean#getObject()} 这个是Spring提供的，可解析yml内容成Properties对象，有了Properties对象
+         * 就可以构造出 PropertySource 对象
+         * */
         PropertySourceFactory factory = (factoryClass
-                                         == PropertySourceFactory.class ? DEFAULT_PROPERTY_SOURCE_FACTORY : BeanUtils.instantiateClass(factoryClass));
+                == PropertySourceFactory.class ? DEFAULT_PROPERTY_SOURCE_FACTORY : BeanUtils.instantiateClass(factoryClass));
 
+        // 遍历 locations
         for (String location : locations) {
             try {
+                /**
+                 * 解析占位符，也就是说可以这么写 @PropertySource("${prop_file}")
+                 * */
                 String resolvedLocation = this.environment.resolveRequiredPlaceholders(location);
+                /**
+                 * 获取资源文件，这里会处理 classpath: 前缀
+                 * {@link GenericApplicationContext#getResource(String)}
+                 * {@link DefaultResourceLoader#getResource(String)}
+                 * */
                 Resource resource = this.resourceLoader.getResource(resolvedLocation);
+                /**
+                 * 一个 location 对应一个 PropertySource 然后记录到环境变量中 {@link AbstractEnvironment#propertySources}
+                 * {@link DefaultPropertySourceFactory#createPropertySource(String, EncodedResource)}
+                 *
+                 * 注：
+                 *  1. name是null，就会根据 EncodedResource 生成名字，默认就是资源文件的路径
+                 *  2. 添加的特点是后添加会放到前面
+                 * */
                 addPropertySource(factory.createPropertySource(name, new EncodedResource(resource, encoding)));
             } catch (IllegalArgumentException | FileNotFoundException | UnknownHostException | SocketException ex) {
                 // Placeholders not resolvable or resource not found when trying to open it
@@ -538,32 +576,46 @@ class ConfigurationClassParser {
         String name = propertySource.getName();
         MutablePropertySources propertySources = ((ConfigurableEnvironment) this.environment).getPropertySources();
 
+        // 已经添加过了
         if (this.propertySourceNames.contains(name)) {
+            // 已经添加过了，那就对已有的属性值进行扩展
             // We've already added a version, we need to extend it
             PropertySource<?> existing = propertySources.get(name);
             if (existing != null) {
+                // 拿到新加的 PropertySource
                 PropertySource<?> newSource = (propertySource instanceof ResourcePropertySource ? ((ResourcePropertySource) propertySource).withResourceName() : propertySource);
                 if (existing instanceof CompositePropertySource) {
+                    /**
+                     * 将新添加的扩展到 现有的里面，newSource 放到集合的前面，从而保证优先使用
+                     * */
                     ((CompositePropertySource) existing).addFirstPropertySource(newSource);
                 } else {
+                    // 将现有的 换成 CompositePropertySource 类型的对象
                     if (existing instanceof ResourcePropertySource) {
                         existing = ((ResourcePropertySource) existing).withResourceName();
                     }
                     CompositePropertySource composite = new CompositePropertySource(name);
+                    // newSource 放到集合的前面，从而保证优先使用
                     composite.addPropertySource(newSource);
                     composite.addPropertySource(existing);
+                    // 替换掉
                     propertySources.replace(name, composite);
                 }
+                // 结束
                 return;
             }
         }
 
         if (this.propertySourceNames.isEmpty()) {
+            // 添加
             propertySources.addLast(propertySource);
         } else {
+            // 拿到最后一个
             String firstProcessed = this.propertySourceNames.get(this.propertySourceNames.size() - 1);
+            // 放到最后一个之前。也就是说 新添加的的会放在前面
             propertySources.addBefore(firstProcessed, propertySource);
         }
+        // 记录
         this.propertySourceNames.add(name);
     }
 
@@ -870,7 +922,7 @@ class ConfigurationClassParser {
             Class<? extends Group> group = deferredImport.getImportSelector()
                     .getImportGroup();
             DeferredImportSelectorGrouping grouping = this.groupings.computeIfAbsent((group
-                                                                                      != null ? group : deferredImport), key -> new DeferredImportSelectorGrouping(createGroup(group)));
+                    != null ? group : deferredImport), key -> new DeferredImportSelectorGrouping(createGroup(group)));
             grouping.add(deferredImport);
             this.configurationClasses.put(deferredImport.getConfigurationClass()
                     .getMetadata(), deferredImport.getConfigurationClass());
@@ -889,7 +941,7 @@ class ConfigurationClassParser {
                             } catch (Throwable ex) {
                                 throw new BeanDefinitionStoreException(
                                         "Failed to process import candidates for configuration class ["
-                                        + configurationClass.getMetadata()
+                                                + configurationClass.getMetadata()
                                                 .getClassName() + "]", ex);
                             }
                         });
@@ -1065,7 +1117,7 @@ class ConfigurationClassParser {
                     // Let's skip it if it's not resolvable - we're just looking for candidates
                     if (logger.isDebugEnabled()) {
                         logger.debug("Failed to resolve member class [" + memberClassName
-                                     + "] - not considering it as a configuration class candidate");
+                                + "] - not considering it as a configuration class candidate");
                     }
                 }
             }
@@ -1181,8 +1233,8 @@ class ConfigurationClassParser {
 
         public CircularImportProblem(ConfigurationClass attemptedImport, Deque<ConfigurationClass> importStack) {
             super(String.format("A circular @Import has been detected: "
-                                + "Illegal attempt by @Configuration class '%s' to import class '%s' as '%s' is "
-                                + "already present in the current import stack %s", importStack.element()
+                    + "Illegal attempt by @Configuration class '%s' to import class '%s' as '%s' is "
+                    + "already present in the current import stack %s", importStack.element()
                     .getSimpleName(), attemptedImport.getSimpleName(), attemptedImport.getSimpleName(), importStack), new Location(importStack.element()
                     .getResource(), attemptedImport.getMetadata()));
         }

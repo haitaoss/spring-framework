@@ -1,11 +1,10 @@
 package cn.haitaoss;
 
 
-import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.*;
-import org.springframework.cache.interceptor.*;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.util.StringValueResolver;
+
+import java.util.Arrays;
 
 /**
  * @author haitao.chen
@@ -52,30 +51,21 @@ public class Test {
          * */
 
         /**
-         * {@link EnableCaching}
-         * {@link CachingConfigurationSelector}
-         *      InfrastructureAdvisorAutoProxyCreator
-         *      {@link ProxyCachingConfiguration}
-         *          {@link CachingConfigurer}
-         *              {@link CacheManager}
-         *              {@link CacheResolver}
-         *              {@link KeyGenerator}
-         *              {@link CacheErrorHandler}
+         * spring aspectj 文档
+         * https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#aop-aj-ltw
          *
-         *          {@link BeanFactoryCacheOperationSourceAdvisor}
-         *          {@link AnnotationCacheOperationSource}
-         *              {@link SpringCacheAnnotationParser}
-         *              {@link CacheOperation}
+         *  Validation, Data Binding, and Type Conversion 文档
+         * https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#validation
          *
-         *          {@link CacheInterceptor}
-         *              {@link CacheAspectSupport.CacheOperationContexts}
-         *              {@link CacheAspectSupport.CacheOperationContext}
-         *              {@link CacheEvaluationContext}
-         *
-         *
+         * Spring 获取资源的方式
          * */
 
+        context.getResource("classpath:demo.xml");
+        context.getResources("classpath*:demo.xml");
 
+        for (String s : Arrays.asList("1")) {
+            System.out.println("s = " + s);
+        }
     }
 
 

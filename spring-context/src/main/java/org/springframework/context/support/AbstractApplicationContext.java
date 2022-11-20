@@ -36,9 +36,7 @@ import org.springframework.core.SpringProperties;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.convert.ConversionService;
-import org.springframework.core.env.ConfigurableEnvironment;
-import org.springframework.core.env.Environment;
-import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.env.*;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
@@ -574,7 +572,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
 
             /**
              * 准备刷新上下文环境
-             *  1. 校验环境变量
+             *  1. 初始化{@link AbstractApplicationContext#environment}属性、设置属性、校验是否存在必要属性
              *  2. 初始化 事件监听器
              *  3. 创建一个容器用于保存早期待发布的事件集合
              */
@@ -720,15 +718,24 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
             }
         }
 
-        /*  相传该方法在网上很多人说该方法没有用，因为这个方法是留个子类实现的，由于是对Sprig源码的核心
-            设计理念没有弄清楚，正是由于Spring提供了大量的可扩展的接口提供给我们自己来实现
-            比如我们自己写一个类重写了 initPropertySources 方法，在该方法中设置了一个环境变量的值为A
-            启动的时候，我的环境变量中没有该值就会启动抛出异常
-         */
+        /**
+         * 子类可以重写这个方法，初始化或者设置 {@link AbstractApplicationContext#environment} 属性，
+         * 然后给 environment 设置 ProperSource。
+         *
+         * 因为占位符的解析(${v1})、属性的获取 都是通过 {@link AbstractEnvironment#getProperty(String)} 得到的
+         *
+         *
+         * {@link cn.haitaoss.javaconfig.PropertySource.Config_Center_Test#main(String[])}
+         * */
         // Initialize any placeholder property sources in the context environment.
         initPropertySources();
 
-        // 用来校验我们容器启动必须依赖的环境变量的值
+        /**
+         * 校验我们容器启动必须依赖的环境变量的值，就是遍历 {@link ConfigurablePropertyResolver#setRequiredProperties(String...)} 设置的值，
+         * 读不到属性值，就报错
+         *
+         * getEnvironment() 若为空，就会初始化 Environment {@link AbstractApplicationContext#createEnvironment()}
+         * */
         // Validate that all properties marked as required are resolvable:
         // see ConfigurablePropertyResolver#setRequiredProperties
         getEnvironment().validateRequiredProperties();
@@ -795,7 +802,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
         if (!shouldIgnoreSpel) {
             /**
              * 为bean工厂设置我们标准的SPEL表达式解析器对象 StandardBeanExpressionResolver
-             * @Value("") 会使用这个来解析表达式
+             * @Value("#{bean1}") 会使用这个来解析表达式
              * */
             beanFactory.setBeanExpressionResolver(new StandardBeanExpressionResolver(beanFactory.getBeanClassLoader()));
         }
@@ -1070,6 +1077,13 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
         // (such as a PropertySourcesPlaceholderConfigurer bean) registered any before:
         // at this point, primarily for resolution in annotation attribute values.
         if (!beanFactory.hasEmbeddedValueResolver()) {
+            /** 
+             * 在依赖注入的时候，解析 @Value("") 时，会使用这个解析字符串，
+             * 所以 @Value("${name}") 的方式引用IOC容器中的属性
+             * 
+             * {@link DefaultListableBeanFactory#doResolveDependency(DependencyDescriptor, String, Set, TypeConverter)}
+             * {@link AbstractBeanFactory#resolveEmbeddedValue(String)}
+             * */            
             beanFactory.addEmbeddedValueResolver(strVal -> getEnvironment().resolvePlaceholders(strVal));
         }
 
