@@ -518,6 +518,13 @@ public abstract class BeanUtils {
         }
 
         String targetTypeName = targetType.getName();
+        /**
+         * 这是一个规范，就是定义一个Editor和类放在一块，就作为类的转换器
+         *      com.chank.pop.Something
+         *      com.chank.pop.SSomethingEditor
+         *
+         * https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#beans-beans-conversion
+         * */
         String editorName = targetTypeName + "Editor";
         try {
             Class<?> editorClass = cl.loadClass(editorName);

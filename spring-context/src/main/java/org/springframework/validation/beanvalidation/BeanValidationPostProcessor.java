@@ -16,14 +16,6 @@
 
 package org.springframework.validation.beanvalidation;
 
-import java.util.Iterator;
-import java.util.Set;
-
-import javax.validation.ConstraintViolation;
-import javax.validation.Validation;
-import javax.validation.Validator;
-import javax.validation.ValidatorFactory;
-
 import org.springframework.aop.framework.AopProxyUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanInitializationException;
@@ -31,6 +23,13 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
+
+import javax.validation.ConstraintViolation;
+import javax.validation.Validation;
+import javax.validation.Validator;
+import javax.validation.ValidatorFactory;
+import java.util.Iterator;
+import java.util.Set;
 
 /**
  * Simple {@link BeanPostProcessor} that checks JSR-303 constraint annotations
@@ -109,12 +108,20 @@ public class BeanValidationPostProcessor implements BeanPostProcessor, Initializ
 	 */
 	protected void doValidate(Object bean) {
 		Assert.state(this.validator != null, "No Validator set");
+		// 拿到被代理类
 		Object objectToValidate = AopProxyUtils.getSingletonTarget(bean);
+		// 拿不到就是用入参
 		if (objectToValidate == null) {
 			objectToValidate = bean;
 		}
+		/**
+		 * 借助 Validator 校验bean的属性
+		 *
+		 * Tips：可以看看 hibernate-validator 怎么用，就知道这里的意思了
+		 * */
 		Set<ConstraintViolation<Object>> result = this.validator.validate(objectToValidate);
 
+		// 不是空，说明有不满足的信息，直接报错
 		if (!result.isEmpty()) {
 			StringBuilder sb = new StringBuilder("Bean state is invalid: ");
 			for (Iterator<ConstraintViolation<Object>> it = result.iterator(); it.hasNext();) {

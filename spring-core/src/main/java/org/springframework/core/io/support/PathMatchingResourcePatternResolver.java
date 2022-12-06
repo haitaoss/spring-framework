@@ -268,6 +268,11 @@ public class PathMatchingResourcePatternResolver implements ResourcePatternResol
                 return findAllClassPathResources(locationPattern.substring(CLASSPATH_ALL_URL_PREFIX.length()));
             }
         } else {
+            /**
+             * 比如：
+             *      - file:///Users/haitao/Desktop/*
+             *      - file:/Users/haitao/Desktop/*
+             * */
             // Generally only look for a pattern after a prefix here,
             // and on Tomcat only after the "*/" separator for its "war:" protocol.
             int prefixEnd = (locationPattern.startsWith("war:") ? locationPattern.indexOf("*/") + 1 :
@@ -278,7 +283,11 @@ public class PathMatchingResourcePatternResolver implements ResourcePatternResol
                 // a file pattern
                 return findPathMatchingResources(locationPattern);
             } else {
-                // 说明没有通配符，那就只查询单个资源就好了
+                /**
+                 * 说明没有通配符，那就只查询单个资源就好了
+                 *  比如：
+                 *      - file:/Users/haitao/Desktop
+                 * */
                 // a single resource with the given name
                 return new Resource[]{getResourceLoader().getResource(locationPattern)};
             }

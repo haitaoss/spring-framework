@@ -6,7 +6,9 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * @author haitao.chen
@@ -49,7 +51,11 @@ public class Spring_API_ResourceLoader {
          *  很简单，使用JDK API {@link ClassLoader#getResources(String)} 所以能获取到依赖jar里面的资源
          * */
         Resource[] resources = resolver.getResources("classpath*:org/springframework/core/io/sup*/*.class");
-        System.out.println("resources = " + resources.length);
+        //        Resource[] resources = context.getResources("classpath*:**/My*properties");
+        //        Resource[] resources = context.getResources("classpath*:*/*properties");
+        //        Resource[] resources = context.getResources("classpath*:*/My*");
+        //        Resource[] resources = context.getResources("file:/Users/haitao/Desktop/*");
+        System.out.println(Arrays.stream(resources).map(Resource::getFilename).collect(Collectors.toList()));
 
         // 其实就是使用 DefaultResourceLoader 实现的
         System.out.println(resolver.getResource("classpath:db.sql").exists());

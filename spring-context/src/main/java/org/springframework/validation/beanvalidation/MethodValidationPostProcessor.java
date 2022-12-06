@@ -16,13 +16,7 @@
 
 package org.springframework.validation.beanvalidation;
 
-import java.lang.annotation.Annotation;
-
-import javax.validation.Validator;
-import javax.validation.ValidatorFactory;
-
 import org.aopalliance.aop.Advice;
-
 import org.springframework.aop.Pointcut;
 import org.springframework.aop.framework.autoproxy.AbstractBeanFactoryAwareAdvisingPostProcessor;
 import org.springframework.aop.support.DefaultPointcutAdvisor;
@@ -32,6 +26,10 @@ import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.validation.annotation.Validated;
+
+import javax.validation.Validator;
+import javax.validation.ValidatorFactory;
+import java.lang.annotation.Annotation;
 
 /**
  * A convenient {@link BeanPostProcessor} implementation that delegates to a
@@ -110,7 +108,14 @@ public class MethodValidationPostProcessor extends AbstractBeanFactoryAwareAdvis
 
 	@Override
 	public void afterPropertiesSet() {
+		/**
+		 * ClassFilter: 类上有 @Validated 才是 true
+		 * MethodMatcher: 不做匹配，都是 true
+		 * */
 		Pointcut pointcut = new AnnotationMatchingPointcut(this.validatedAnnotationType, true);
+		/**
+		 * 具体的增强逻辑，会进行方法参数和方法返回值的约束验证
+		 * */
 		this.advisor = new DefaultPointcutAdvisor(pointcut, createMethodValidationAdvice(this.validator));
 	}
 

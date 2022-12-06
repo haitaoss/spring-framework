@@ -16,12 +16,6 @@
 
 package org.springframework.format.support;
 
-import java.lang.annotation.Annotation;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
 import org.springframework.context.EmbeddedValueResolverAware;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.DecoratingProxy;
@@ -31,16 +25,19 @@ import org.springframework.core.convert.TypeDescriptor;
 import org.springframework.core.convert.converter.ConditionalGenericConverter;
 import org.springframework.core.convert.converter.GenericConverter;
 import org.springframework.core.convert.support.GenericConversionService;
-import org.springframework.format.AnnotationFormatterFactory;
-import org.springframework.format.Formatter;
-import org.springframework.format.FormatterRegistry;
-import org.springframework.format.Parser;
-import org.springframework.format.Printer;
+import org.springframework.format.*;
+import org.springframework.format.datetime.DateFormatter;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.util.StringValueResolver;
+
+import java.lang.annotation.Annotation;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A {@link org.springframework.core.convert.ConversionService} implementation
@@ -81,6 +78,12 @@ public class FormattingConversionService extends GenericConversionService
 
 	@Override
 	public void addFormatter(Formatter<?> formatter) {
+		/**
+		 * getFieldType(formatter) 是拿到泛型类型
+		 * 比如 {@link DateFormatter} 拿到的是 Date 类型
+		 *
+		 * 根据泛型类型设置格式化器
+		 * */
 		addFormatterForFieldType(getFieldType(formatter), formatter);
 	}
 

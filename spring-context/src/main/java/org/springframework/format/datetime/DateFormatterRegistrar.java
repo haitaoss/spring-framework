@@ -16,15 +16,15 @@
 
 package org.springframework.format.datetime;
 
-import java.util.Calendar;
-import java.util.Date;
-
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.core.convert.converter.ConverterRegistry;
 import org.springframework.format.FormatterRegistrar;
 import org.springframework.format.FormatterRegistry;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
+
+import java.util.Calendar;
+import java.util.Date;
 
 /**
  * Configures basic date formatting for use with Spring, primarily for
@@ -60,13 +60,38 @@ public class DateFormatterRegistrar implements FormatterRegistrar {
 
 	@Override
 	public void registerFormatters(FormatterRegistry registry) {
+		// 添加处理 Date 类型的 Converter
 		addDateConverters(registry);
 		// In order to retain back compatibility we only register Date/Calendar
 		// types when a user defined formatter is specified (see SPR-10105)
 		if (this.dateFormatter != null) {
+			// 设置 String <---> Date 的格式化器
 			registry.addFormatter(this.dateFormatter);
+			// 设置 String <---> Calendar 的格式化器
 			registry.addFormatterForFieldType(Calendar.class, this.dateFormatter);
 		}
+		/**
+		 * 这是用来处理 @DateTimeFormat 注解的格式化的
+		 * 主要是给这三个类型设置Converter：
+		 * 	- Date
+		 * 	- Calendar
+		 * 	- Long
+		 *
+		 * 也就是可以这么写
+		 * class A{
+		 * 	   @DateTimeFormat(pattern = "yyyyMM")
+		 *     @Value("202211")
+		 *     private Date date;
+		 *
+		 *     @DateTimeFormat(pattern = "yyyyMM")
+		 *     @Value("202211")
+		 *     private Calendar cal;
+		 *
+		 *     @DateTimeFormat(pattern = "yyyyMM")
+		 *     @Value("202211")
+		 *     private Long l;
+		 * }
+		 * */
 		registry.addFormatterForFieldAnnotation(new DateTimeFormatAnnotationFormatterFactory());
 	}
 

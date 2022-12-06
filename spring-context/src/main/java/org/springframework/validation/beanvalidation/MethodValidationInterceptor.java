@@ -16,19 +16,8 @@
 
 package org.springframework.validation.beanvalidation;
 
-import java.lang.reflect.Method;
-import java.util.Set;
-
-import javax.validation.ConstraintViolation;
-import javax.validation.ConstraintViolationException;
-import javax.validation.Validation;
-import javax.validation.Validator;
-import javax.validation.ValidatorFactory;
-import javax.validation.executable.ExecutableValidator;
-
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
-
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.SmartFactoryBean;
 import org.springframework.core.BridgeMethodResolver;
@@ -37,6 +26,11 @@ import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.validation.annotation.Validated;
+
+import javax.validation.*;
+import javax.validation.executable.ExecutableValidator;
+import java.lang.reflect.Method;
+import java.util.Set;
 
 /**
  * An AOP Alliance {@link MethodInterceptor} implementation that delegates to a
@@ -91,11 +85,16 @@ public class MethodValidationInterceptor implements MethodInterceptor {
 	@Override
 	@Nullable
 	public Object invoke(MethodInvocation invocation) throws Throwable {
+		// 不对 FactoryBean.getObjectType/isSingleton 进行校验
 		// Avoid Validator invocation on FactoryBean.getObjectType/isSingleton
 		if (isFactoryBeanMetadataMethod(invocation.getMethod())) {
 			return invocation.proceed();
 		}
 
+		/**
+		 * 拿到 @Validated 注解：从方法上找 -> 再从类上找
+		 * 拿到注解的属性值，也就是 groups
+		 * */
 		Class<?>[] groups = determineValidationGroups(invocation);
 
 		// Standard Bean Validation 1.1 API
@@ -107,6 +106,10 @@ public class MethodValidationInterceptor implements MethodInterceptor {
 		Assert.state(target != null, "Target must not be null");
 
 		try {
+			/**
+			 * 按照分组进行方法参数的校验
+			 * Tips：可以看看 hibernate-validator 怎么用，就知道这里的意思了
+			 * */
 			result = execVal.validateParameters(target, methodToValidate, invocation.getArguments(), groups);
 		}
 		catch (IllegalArgumentException ex) {
@@ -116,12 +119,19 @@ public class MethodValidationInterceptor implements MethodInterceptor {
 					ClassUtils.getMostSpecificMethod(invocation.getMethod(), target.getClass()));
 			result = execVal.validateParameters(target, methodToValidate, invocation.getArguments(), groups);
 		}
+		// 不为null，说明有不满足约束的方法参数
 		if (!result.isEmpty()) {
+			// 直接抛出异常
 			throw new ConstraintViolationException(result);
 		}
 
+		// 放行方法
 		Object returnValue = invocation.proceed();
 
+		/**
+		 * 按照分组进行方法返回值的校验
+		 * Tips：可以看看 hibernate-validator 怎么用，就知道这里的意思了
+		 * */
 		result = execVal.validateReturnValue(target, methodToValidate, returnValue, groups);
 		if (!result.isEmpty()) {
 			throw new ConstraintViolationException(result);

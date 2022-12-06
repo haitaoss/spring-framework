@@ -1,10 +1,14 @@
 yml_name: hello yml
+haitaoss: ${map1.key1}+${list1[1]}
 map1:
   key1: value1
   key2: value2
-
 list1:
   - v1
   - v2
 
 list2: [ v1,v2 ]
+
+spring:
+  profiles:
+    active: prod,uat

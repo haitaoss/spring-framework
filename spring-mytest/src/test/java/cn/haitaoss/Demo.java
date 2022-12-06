@@ -9,21 +9,18 @@ import org.springframework.aop.framework.adapter.DefaultAdvisorAdapterRegistry;
 import org.springframework.aop.support.DefaultPointcutAdvisor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.GenericTypeResolver;
-import org.springframework.expression.*;
-import org.springframework.expression.common.TemplateParserContext;
-import org.springframework.expression.spel.ast.PropertyOrFieldReference;
-import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.transaction.annotation.ProxyTransactionManagementConfiguration;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
 import java.util.StringTokenizer;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -40,7 +37,15 @@ public class Demo {
 
 
     private String name;
+    @Test
+    public void test_(){
+        Consumer<Class> consumer = clazz ->
+                System.out.println(AnnotatedElementUtils.hasAnnotation(ProxyTransactionManagementConfiguration.class, clazz));
+        consumer.accept(Bean.class);
+        consumer.accept(Configuration.class);
 
+        // clazz.isAnnotationPresent(this.annotationType)
+    }
     public void dynamic_args(String... args) {
         System.out.println("args = " + args);
     }
@@ -94,84 +99,6 @@ public class Demo {
         x.invoke(null);
         x.invoke(Demo.class);
         x.invoke(new Demo());
-    }
-
-
-    @Test
-    public void test_spel() {
-        Demo demo = new Demo();
-
-        ExpressionParser parser = new SpelExpressionParser();
-
-        StandardEvaluationContext context = new StandardEvaluationContext(demo);
-        context.setVariable("newName", "Mike Tesla");
-
-        Function<String, Object> consumer = exp -> parser.parseExpression(exp).getValue(context);
-        // 字符串
-        System.out.println(consumer.apply("'a'"));
-        // 运算
-        System.out.println(consumer.apply("1+1"));
-        /**
-         * name 表示 context中的属性名
-         * #newName 表示获取变量
-         *
-         * 意思就是给name赋值
-         * */
-        System.out.println(consumer.apply("name = #newName"));
-        /**
-         * name变量的值，这样子写就是访问属性
-         * */
-        System.out.println(consumer.apply("name"));
-        /**
-         * 设置BeanResolver,就是 @ 开头的会通过这个解析值
-         * */
-        context.setBeanResolver(new BeanResolver() {
-            @Override
-            public Object resolve(EvaluationContext context, String beanName) throws AccessException {
-                return "通过BeanResolver解析的值-->" + beanName;
-            }
-        });
-        // 会使用BeanResolver 解析
-        System.out.println(consumer.apply("@a"));
-        // 模板解析上下文，就是可以去掉模板字符
-        System.out.println(parser.parseExpression("#{@x}", new TemplateParserContext()).getValue(context));
-        // PropertyAccessor 用来解析属性是怎么取值的
-        context.addPropertyAccessor(new PropertyAccessor() {
-            @Override
-            public Class<?>[] getSpecificTargetClasses() {
-                //                return new Class[0];
-                /**
-                 * 返回 null，表示都满足
-                 * 不会null，就会匹配 EvaluationContext 类型，匹配了才会使用这个 PropertyAccessor
-                 * {@link PropertyOrFieldReference#readProperty(TypedValue, EvaluationContext, String)}
-                 *  {@link PropertyOrFieldReference#getPropertyAccessorsToTry(Object, List)}
-                 * */
-                return null;
-            }
-
-            @Override
-            public boolean canRead(EvaluationContext context, Object target, String name) throws AccessException {
-                System.out.println("canRead...." + name);
-                return true;
-            }
-
-            @Override
-            public TypedValue read(EvaluationContext context, Object target, String name) throws AccessException {
-                System.out.println("read...." + name);
-                return null;
-            }
-
-            @Override
-            public boolean canWrite(EvaluationContext context, Object target, String name) throws AccessException {
-                return false;
-            }
-
-            @Override
-            public void write(EvaluationContext context, Object target, String name, Object newValue) throws AccessException {
-
-            }
-        });
-        System.out.println(consumer.apply("testPropertyAccessor"));
     }
 
     public static void main(String[] args) {

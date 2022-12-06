@@ -43,6 +43,17 @@ dependencies {
 
     // 解析 yml 内容的
     optional("org.yaml:snakeyaml:1.29")
+
+    // https://hibernate.org/validator/releases/7.0/
+    optional("javax.validation:validation-api:1.1.0.Final")
+    optional("org.hibernate:hibernate-validator:5.4.3.Final")
+    optional("org.glassfish:javax.el:3.0.1-b08")
+
+
+    // 比较新的
+    optional 'jakarta.validation:jakarta.validation-api:3.0.2'
+    // optional 'org.hibernate.validator:hibernate-validator:7.0.5.Final'
+    // optional "org.glassfish:jakarta.el:4.0.1"
 }
 test {
     useJUnitPlatform()

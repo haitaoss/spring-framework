@@ -72,6 +72,12 @@ dependencies {
 ```
 # 源码分析
 
+1. [先看懂new一个IOC容器会发生什么](#Spring容器创建的核心流程)，也就是IOC容器的生命周期。重点就看refresh方法做了啥，关注用到了那些类型的对象，回调了类的那些方法。
+
+2. [再看getBean发生了啥](#bean 创建的生命周期)，也就是一个bean的生命周期，也是一样的套路看用到了哪些类型的对象，回调了类的那些方法
+
+3. 根据功能看源码，比如 @EnableAsync ，那就看看这个注解做了啥，原理很简单，一般都是导入特殊的类(比如后置处理器)，类的方法会在 bean的生命周期中被回调，从而实现功能
+
 ## [ASM 技术](https://asm.ow2.io/)
 
 > 简单来说，ASM是一个操作Java字节码的类库。
@@ -633,7 +639,7 @@ public class FullConfigClassTest {
  * */
 ```
 
-### 细说个个环节
+### 细说各个环节
 
 1. 所有的bean 都是通过 `getBean()` 来创建的
 
@@ -5745,7 +5751,324 @@ public class ProfileTest {
 
 [context.getEnvironment().getProperty("name")](#AbstractEnvironment.getProperty)
 
+## @Validated
+
+> Spring没有实现约束注解，具体的约束逻辑的实现是依赖第三方框架的，所以你得先知道如何使用第三方框架。比如 [hibernate-validator](https://docs.jboss.org/hibernate/stable/validator/reference/en-US/html_single/)
+>
+> 注册`MethodValidationPostProcessor`：可以实现对方法参数和方法返回值的约束校验，前提将`@Validated`标注在类上
+>
+> 注册`BeanValidationPostProcessor`：可以实现对bean里面的 @NotNull 等注解进行校验
+
+### LocalValidatorFactoryBean
+
+```java
+/**
+ * LocalValidatorFactoryBean 就是一个工具类，是用来配置 Validator
+ * 所以你得懂 Validator 怎么用，可以看看 hibernate-validator 的使用手册
+ *
+ * 主要是配置了这两个东西：
+ * MessageInterpolator：错误消息的模板解析。可以配置Spring的MessageSource也就是错误消息的i18n
+ * ConstraintValidatorFactory：约束的创建工厂，会使用 `beanFactory#createBean` 来创建 ConstraintValidator，也就是说可以使用依赖注入等功能
+ * */
+```
+
+### MethodValidationPostProcessor
+
+[AbstractAdvisingBeanPostProcessor](#`AbstractAdvisingBeanPostProcessor#postProcessAfterInitialization`)
+
+```java
+/**
+ * MethodValidationPostProcessor 继承 AbstractAdvisingBeanPostProcessor 是一个后置处理器
+ * 而 AbstractAdvisingBeanPostProcessor 会在 postProcessAfterInitialization 阶段对 bean进行AOP的判断，判断满足了就进件AOP也就是创建代理对象
+ * 判断逻辑：
+ *      ClassFilter: 类上有 @Validated 才是 true
+ *      MethodMatcher: 不做匹配，都是 true
+ *
+ * 增强逻辑：{@link MethodValidationInterceptor#invoke(MethodInvocation)}
+ *      1. 方法是 FactoryBean.getObjectType/isSingleton 直接放行
+ *          `return invocation.proceed();`
+ *      2. 拿到 @Validated 注解：从方法上找 -> 再从类上找，拿到注解的属性值，也就是 groups
+ *      3. 按照分组进行方法参数的校验
+ *          有不满足的约束校验，就抛出异常
+ *      4. 放行方法，拿到方法返回值
+ *      5. 按照分组进行方法返回值的校验
+ *          有不满足的约束校验，就抛出异常
+ *
+ *  Tips：Spring没有实现约束注解的校验，是依赖第三方框架来实现参数的校验。可以看看 hibernate-validator 怎么用
+ * */
+```
+
+### BeanValidationPostProcessor
+
+```java
+/**
+ * 这是对bean进行属性校验的，默认是在 postProcessBeforeInitialization(初始化前后置处理器)
+ * 对bean里面的 @NotNull 等注解进行校验
+ * */
+```
+
+### 示例代码
+
+#### hibernate-validator使用demo
+
+```java
+@Data
+public class validate_factory {
+    public static void main(String[] args) {
+    
+        ValidatorFactory validatorFactory = Validation.byProvider(HibernateValidator.class)
+                .configure()
+                // 指定脚本评估工厂，就是处理 @ScriptAssert(script = "value > 0", lang = "spring")
+                .scriptEvaluatorFactory(new SpringELScriptEvaluatorFactory())
+               /* // 就是配置文件开发，把对类的约束信息，配置到xml里面（好鸡肋啊，写注解不是很方便吗）
+                .addMapping((InputStream) null)*/
+                // 就是匹配错了，就别匹配后面的约束注解了
+                .failFast(true)
+                .addProperty("hibernate.validator.fail_fast", "true")
+                .addProperty("hibernate.validator.show_validated_value_in_trace_logs", "true")
+                .buildValidatorFactory();
+
+        Validator validator = validatorFactory.usingContext()
+                // 通过查询 TraversableResolver 接口可以访问哪些属性，哪些属性不能访问
+                .traversableResolver(new MyTraversableResolver())
+                // 解析模板的。可以在方法内对占位符做国际化的解析
+                .messageInterpolator(new MyMessageInterpolator())
+                // 约束校验器工厂，用来生成 ConstraintValidator 的
+                // .constraintValidatorFactory(new MyConstraintValidatorFactory())
+                // 参数名字解析器
+                // .parameterNameProvider(new MyParameterNameProvider())
+                // 值提取器（就是校验注解标注在对象上，但是其校验的是对象的某个属性，这时候就需要使用值提取器来提取对象的属性）
+                .addValueExtractor(new UnwrapByDefaultValueExtractor())
+                .getValidator();
+
+      validator.validate(null); // 验证bean中的属性约束
+      
+      
+      ExecutableValidator executableValidator = validator.forExecutables();
+      // 验证方法参数
+      Set<ConstraintViolation<Car>> violations = executableValidator.validateParameters(
+                object,
+                method,
+                parameterValues
+        );
+      // 验证方法返回值
+      violations = executableValidator.validateReturnValue(
+                object,
+                method,
+                returnValue
+        );
+      // 验证构造器参数
+      violations = executableValidator.validateConstructorParameters(
+                constructor,
+                parameterValues
+        );
+      // 验证构造器返回值
+      violations = executableValidator.validateConstructorReturnValue(
+                constructor,
+                createdObject
+        );
+    }
+}
+```
+
+#### Spring配置Validator
+
+```java
+@Configuration
+public class SpringValidatorConfig {
+    @Bean
+    public LocalValidatorFactoryBean localValidatorFactoryBean() {
+        LocalValidatorFactoryBean localValidatorFactoryBean = new LocalValidatorFactoryBean();
+        localValidatorFactoryBean.setValidationMessageSource(messageSource());
+        return localValidatorFactoryBean;
+    }
+
+    @Bean
+    public MethodValidationPostProcessor validationPostProcessor(Validator validation) {
+        MethodValidationPostProcessor methodValidationPostProcessor = new MethodValidationPostProcessor();
+        methodValidationPostProcessor.setValidator(validation);
+        return methodValidationPostProcessor;
+    }
+
+    @Bean
+    public BeanValidationPostProcessor beanValidationPostProcessor(Validator validation) {
+        BeanValidationPostProcessor beanValidationPostProcessor = new BeanValidationPostProcessor();
+        beanValidationPostProcessor.setValidator(validation);
+        return beanValidationPostProcessor;
+    }
+
+    @Bean
+    public MessageSource messageSource() {
+        ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
+        messageSource.setDefaultEncoding("UTF-8");
+        // 不需要指定后缀，在获取指定Locale的信息时，会拼接 _zh_CN.properties 然后通过ClassLoader读取文件
+        messageSource.setBasenames("i18n/f1");
+        return messageSource;
+    }
+}
+```
+
+#### 自定义约束注解
+
+```java
+/**
+ *
+ * 验证约束由两部分组成：：
+ *  1. 定义一个注解，使用 @Constraint 标注
+ *  2. 定义 ConstraintValidator 接口的实例，用来实现具体约束的校验逻辑
+ *
+ *  注：为了将声明与实现相关联，每个 @Constraint 注释都引用相应的 ConstraintValidator 实现类，
+ *      在校验约束注解时，会使用 ConstraintValidatorFactory 实例化 ConstraintValidator，然后回调 ConstraintValidator#isValid 方法做校验
+ * */
+@Target({ElementType.METHOD, ElementType.FIELD, ElementType.ANNOTATION_TYPE, ElementType.CONSTRUCTOR, ElementType.PARAMETER})
+@Retention(RetentionPolicy.RUNTIME)
+@Constraint(validatedBy = MyConstraint.MyConstraintValidator.class)
+public @interface MyConstraint {
+    // 这三个属性必须写，会校验的
+    String message() default "{javax.validation.constraints.NotNull.message}";
+
+    Class<?>[] groups() default {};
+
+    Class<? extends Payload>[] payload() default {};
+
+    class MyConstraintValidator implements ConstraintValidator<MyConstraint, String> {
+        public MyConstraintValidator() {
+            System.out.println("MyConstraintValidator...");
+        }
+
+        @Autowired
+        private ApplicationContext applicationContext; // 因为Spring配置了ConstraintValidatorFactory，所以可以依赖注入
+
+        @Override
+        public void initialize(MyConstraint myConstraint) {
+            System.out.println("initialize...." + myConstraint.message());
+        }
+
+        @Override
+        public boolean isValid(String value, ConstraintValidatorContext context) {
+            System.out.println("MyConstraintValidator.isValid--->");
+            return value.contains("haitao");
+        }
+    }
+}
+```
+
+#### 校验方法参数
+
+```java
+@Import(SpringValidatorConfig.class)
+@Validated
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class ValidatedTest {
+    @NotNull(message = "{name}不能为null")
+    @MyConstraint(message = "1")
+    @Value("haitao")
+    public String name;
+
+    @NotNull(message = "返回值不能为null")
+    public Object test_Validated(@Valid @NotNull ValidatedTest test, @MyConstraint(message = "2") String name) {
+        System.out.println("test = " + test);
+        return null;
+    }
+
+    public static void main(String[] args) {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(ValidatedTest.class);
+
+        try {
+            ValidatedTest bean = context.getBean(ValidatedTest.class);
+            // bean.test_Validated(null,null);
+            // bean.test_Validated(new ValidatedTest(), "haitao");
+            bean.test_Validated(new ValidatedTest("haitao"), "haitao");
+        } catch (ConstraintViolationException e) {
+            print_constraint_info(e.getConstraintViolations());
+        }
+    }
+
+    private static void print_constraint_info(Set<ConstraintViolation<?>> violations) {
+        System.out.println("===============================");
+        for (ConstraintViolation<?> item : violations) {
+            // 错误信息
+            System.out.println(item.getMessage());
+            // 约束类型
+            System.out.println(item.getConstraintDescriptor().getAnnotation().annotationType());
+        }
+    }
+}
+```
+
+
+
 # Spring好用的工具类
+
+## ProxyFactoryBean
+
+> 就是生成代理对象的工具类，代理逻辑是容器中的bean，使用beanName指定增强逻辑，会查找
+>
+> Advisor 和 Interceptor 类型的bean，然后匹配前缀
+
+````java
+public class Test {
+    @Bean
+    public ProxyFactoryBean proxyFactoryBean() {
+        ProxyFactoryBean proxyFactoryBean = new ProxyFactoryBean();
+				proxyFactoryBean.setInterceptorNames("Advisor*","Interceptor*");
+        return proxyFactoryBean;
+    }
+}
+````
+
+
+
+## MessageSource
+
+> [Spring messagesource 文档](https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#context-functionality-messagesource)
+>
+> 没啥特别的就是资源文件的读取，支持占位符。
+>
+> 而占位符是用的JDK的MessageFormat实现的，看[JDK文档](https://docs.oracle.com/javase/8/docs/api/java/text/MessageFormat.html)就知道了怎么用了
+
+`resources/i18n/f1.properties`
+
+```text
+desc=海涛真的{0}。手机还剩{1,number,percent}电
+error=错误
+name=姓名
+```
+
+```java
+public class Test {
+
+    @Bean
+    public MessageSource messageSource() {
+        ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
+        messageSource.setDefaultEncoding("UTF-8");
+        // 不需要指定后缀，在获取指定Locale的信息时，会拼接 _zh_CN.properties 然后通过ClassLoader读取文件
+        messageSource.setBasenames("i18n/f1");
+        return messageSource;
+    }
+
+    public static void main(String[] args) {
+        // System.out.println(Locale.getDefault());
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(Test.class);
+        System.out.println(context.getMessage("name", null, Locale.SIMPLIFIED_CHINESE));
+        System.out.println(context.getMessage("name", null, Locale.US));
+        System.out.println(context.getMessage("name", null, Locale.forLanguageTag("haitao")));
+        System.out.println(context.getMessage("name", null, null));
+        // 是使用 MessageFormat 来解析占位符，所以 i18n 文件，可以使用 {index} 的方式 引用参数
+        System.out.println(context.getMessage("desc", new Object[]{"帅", 0.5}, null));
+
+        /**
+         * JDK API 使用举例
+         * https://docs.oracle.com/javase/8/docs/api/java/text/MessageFormat.html
+         * */
+        System.out.println(MessageFormat.format("海涛真的{0}。手机还剩{1,number,percent}电", "帅", 0.5));
+    }
+}
+```
+
+
 
 ## StandardEnvironment
 
@@ -5977,9 +6300,7 @@ public class Spring_API_PropertyPlaceholderHelper {
 >
 > PathMatchingResourcePatternResolver 支持使用Ant风格的路径符，返回匹配的资源。而且聚合了`DefaultResourceLoader`
 >
-> 直接使用这个功能最多
-
-
+> 直接使用这个，功能最多
 
 ### 示例代码
 
@@ -6009,10 +6330,6 @@ public class JDK_API_Resource {
 
 ```java
 public class Spring_API_ResourceLoader {
-
-    /**
-     * {@link PathMatchingResourcePatternResolver#getResources(String)}
-     * */
     public static void main(String[] args) throws IOException {
 
         /*ApplicationContext context = new AnnotationConfigApplicationContext();
@@ -6047,7 +6364,11 @@ public class Spring_API_ResourceLoader {
          *  很简单，使用JDK API {@link ClassLoader#getResources(String)} 所以能获取到依赖jar里面的资源
          * */
         Resource[] resources = resolver.getResources("classpath*:org/springframework/core/io/sup*/*.class");
-        System.out.println("resources = " + resources.length);
+        //        Resource[] resources = context.getResources("classpath*:**/My*properties");
+        //        Resource[] resources = context.getResources("classpath*:*/*properties");
+        //        Resource[] resources = context.getResources("classpath*:*/My*");
+        //        Resource[] resources = context.getResources("file:/Users/haitao/Desktop/*");
+        System.out.println(Arrays.stream(resources).map(Resource::getFilename).collect(Collectors.toList()));
 
         // 其实就是使用 DefaultResourceLoader 实现的
         System.out.println(resolver.getResource("classpath:db.sql").exists());
@@ -6113,6 +6434,8 @@ public class Spring_API_ResourceLoader {
 > `PropertyEditor` 是JDK提供的，`ConversionService`是Spring提供的。而`TypeConverter`是聚合了这两个东西
 >
 > 注入 `CustomEditorConfigurer` 可以扩展`TypeConverter`中的`PropertyEditor`
+>
+> [内置`PropertyEditor`实现](https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#beans-beans-conversion)
 
 ### `PropertyEditorTest`
 
@@ -6281,6 +6604,335 @@ public class TypeConverterTest {
     }
 }
 ```
+
+## 格式化
+
+> 格式化可以看作是特殊的类型转换，是 String <---> Object 的转换
+>
+> https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#format
+
+```java
+/**
+ * Printer：是函数式接口，函数方法逻辑入参是Object 返回值是String
+ * Parser：是函数式接口，函数方法逻辑入参是String 返回值是Object
+ * Formatter：格式化接口，其实现 Printer 和 Parser 接口
+ *
+ * AnnotationFormatterFactory：注解格式化接口工厂，就是用来生成 Printer 和 Parser 的
+ *  比如：
+ *      - NumberFormatAnnotationFormatterFactory 会根据 @NumberFormat(pattern="") 生成对应格式的 Printer 和 Parser
+ *      - DateTimeFormatAnnotationFormatterFactory 会根据 @DateTimeFormat(pattern="")  生成对应格式的 Printer 和 Parser
+ *
+ * FormatterRegistry：格式化注册器，用来将 Printer 和 Parser 加工成 Converter 的。
+ *
+ * FormatterRegistrar：格式化登记员，是用来加工 FormatterRegistry(格式化注册器) 的。加工的含义就是往 FormatterRegistry 中添加 Converter、Printer、Parser
+ *  比如：
+ *      - DateTimeFormatterRegistrar：是处理 LocalDate、LocalTime、OffsetTime、LocalDateTime、ZonedDateTime、OffsetDateTime 类型的转换的
+ *      - DateFormatterRegistrar：是处理 Calendar、Date 类型的转换的
+ *
+ * FormattingConversionServiceFactoryBean：是用来FactoryBean，其getObject方法返回的是 FormattingConversionService 也就是生成 FormatterRegistry(格式化注册器)。
+ *      FormattingConversionServiceFactoryBean 聚合了上线的东西，用来配置 FormatterRegistry
+ *
+ *  Tips：可以将 Printer 和 Parser 看成特殊的 Converter。
+ *       Printer 是 Object 转成 String 的Converter
+ *       Parser 是 String 转成 Object 的Converter
+ * */
+```
+
+![Formatter类图](.README_imgs/Formatter类图.png)
+
+```java
+@Data
+public class FormatterTest {
+    @NumberFormat(style = NumberFormat.Style.PERCENT)
+    @Value("56%")
+    private double d;
+
+    @DateTimeFormat(pattern = "yyyyMM")
+    @Value("202211")
+    private Date date;
+
+    @DateTimeFormat(pattern = "yyyyMM")
+    @Value("202211")
+    private Calendar cal;
+
+    @DateTimeFormat(pattern = "yyyyMM")
+    @Value("202211")
+    private Long l;
+
+    @Value("20221205")
+    private Date defaultDate;
+
+    //@Bean("conversionService")
+    public static FormattingConversionService conversionService() {
+        /**
+         * 实例化DefaultFormattingConversionService，构造器参数传 false
+         *
+         * 默认是会注册默认的 其实就是执行下面的代码，但是我们想自定义格式化样式，所以传 false，然后写注册代码
+         * */
+        DefaultFormattingConversionService conversionService = new DefaultFormattingConversionService(false);
+
+        // 支持 @NumberFormat 的格式化
+        conversionService.addFormatterForFieldAnnotation(new NumberFormatAnnotationFormatterFactory());
+
+        /**
+         * 配置全局的格式化格式
+         * */
+        // Register JSR-310 date conversion with a specific global format
+        DateTimeFormatterRegistrar dateTimeFormatterRegistrar = new DateTimeFormatterRegistrar();
+        dateTimeFormatterRegistrar.setDateFormatter(DateTimeFormatter.ofPattern("yyyyMMdd")); // 用于设置 LocalDate 类型的格式化
+        dateTimeFormatterRegistrar.setDateTimeFormatter(DateTimeFormatter.ofPattern("yyyyMMdd")); // 用于设置 LocalTime、OffsetTime 类型的格式化
+        dateTimeFormatterRegistrar.setTimeFormatter(DateTimeFormatter.ofPattern("yyyyMMdd")); // 用于设置 LocalDateTime、ZonedDateTime、OffsetDateTime 类型的格式化
+        // 将内置的格式化器 注册到 conversionService 中
+        dateTimeFormatterRegistrar.registerFormatters(conversionService);
+
+        /**
+         * 配置全局的格式化格式
+         * */
+        // Register date conversion with a specific global format
+        DateFormatterRegistrar dateFormatterRegistrar = new DateFormatterRegistrar();
+        dateFormatterRegistrar.setFormatter(new DateFormatter("yyyyMMdd")); // 用于设置 Calendar、Date 类型的格式化
+        // 将内置的格式化器 注册到 conversionService 中
+        dateFormatterRegistrar.registerFormatters(conversionService);
+
+        return conversionService;
+    }
+
+    @Bean("conversionService")
+    public static FormattingConversionServiceFactoryBean formattingConversionServiceFactoryBean(Environment environment) {
+        FormattingConversionServiceFactoryBean formattingConversionServiceFactoryBean = new FormattingConversionServiceFactoryBean();
+
+        // 自定义默认格式
+        DateTimeFormatterRegistrar dateTimeFormatterRegistrar = new DateTimeFormatterRegistrar();
+        dateTimeFormatterRegistrar.setDateFormatter(DateTimeFormatter.ofPattern("yyyyMMdd")); // 用于设置 LocalDate 类型的格式化
+        dateTimeFormatterRegistrar.setDateTimeFormatter(DateTimeFormatter.ofPattern("yyyyMMdd")); // 用于设置 LocalTime、OffsetTime 类型的格式化
+        dateTimeFormatterRegistrar.setTimeFormatter(DateTimeFormatter.ofPattern("yyyyMMdd")); // 用于设置 LocalDateTime、ZonedDateTime、OffsetDateTime 类型的格式化
+
+        DateFormatterRegistrar dateFormatterRegistrar = new DateFormatterRegistrar();
+        dateFormatterRegistrar.setFormatter(new DateFormatter("yyyyMMdd")); // 用于设置 Calendar、Date 类型的格式化
+
+        HashSet<FormatterRegistrar> registrars = new HashSet<>();
+        registrars.add(dateTimeFormatterRegistrar);
+        registrars.add(dateFormatterRegistrar);
+
+        HashSet<Object> formatters = new HashSet<>();
+        formatters.add(new NumberFormatAnnotationFormatterFactory());
+
+        // 配置
+        formattingConversionServiceFactoryBean.setFormatters(formatters);
+        formattingConversionServiceFactoryBean.setFormatterRegistrars(registrars);
+        formattingConversionServiceFactoryBean.setRegisterDefaultFormatters(false);
+        formattingConversionServiceFactoryBean.setEmbeddedValueResolver(environment::resolvePlaceholders);
+        return formattingConversionServiceFactoryBean;
+    }
+
+    public static void main(String[] args) {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(FormatterTest.class);
+        System.out.println(context.getBean(FormatterTest.class));
+
+        /*ConversionService conversionService = context.getBeanFactory().getConversionService();
+        conversionService.convert(null, null);*/
+    }
+}
+```
+
+## Java Bean Validation
+
+> [Spring Java Bean Validation 文档](https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#validation-beanvalidation)
+>
+> Validator 是 Spring提供的接口，用来编写bean的检验逻辑。可以引用 hibernate-validator  来完成具体的校验逻辑
+>
+>  DataBinder 是Spring提供用于校验bean工具，会将校验的**错误信息封装**起来。会依赖 Validator 来实现校验逻辑。
+
+### Validator 校验器
+
+```java
+public class PersonValidator implements Validator {
+    private final Validator addressValidator;
+
+    public PersonValidator(Validator addressValidator) {
+        this.addressValidator = addressValidator;
+    }
+
+    /**
+     * 这个验证器只能验证 Person 类型的实例
+     * This Validator validates only Person instances
+     */
+    public boolean supports(Class clazz) {
+        return Person.class.equals(clazz);
+    }
+
+    /**
+     * Validation 文档
+     * https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#validation
+     *
+     * JavaDoc ValidationUtils
+     * https://docs.spring.io/spring-framework/docs/6.0.0/javadoc-api/org/springframework/validation/ValidationUtils.html
+     * JavaDoc Errors
+     * https://docs.spring.io/spring-framework/docs/6.0.0/javadoc-api/org/springframework/validation/Errors.html
+     * JavaDoc MessageCodesResolver
+     * https://docs.spring.io/spring-framework/docs/6.0.0/javadoc-api/org/springframework/validation/MessageCodesResolver.html
+     * JavaDoc DefaultMessageCodesResolver
+     * https://docs.spring.io/spring-framework/docs/6.0.0/javadoc-api/org/springframework/validation/DefaultMessageCodesResolver.html
+     *
+     * Validator是个工具，而DataBinder是使用工具的人
+     * */
+    public void validate(Object obj, Errors errors) {
+        /**
+         * 工具类，字段 name 是空 就将错误信息 记录到 e 里面
+         *
+         * 因为 Errors 里面包含了 obj的引用
+         * */
+        ValidationUtils.rejectIfEmpty(errors, "name", "name.empty"); // 是执行 errors.rejectValue 注册的错误信息
+        /**
+         * e#reject 和 e#rejectValue 默认是使用 DefaultMessageCodesResolver 解析 errorCode
+         *      Resolving Codes to Error Messages
+         * */
+        errors.reject("error");
+        /**
+         *
+         * 而且还注册包含您传递给拒绝方法的字段名称的消息
+         * rejectValue 这样子注册信息，还会额外记录：
+         *  1.字段的名称
+         *  2.字段的类型
+         *
+         * the first includes the field name and the second includes the type of the field
+         * */
+        errors.rejectValue("name", "name has error");
+        Person p = (Person) obj;
+        if (p.getAge() < 0) {
+            // 记录错误信息
+            errors.rejectValue("age", "negativevalue");
+        } else if (p.getAge() > 110) {
+            // 记录错误信息
+            errors.rejectValue("age", "too.darn.old");
+        }
+
+        // 嵌套校验
+        try {
+            // 先设置一个路径
+            errors.pushNestedPath("address");
+            // 使用 addressValidator 验证 customer.getAddress() ，验证的结果存到 errors 中
+            ValidationUtils.invokeValidator(this.addressValidator, p.getAddress(), errors);
+        } finally {
+            errors.popNestedPath();
+        }
+    }
+
+    @Data
+    public static class Person {
+        private String name;
+        private int age;
+        private Address address;
+    }
+
+    @Data
+    public static class Address {
+        private String location;
+    }
+}
+```
+
+### DataBinder 使用校验器的工具
+
+```java
+public class DataBinderTest {
+    public static void main(String[] args) {
+        /**
+         * DataBinder，可以用来验证bean的信息，然后里面在引入 hibernate-validator 来实现对象的验证
+         * 岂不是妙哉
+         * https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#validation-binder
+         * */
+        Address target = new Address();
+        target.setLocation("bj");
+
+        DataBinder binder = new DataBinder(target);
+
+        // 会校验 Validator 是否适配绑定的data
+        binder.setValidator(new Validator() {
+            @Override
+            public boolean supports(Class<?> clazz) {
+                return Address.class.isAssignableFrom(clazz);
+            }
+
+            @Override
+            public void validate(Object target, Errors errors) {
+
+            }
+        });
+        // 使用 hibernate-validator
+        binder.addValidators(new SpringValidatorAdapter(Validation.buildDefaultValidatorFactory().getValidator()));
+        // bind to the target object
+        MutablePropertyValues propertyValues = new MutablePropertyValues();
+        propertyValues.add("location", null);
+        binder.bind(propertyValues);
+
+        // 用来解析错误信息中的占位符
+        binder.setMessageCodesResolver(new DefaultMessageCodesResolver());
+        // 校验
+        binder.validate();
+
+        // get BindingResult that includes any validation errors
+        BindingResult results = binder.getBindingResult();
+        System.out.println("results = " + results);
+
+    }
+
+    @Data
+    public static class Address {
+        private String location;
+    }
+}
+```
+
+
+
+## BeanWrapper
+
+> 一个工具而已，没啥特别的
+
+```java
+public class BeanWrapperTest {
+    /**
+     * https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#beans-beans
+     * 
+     * BeanWrapper 包装bean，然后可以获取属性、设置属性、查询属性可读可写等
+     * */
+    public static void main(String[] args) {
+        BeanWrapper beanWrapper = new BeanWrapperImpl(new Person());
+        // setting the Person name..
+        beanWrapper.setPropertyValue("name", "Some Person Inc.");
+        // ... can also be done like this:
+        PropertyValue value = new PropertyValue("name", "Some Person Inc.");
+        beanWrapper.setPropertyValue(value);
+
+        // ok, let's create the director and tie it to the Person:
+        BeanWrapper jim = new BeanWrapperImpl(new Address());
+        jim.setPropertyValue("name", "Jim Stravinsky");
+        beanWrapper.setPropertyValue("address", jim.getWrappedInstance());
+
+        // retrieving the salary of the managingDirector through the Person
+        String location = (String) beanWrapper.getPropertyValue("address.location");
+
+        beanWrapper.isReadableProperty("name");
+        beanWrapper.isWritableProperty("name");
+
+    }
+
+    @Data
+    public static class Person {
+        private String name;
+        private int age;
+        private Address address;
+    }
+
+    @Data
+    public static class Address {
+        private String location;
+    }
+}
+```
+
+
 
 ## SpEL
 

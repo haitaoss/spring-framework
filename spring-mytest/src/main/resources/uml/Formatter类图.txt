@@ -1,0 +1,104 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+interface AnnotationFormatterFactory<A> << interface >> {
+  + getPrinter(A, Class<?>): Printer<?>
+  + getParser(A, Class<?>): Parser<?>
+  + getFieldTypes(): Set<Class<?>>
+}
+class DateFormatterRegistrar {
+  + registerFormatters(FormatterRegistry): void
+  + setFormatter(DateFormatter): void
+  + addDateConverters(ConverterRegistry): void
+}
+class DateTimeFormatterRegistrar {
+  + setTimeStyle(FormatStyle): void
+  + setTimeFormatter(DateTimeFormatter): void
+  + setDateStyle(FormatStyle): void
+  + setDateTimeFormatter(DateTimeFormatter): void
+  + registerFormatters(FormatterRegistry): void
+  - getFormatter(Type): DateTimeFormatter
+  + setDateFormatter(DateTimeFormatter): void
+  + setUseIsoFormat(boolean): void
+  + setDateTimeStyle(FormatStyle): void
+  - getFallbackFormatter(Type): DateTimeFormatter
+}
+interface Formatter<T> << interface >>
+interface FormatterRegistrar << interface >> {
+  + registerFormatters(FormatterRegistry): void
+}
+interface FormatterRegistry << interface >> {
+  + addFormatter(Formatter<?>): void
+  + addFormatterForFieldType(Class<?>, Printer<?>, Parser<?>): void
+  + addFormatterForFieldAnnotation(AnnotationFormatterFactory<Annotation>): void
+  + addPrinter(Printer<?>): void
+  + addParser(Parser<?>): void
+  + addFormatterForFieldType(Class<?>, Formatter<?>): void
+}
+class FormattingConversionServiceFactoryBean {
+  + setFormatterRegistrars(Set<FormatterRegistrar>): void
+  + getObject(): FormattingConversionService?
+  + setFormatters(Set<?>): void
+  - registerFormatters(FormattingConversionService): void
+  + setEmbeddedValueResolver(StringValueResolver): void
+  + getObjectType(): Class<FormattingConversionService>?
+  + isSingleton(): boolean
+  + setRegisterDefaultFormatters(boolean): void
+  + setConverters(Set<?>): void
+  + afterPropertiesSet(): void
+}
+interface GenericConverter << interface >> {
+  + getConvertibleTypes(): Set<ConvertiblePair>?
+  + convert(Object?, TypeDescriptor, TypeDescriptor): Object?
+}
+interface Parser<T> << interface >> {
+  + parse(String, Locale): T
+}
+interface Printer<T> << interface >> {
+  + print(T, Locale): String
+}
+class ParserConverter {
+  + convert(Object?, TypeDescriptor, TypeDescriptor): Object?
+  + toString(): String
+  + getConvertibleTypes(): Set<ConvertiblePair>?
+}
+
+class PrinterConverter {
+  + getConvertibleTypes(): Set<ConvertiblePair>?
+  + convert(Object?, TypeDescriptor, TypeDescriptor): Object?
+  - resolvePrinterObjectType(Printer<?>): Class<?>?
+  + toString(): String
+}
+
+interface ConverterRegistry << interface >> {
+  + addConverter(Converter<?, ?>): void
+  + removeConvertible(Class<?>, Class<?>): void
+  + addConverter(GenericConverter): void
+  + addConverterFactory(ConverterFactory<?, ?>): void
+  + addConverter(Class<S>, Class<T>, Converter<S, T>): void
+}
+
+
+FormatterRegistry  -[#008200,plain]-^  ConverterRegistry
+ParserConverter   -[#008200,dashed]-^  GenericConverter
+PrinterConverter  -[#008200,dashed]-^  GenericConverter
+
+DateFormatterRegistrar                  -[#008200,dashed]-^  FormatterRegistrar
+DateTimeFormatterRegistrar              -[#008200,dashed]-^  FormatterRegistrar
+Formatter                               -[#008200,plain]-^  Parser
+Formatter                               -[#008200,plain]-^  Printer
+FormattingConversionServiceFactoryBean *-- FormatterRegistrar
+
+FormatterRegistry *-- AnnotationFormatterFactory
+FormatterRegistrar *-- FormatterRegistry
+ConverterRegistry *-- GenericConverter
+ParserConverter *-- Parser
+PrinterConverter *-- Printer
+FormatterRegistry *-- Formatter
+
+@enduml
+
+
