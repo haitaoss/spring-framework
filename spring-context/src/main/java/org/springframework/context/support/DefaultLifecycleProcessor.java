@@ -86,6 +86,7 @@ public class DefaultLifecycleProcessor implements LifecycleProcessor, BeanFactor
      */
     @Override
     public void start() {
+        // 会启动 Lifecycle 的bean
         startBeans(false);
         this.running = true;
     }
@@ -106,6 +107,7 @@ public class DefaultLifecycleProcessor implements LifecycleProcessor, BeanFactor
 
     @Override
     public void onRefresh() {
+        // 只会启动是 SmartLifecycle#isAutoStartup 为true的bean
         startBeans(true);
         this.running = true;
     }
@@ -125,17 +127,26 @@ public class DefaultLifecycleProcessor implements LifecycleProcessor, BeanFactor
     // Internal helpers
 
     private void startBeans(boolean autoStartupOnly) {
+        // 拿到容器中 Lifecycle 类型的bean
         Map<String, Lifecycle> lifecycleBeans = getLifecycleBeans();
+
         Map<Integer, LifecycleGroup> phases = new TreeMap<>();
 
         lifecycleBeans.forEach((beanName, bean) -> {
+            // 是 autoStartup 的才需要收集
             if (!autoStartupOnly || (bean instanceof SmartLifecycle && ((SmartLifecycle) bean).isAutoStartup())) {
                 int phase = getPhase(bean);
+                // 按照 phase 进行分组
                 phases.computeIfAbsent(phase, p -> new LifecycleGroup(phase, this.timeoutPerShutdownPhase, lifecycleBeans, autoStartupOnly))
                         .add(beanName, bean);
             }
         });
         if (!phases.isEmpty()) {
+            /**
+             * 分组触发
+             *
+             * 注：因为phases是TreeMap类型的，所以这里是有序的(key做升序排列)
+             * */
             phases.values()
                     .forEach(LifecycleGroup::start);
         }
@@ -149,12 +160,22 @@ public class DefaultLifecycleProcessor implements LifecycleProcessor, BeanFactor
      * @param beanName       the name of the bean to start
      */
     private void doStart(Map<String, ? extends Lifecycle> lifecycleBeans, String beanName, boolean autoStartupOnly) {
+        // 移除，防止重复start
         Lifecycle bean = lifecycleBeans.remove(beanName);
         if (bean != null && bean != this) {
+            /**
+             * 拿到这个bean依赖项
+             * Tips: 比如 使用 @Autowired注入的bean 和 使用@DependsOn("bean") 都属于依赖项
+             * */
             String[] dependenciesForBean = getBeanFactory().getDependenciesForBean(beanName);
             for (String dependency : dependenciesForBean) {
+                // 优先启动依赖项
                 doStart(lifecycleBeans, dependency, autoStartupOnly);
             }
+            /**
+             * 1. bean正在运行就不能start
+             * 2. 如果是 SmartLifecycle 可以根据其 SmartLifecycle#isAutoStartup 方法决定是否要启动
+             * */
             if (!bean.isRunning() && (!autoStartupOnly || !(bean instanceof SmartLifecycle)
                                       || ((SmartLifecycle) bean).isAutoStartup())) {
                 if (logger.isTraceEnabled()) {
@@ -162,6 +183,7 @@ public class DefaultLifecycleProcessor implements LifecycleProcessor, BeanFactor
                             .getName() + "]");
                 }
                 try {
+                    // 回调 start 方法
                     bean.start();
                 } catch (Throwable ex) {
                     throw new ApplicationContextException("Failed to start bean '" + beanName + "'", ex);
@@ -323,6 +345,7 @@ public class DefaultLifecycleProcessor implements LifecycleProcessor, BeanFactor
         }
 
         public void add(String name, Lifecycle bean) {
+            // compare 是通过 phase 的值
             this.members.add(new LifecycleGroupMember(name, bean));
             if (bean instanceof SmartLifecycle) {
                 this.smartMemberCount++;
@@ -336,6 +359,10 @@ public class DefaultLifecycleProcessor implements LifecycleProcessor, BeanFactor
             if (logger.isDebugEnabled()) {
                 logger.debug("Starting beans in phase " + this.phase);
             }
+            /**
+             * 排序 是比较 phase 的值
+             *  Lifecycle类型的phase是0
+             * */
             Collections.sort(this.members);
             for (LifecycleGroupMember member : this.members) {
                 doStart(this.lifecycleBeans, member.name, this.autoStartupOnly);

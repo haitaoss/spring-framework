@@ -28,6 +28,8 @@ import org.springframework.beans.support.ResourceEditorRegistrar;
 import org.springframework.context.*;
 import org.springframework.context.event.*;
 import org.springframework.context.expression.StandardBeanExpressionResolver;
+import org.springframework.context.weaving.AspectJWeavingEnabler;
+import org.springframework.context.weaving.DefaultContextLoadTimeWeaver;
 import org.springframework.context.weaving.LoadTimeWeaverAware;
 import org.springframework.context.weaving.LoadTimeWeaverAwareProcessor;
 import org.springframework.core.NativeDetector;
@@ -44,6 +46,7 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.core.metrics.ApplicationStartup;
 import org.springframework.core.metrics.StartupStep;
+import org.springframework.instrument.classloading.LoadTimeWeaver;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
@@ -53,6 +56,8 @@ import org.springframework.util.ReflectionUtils;
 import java.beans.PropertyDescriptor;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.instrument.ClassFileTransformer;
+import java.lang.instrument.Instrumentation;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -454,7 +459,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
     ApplicationEventMulticaster getApplicationEventMulticaster() throws IllegalStateException {
         if (this.applicationEventMulticaster == null) {
             throw new IllegalStateException("ApplicationEventMulticaster not initialized - "
-                    + "call 'refresh' before multicasting events via the context: " + this);
+                                            + "call 'refresh' before multicasting events via the context: " + this);
         }
         return this.applicationEventMulticaster;
     }
@@ -479,8 +484,8 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
     LifecycleProcessor getLifecycleProcessor() throws IllegalStateException {
         if (this.lifecycleProcessor == null) {
             throw new IllegalStateException("LifecycleProcessor not initialized - "
-                    + "call 'refresh' before invoking lifecycle methods via the context: "
-                    + this);
+                                            + "call 'refresh' before invoking lifecycle methods via the context: "
+                                            + this);
         }
         return this.lifecycleProcessor;
     }
@@ -680,7 +685,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
                 if (logger.isWarnEnabled()) {
                     logger.warn(
                             "Exception encountered during context initialization - " + "cancelling refresh attempt: "
-                                    + ex);
+                            + ex);
                 }
 
                 // Destroy already created singletons to avoid dangling resources.
@@ -862,7 +867,29 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
         // Detect a LoadTimeWeaver and prepare for weaving, if found.
         if (!NativeDetector.inNativeImage() && beanFactory.containsBean(LOAD_TIME_WEAVER_BEAN_NAME)) {
             /**
-             * TODOHAITAO 还没看到
+             * LoadTimeWeaverAwareProcessor 是一个BeanPostProcessor，是用来暴露 LoadTimeWeaver 对象给bean的一个后置处理器，
+             * 而 {@link LoadTimeWeaver#addTransformer(ClassFileTransformer)} 方法可以间接的往
+             * {@link Instrumentation} 中注册 {@link ClassFileTransformer} ，从而能拦截到 class文件加载到JVM的过程，拦截到了就可以修改。
+             * Tips：LoadTimeWeaver 是 Instrumentation 的一个包装对象
+             *
+             * 比如：
+             * 使用 <context:load-time-weaver aspectj-weaving="on"/> 会注册 {@link AspectJWeavingEnabler} 和 {@link DefaultContextLoadTimeWeaver} 到 BeanFactory 中
+             *  AspectJWeavingEnabler 实现 LoadTimeWeaverAware、BeanFactoryPostProcessor
+             *  DefaultContextLoadTimeWeaver 实现 BeanClassLoaderAware
+             *
+             * AspectJWeavingEnabler 会在 {@link PostProcessorRegistrationDelegate#invokeBeanFactoryPostProcessors(ConfigurableListableBeanFactory, List)} 时被实例化，
+             * AspectJWeavingEnabler 的实例化会被 {@link LoadTimeWeaverAwareProcessor#postProcessBeforeInitialization(Object, String)} 处理
+             *      而 postProcessBeforeInitialization 会 getBean(DefaultContextLoadTimeWeaver)，
+             *      而 DefaultContextLoadTimeWeaver 的实例化会设置属性
+             *          `this.loadTimeWeaver = new InstrumentationLoadTimeWeaver(classLoader);` 说白了就是暴露出 {@link Instrumentation} 对象
+             *      然后将 DefaultContextLoadTimeWeaver 实例作为参数回调 {@link AspectJWeavingEnabler#setLoadTimeWeaver(LoadTimeWeaver)}
+             *
+             * AspectJWeavingEnabler 作为 BeanFactoryPostProcessor 的作用
+             * {@link AspectJWeavingEnabler#postProcessBeanFactory(ConfigurableListableBeanFactory)}
+             *      执行 {@link AspectJWeavingEnabler#enableAspectJWeaving(LoadTimeWeaver, ClassLoader)}
+             *      loadTimeWeaver.addTransformer(new AspectJClassBypassingClassFileTransformer(new ClassPreProcessorAgentAdapter()));
+             *      也就是间接的往 Instrumentation 中注册 {@link ClassFileTransformer} ，从而能拦截到 class文件加载到JVM的过程，在加载之前通过 Aspectj 对
+             *      class文件进行修改增加增强逻辑
              * */
             beanFactory.addBeanPostProcessor(new LoadTimeWeaverAwareProcessor(beanFactory));
             // Set a temporary ClassLoader for type matching.
@@ -919,10 +946,14 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
          * */
         PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(beanFactory, getBeanFactoryPostProcessors());
 
+        /**
+         * 算是一种补偿机制，因为在 {@link AbstractApplicationContext#prepareBeanFactory(ConfigurableListableBeanFactory)} 会有第一次判断，
+         * 这里再次判断的目的是处理@Bean注册的情况
+         * */
         // Detect a LoadTimeWeaver and prepare for weaving, if found in the meantime
         // (e.g. through an @Bean method registered by ConfigurationClassPostProcessor)
         if (!NativeDetector.inNativeImage() && beanFactory.getTempClassLoader() == null
-                && beanFactory.containsBean(LOAD_TIME_WEAVER_BEAN_NAME)) {
+            && beanFactory.containsBean(LOAD_TIME_WEAVER_BEAN_NAME)) {
             beanFactory.addBeanPostProcessor(new LoadTimeWeaverAwareProcessor(beanFactory));
             beanFactory.setTempClassLoader(new ContextTypeMatchClassLoader(beanFactory.getBeanClassLoader()));
         }
@@ -987,8 +1018,8 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
             beanFactory.registerSingleton(APPLICATION_EVENT_MULTICASTER_BEAN_NAME, this.applicationEventMulticaster);
             if (logger.isTraceEnabled()) {
                 logger.trace("No '" + APPLICATION_EVENT_MULTICASTER_BEAN_NAME + "' bean, using " + "["
-                        + this.applicationEventMulticaster.getClass()
-                        .getSimpleName() + "]");
+                             + this.applicationEventMulticaster.getClass()
+                                     .getSimpleName() + "]");
             }
         }
     }
@@ -1001,20 +1032,27 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
      */
     protected void initLifecycleProcessor() {
         ConfigurableListableBeanFactory beanFactory = getBeanFactory();
+        /**
+         * 当前BeanFactory中是否有 bean。
+         *
+         * 注：不会查询parent
+         * */
         if (beanFactory.containsLocalBean(LIFECYCLE_PROCESSOR_BEAN_NAME)) {
             this.lifecycleProcessor = beanFactory.getBean(LIFECYCLE_PROCESSOR_BEAN_NAME, LifecycleProcessor.class);
             if (logger.isTraceEnabled()) {
                 logger.trace("Using LifecycleProcessor [" + this.lifecycleProcessor + "]");
             }
         } else {
+            // 默认就是这个
             DefaultLifecycleProcessor defaultProcessor = new DefaultLifecycleProcessor();
             defaultProcessor.setBeanFactory(beanFactory);
             this.lifecycleProcessor = defaultProcessor;
+            // 注册到 BeanFactory 中
             beanFactory.registerSingleton(LIFECYCLE_PROCESSOR_BEAN_NAME, this.lifecycleProcessor);
             if (logger.isTraceEnabled()) {
                 logger.trace("No '" + LIFECYCLE_PROCESSOR_BEAN_NAME + "' bean, using " + "["
-                        + this.lifecycleProcessor.getClass()
-                        .getSimpleName() + "]");
+                             + this.lifecycleProcessor.getClass()
+                                     .getSimpleName() + "]");
             }
         }
     }
@@ -1069,7 +1107,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
          * */
         // Initialize conversion service for this context.
         if (beanFactory.containsBean(CONVERSION_SERVICE_BEAN_NAME)
-                && beanFactory.isTypeMatch(CONVERSION_SERVICE_BEAN_NAME, ConversionService.class)) {
+            && beanFactory.isTypeMatch(CONVERSION_SERVICE_BEAN_NAME, ConversionService.class)) {
             beanFactory.setConversionService(beanFactory.getBean(CONVERSION_SERVICE_BEAN_NAME, ConversionService.class));
         }
 
@@ -1077,17 +1115,20 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
         // (such as a PropertySourcesPlaceholderConfigurer bean) registered any before:
         // at this point, primarily for resolution in annotation attribute values.
         if (!beanFactory.hasEmbeddedValueResolver()) {
-            /** 
+            /**
              * 在依赖注入的时候，解析 @Value("") 时，会使用这个解析字符串，
              * 所以 @Value("${name}") 的方式引用IOC容器中的属性
-             * 
+             *
              * {@link DefaultListableBeanFactory#doResolveDependency(DependencyDescriptor, String, Set, TypeConverter)}
              * {@link AbstractBeanFactory#resolveEmbeddedValue(String)}
-             * */            
+             * */
             beanFactory.addEmbeddedValueResolver(strVal -> getEnvironment().resolvePlaceholders(strVal));
         }
 
-        // 处理关于 aspectj
+        /**
+         * 优先实例化 LoadTimeWeaverAware 类型的bean，从而可以更早的注册 Transformer，
+         * 从而保证后续 Xx.class 的加载能被拦截到
+         * */
         // Initialize LoadTimeWeaverAware beans early to allow for registering their transformers early.
         String[] weaverAwareNames = beanFactory.getBeanNamesForType(LoadTimeWeaverAware.class, false, false);
         for (String weaverAwareName : weaverAwareNames) {
@@ -1116,10 +1157,20 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
         // Clear context-level resource caches (such as ASM metadata from scanning).
         clearResourceCaches();
 
+        /**
+         * 初始化 LifecycleProcessor。其实就是将BeanFactory中的LifecycleProcessor 设置成 IOC容器的属性，
+         * 设置这个属性的目的，是将 bean的声明周期和IOC容器的声明周期做关联。
+         *
+         * 注：如果BeanFactory中没有设置LifecycleProcessor，那么会实例化一个 DefaultLifecycleProcessor 然后设置到BeanFactory中
+         * */
         // Initialize lifecycle processor for this context.
         initLifecycleProcessor();
 
-        // 首先将刷新传播到生命周期处理器。TODOHAITAO 这有什么应用场景？？？
+        /**
+         * 触发 LifecycleProcessor 的刷新
+         *
+         * 注：目的是触发BeanFactory中的 Lifecycle和SmartLifecycle类型的bean
+         * */
         // Propagate refresh to lifecycle processor first.
         getLifecycleProcessor().onRefresh();
 
@@ -1580,7 +1631,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
         if (this.messageSource == null) {
             throw new IllegalStateException(
                     "MessageSource not initialized - " + "call 'refresh' before accessing messages via the context: "
-                            + this);
+                    + this);
         }
         return this.messageSource;
     }

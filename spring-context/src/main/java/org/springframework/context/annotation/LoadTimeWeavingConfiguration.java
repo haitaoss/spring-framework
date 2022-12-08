@@ -79,7 +79,7 @@ public class LoadTimeWeavingConfiguration implements ImportAware, BeanClassLoade
 	@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
 	public LoadTimeWeaver loadTimeWeaver() {
 		Assert.state(this.beanClassLoader != null, "No ClassLoader set");
-		LoadTimeWeaver loadTimeWeaver = null;
+			LoadTimeWeaver loadTimeWeaver = null;
 
 		if (this.ltwConfigurer != null) {
 			// The user has provided a custom LoadTimeWeaver instance

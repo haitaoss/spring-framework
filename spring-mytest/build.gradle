@@ -35,8 +35,8 @@ dependencies {
 
     // 嵌入式tomcat
     optional("org.apache.tomcat.embed:tomcat-embed-core")
-    // Aspectj 依赖
-    implementation "org.aspectj:aspectjweaver"
+    // AspectJ 依赖
+    optional "org.aspectj:aspectjweaver:1.9.7"
 
     // 本地缓存框架
     optional 'com.github.ben-manes.caffeine:caffeine:2.9.1'

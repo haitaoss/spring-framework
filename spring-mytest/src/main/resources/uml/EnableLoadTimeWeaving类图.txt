@@ -1,0 +1,100 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AspectJWeavingEnabler {
+  - beanClassLoader: ClassLoader?
+  + ASPECTJ_AOP_XML_RESOURCE: String
+  - loadTimeWeaver: LoadTimeWeaver?
+  + setBeanClassLoader(ClassLoader): void
+  + getOrder(): int
+  + enableAspectJWeaving(LoadTimeWeaver?, ClassLoader?): void
+  + setLoadTimeWeaver(LoadTimeWeaver): void
+  + postProcessBeanFactory(ConfigurableListableBeanFactory): void
+}
+interface ClassFileTransformer << interface >> {
+  + transform(Module, ClassLoader, String, Class<?>, ProtectionDomain, byte[]): byte[]
+  + transform(ClassLoader, String, Class<?>, ProtectionDomain, byte[]): byte[]
+}
+class DefaultContextLoadTimeWeaver {
+  - loadTimeWeaver: LoadTimeWeaver?
+  # logger: Log
+  + setBeanClassLoader(ClassLoader): void
+  # createServerSpecificLoadTimeWeaver(ClassLoader): LoadTimeWeaver?
+  + getThrowawayClassLoader(): ClassLoader
+  + getInstrumentableClassLoader(): ClassLoader
+  + destroy(): void
+  + addTransformer(ClassFileTransformer): void
+}
+annotation EnableLoadTimeWeaving << annotation >> {
+  + aspectjWeaving(): AspectJWeaving
+}
+interface Instrumentation << interface >> {
+  + appendToBootstrapClassLoaderSearch(JarFile): void
+  + isModifiableModule(Module): boolean
+  + addTransformer(ClassFileTransformer, boolean): void
+  + isNativeMethodPrefixSupported(): boolean
+  + getInitiatedClasses(ClassLoader): Class[]
+  + retransformClasses(Class<?>[]): void
+  + appendToSystemClassLoaderSearch(JarFile): void
+  + redefineModule(Module, Set<Module>, Map<String, Set<Module>>, Map<String, Set<Module>>, Set<Class<?>>, Map<Class<?>, List<Class<?>>>): void
+  + addTransformer(ClassFileTransformer): void
+  + isModifiableClass(Class<?>): boolean
+  + redefineClasses(ClassDefinition[]): void
+  + isRedefineClassesSupported(): boolean
+  + removeTransformer(ClassFileTransformer): boolean
+  + isRetransformClassesSupported(): boolean
+  + getObjectSize(Object): long
+  + getAllLoadedClasses(): Class[]
+  + setNativeMethodPrefix(ClassFileTransformer, String): void
+}
+class InstrumentationLoadTimeWeaver {
+  - classLoader: ClassLoader?
+  - AGENT_CLASS_PRESENT: boolean
+  - transformers: List<ClassFileTransformer>
+  - instrumentation: Instrumentation?
+  + removeTransformers(): void
+  + getInstrumentableClassLoader(): ClassLoader
+  - getInstrumentation(): Instrumentation?
+  + addTransformer(ClassFileTransformer): void
+  + isInstrumentationAvailable(): boolean
+  + getThrowawayClassLoader(): ClassLoader
+}
+interface LoadTimeWeaver << interface >> {
+  + getThrowawayClassLoader(): ClassLoader
+  + addTransformer(ClassFileTransformer): void
+  + getInstrumentableClassLoader(): ClassLoader
+}
+class LoadTimeWeaverAwareProcessor {
+  - loadTimeWeaver: LoadTimeWeaver?
+  - beanFactory: BeanFactory?
+  + setBeanFactory(BeanFactory): void
+  + postProcessAfterInitialization(Object, String): Object?
+  + postProcessBeforeInitialization(Object, String): Object?
+}
+class LoadTimeWeavingConfiguration {
+  - enableLTW: AnnotationAttributes?
+  - ltwConfigurer: LoadTimeWeavingConfigurer?
+  - beanClassLoader: ClassLoader?
+  + setLoadTimeWeavingConfigurer(LoadTimeWeavingConfigurer): void
+  + setImportMetadata(AnnotationMetadata): void
+  + setBeanClassLoader(ClassLoader): void
+  + loadTimeWeaver(): LoadTimeWeaver
+}
+interface LoadTimeWeavingConfigurer << interface >> {
+  + getLoadTimeWeaver(): LoadTimeWeaver
+}
+
+DefaultContextLoadTimeWeaver   -[#008200,dashed]-^  LoadTimeWeaver
+InstrumentationLoadTimeWeaver  -[#008200,dashed]-^  LoadTimeWeaver
+InstrumentationLoadTimeWeaver  *--  Instrumentation
+InstrumentationLoadTimeWeaver  *--  ClassFileTransformer
+EnableLoadTimeWeaving *-- LoadTimeWeavingConfiguration
+
+LoadTimeWeavingConfiguration *-- LoadTimeWeavingConfigurer
+LoadTimeWeavingConfigurer *-- LoadTimeWeaver
+LoadTimeWeavingConfiguration *-- LoadTimeWeaver
+DefaultContextLoadTimeWeaver *-- LoadTimeWeaver
+@enduml

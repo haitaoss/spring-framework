@@ -42,10 +42,12 @@ public class Test {
          *
          * @PropertySource
          *
+         * @EnableLoadTimeWeaving
+         *
          * 待掌握 aspectj 相关的 没看懂
          * https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#aop-using-aspectj
          * https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#aop-aj-ltw
-         * @EnableLoadTimeWeaving
+         *
          * @EnableSpringConfigured @Configurable
          * */
     }

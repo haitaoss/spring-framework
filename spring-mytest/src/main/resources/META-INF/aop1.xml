@@ -1,0 +1,15 @@
+<!DOCTYPE aspectj PUBLIC "-//AspectJ//DTD//EN" "https://www.eclipse.org/aspectj/dtd/aspectj.dtd">
+<aspectj>
+    <aspects>
+        <!-- weave in just this aspect -->
+        <aspect name="cn.haitaoss.javaconfig.EnableLoadTimeWeaving.ProfilingAspect"/>
+        <weaver options="-verbose -showWeaveInfo">
+            <!-- only weave classes in our application-specific packages -->
+<!--            <include within="cn.haitaoss.javaconfig.EnableLoadTimeWeaving.*"/>-->
+<!--            <include within="cn..*"/>-->
+            <include within="*"/>
+        </weaver>
+    </aspects>
+
+
+</aspectj>

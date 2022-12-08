@@ -15,6 +15,8 @@ import org.springframework.core.GenericTypeResolver;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.transaction.annotation.ProxyTransactionManagementConfiguration;
 
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -37,24 +39,45 @@ public class Demo {
 
 
     private String name;
+
     @Test
-    public void test_(){
-        Consumer<Class> consumer = clazz ->
-                System.out.println(AnnotatedElementUtils.hasAnnotation(ProxyTransactionManagementConfiguration.class, clazz));
+    public void test_write_class() {
+        // 输出加载的字节码到本地文件中
+        try (
+                InputStream inputStream = Thread.currentThread()
+                        .getContextClassLoader()
+                        .getResource("cn/haitaoss/Demo.class")
+                        .openStream();
+                FileOutputStream fos = new FileOutputStream("/Users/haitao/Desktop/xx/x.class")
+        ) {
+            byte[] buff = new byte[102400];
+            inputStream.read(buff);
+            fos.write(buff);
+        } catch (Exception e) {
+        } finally {}
+
+    }
+
+    @Test
+    public void test_() {
+        Consumer<Class> consumer = clazz -> System.out.println(
+                AnnotatedElementUtils.hasAnnotation(ProxyTransactionManagementConfiguration.class, clazz));
         consumer.accept(Bean.class);
         consumer.accept(Configuration.class);
 
         // clazz.isAnnotationPresent(this.annotationType)
     }
+
     public void dynamic_args(String... args) {
         System.out.println("args = " + args);
     }
 
     @Test
-    public void test_dynamic_args(){
+    public void test_dynamic_args() {
         dynamic_args("1");
         dynamic_args("1");
     }
+
     @Test
     public void test_StringTokenizer() {
         String expression = "(11 1)&(bbb)|c2|!axx";
@@ -62,7 +85,8 @@ public class Demo {
 
         while (tokens.hasMoreTokens()) {
             // 返回的是 分隔符 分隔符之间的内容
-            String token = tokens.nextToken().trim();
+            String token = tokens.nextToken()
+                    .trim();
             System.out.println("token = " + token);
         }
         System.out.println("=====================================");
@@ -82,7 +106,9 @@ public class Demo {
 
     @Test
     public void test1_reflection() throws NoSuchMethodException {
-        System.out.println(Demo.class.getMethod("a").getReturnType().isAssignableFrom(BeanPostProcessor.class));
+        System.out.println(Demo.class.getMethod("a")
+                .getReturnType()
+                .isAssignableFrom(BeanPostProcessor.class));
     }
 
     public BeanPostProcessor a() {
@@ -105,20 +131,24 @@ public class Demo {
         Demo demo = new Demo();
         System.out.println(demo.getName());
         demo.test2();
-        Optional.ofNullable(null).ifPresent(item -> {
-        });
+        Optional.ofNullable(null)
+                .ifPresent(item -> {
+                });
     }
 
     @Test
     public void test_compoentType() {
         Object[] objects = {};
-        System.out.println(objects.getClass().getComponentType());
+        System.out.println(objects.getClass()
+                .getComponentType());
 
         String[] strings = {};
-        System.out.println(strings.getClass().getComponentType());
+        System.out.println(strings.getClass()
+                .getComponentType());
 
 
-        System.out.println(Array.newInstance(String.class, 0).getClass());
+        System.out.println(Array.newInstance(String.class, 0)
+                .getClass());
     }
 
     @Test
@@ -127,16 +157,13 @@ public class Demo {
         System.out.println("primaryConstructor = " + primaryConstructor);
     }
 
-    interface interfaceA<T> {
-    }
+    interface interfaceA<T> {}
 
     @Test
     public void test泛型接口工具() {
         {
-            class A<T> {
-            }
-            class B extends A<String> implements interfaceA<Integer> {
-            }
+            class A<T> {}
+            class B extends A<String> implements interfaceA<Integer> {}
 
             Class<?> t1 = GenericTypeResolver.resolveTypeArgument(B.class, A.class);
             System.out.println(t1);

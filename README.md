@@ -263,6 +263,49 @@ class AnnotationConfigApplicationContext {
  *  - LoadTimeWeaverAwareProcessor: 还不知道是干啥的，好像说是加载期织入的
  * */
 ```
+### AbstractApplicationContext#finishRefresh
+
+```java
+/**
+ * {@link AbstractApplicationContext#refresh()}
+ * {@link AbstractApplicationContext#finishRefresh()}
+ *
+ *  1. 初始化 LifecycleProcessor。其实就是将BeanFactory中的LifecycleProcessor 设置成 IOC容器的属性，设置这个属性的目的，是将bean的声明周期和IOC容器的声明周期做关联。
+ *      `initLifecycleProcessor();`
+ *      注：如果BeanFactory中没有设置LifecycleProcessor，那么会实例化一个 `new DefaultLifecycleProcessor()` 然后设置到BeanFactory中
+ *
+ *  2. 触发 LifecycleProcessor 的刷新
+ *      `getLifecycleProcessor().onRefresh();`
+ *
+ *  3. 发布 ContextRefreshedEvent 事件
+ *      `publishEvent(new ContextRefreshedEvent(this));`
+ *      Tips：其实就是回调BeanFactory中的 ApplicationListener 类型的bean 和 @EventListener 标注的方法
+ *
+ * {@link DefaultLifecycleProcessor#onRefresh()}
+ *      1. 拿到容器中 Lifecycle 类型的bean
+ *          `Map<String, Lifecycle> lifecycleBeans = getLifecycleBeans();`
+ *
+ *      2. 遍历 lifecycleBeans 过滤是autoStartup的，按照phase分组收集
+ *           int phase = (bean instanceof Phased ? ((Phased) bean).getPhase() : 0);
+ *
+ *          Tips: SmartLifecycle 实现了 Phased，而 Lifecycle 没有实现
+ *
+ *      3. 收集结果按照 phase 的值升序排序，遍历，执行 `doStart`
+ *          3.1 拿到这个bean的依赖项
+ *              `String[] dependenciesForBean = getBeanFactory().getDependenciesForBean(beanName);`
+ *          3.2 优先启动依赖项
+ *              `doStart(lifecycleBeans, dependency, autoStartupOnly);`
+ *
+ *              Tips: 比如 使用 @Autowired注入的bean 和 使用@DependsOn("bean") 都属于依赖项
+ *
+ *          3.3 回调 start 方法
+ *              `((Lifecycle)bean).start();`
+ *              注：为了避免重复启动，这里只有是 !bean.isRunning() 才会回调 start方法
+ *
+ *      注：onRefresh 只会启动 SmartLifecycle#isAutoStartup 为true的bean，说白了就是回调 Lifecycle#start 方法。回调是有优先级的，按照 phase 升序的顺序
+ * */
+```
+
 ## BeanFactoryPostProcessor
 
 ![BeanFactoryPostProcessor类图](.README_imgs/BeanFactoryPostProcessor类图.png)
@@ -4764,7 +4807,20 @@ class X {
 ```
 ## @EventListener
 
-源码解析：
+注册`ApplicationListener`的两种方式：
+
+1. 在任意的一个bean 方法上标注 `@EventListener` 注解。方法只能有一个参数，该参数就是事件对象
+2. 一个 bean 实现 `ApplicationListener` 接口
+
+两种注册事件监听器的区别：
+
+1. Spring 发布时间默认是通过 `ApplicationEventMulticaster` 进行广播的，该实例里面注册了IOC容器中类型 `ApplicationListener` 的 bean，当发布事件时 是遍历实例里所有的 `ApplicationListener` ,判断是否能适配，可以适配就回调`ApplicationListener#onApplicationEvent` 也就是要想`ApplicationListener` 能被回调，首先要注册到`ApplicationEventMulticaster` 中
+2. 实现 `ApplicationListener` 接口的方式，是在实例化单例bean之前就注册到 `ApplicationEventMulticaster` 中
+3. `@EventListener` 是在所有单例bean都注册到IOC容器后，才解析的。
+
+注：所以如果在IOC容器创建单例bean的过程中发布事件，`@EventListener` 的方式是收不到的
+
+### 源码解析
 
 ```java
 /**
@@ -4795,7 +4851,7 @@ class X {
  * */
 ```
 
-示例代码：
+### @EventListener的使用
 
 ```java
 @ComponentScan
@@ -4846,21 +4902,7 @@ class DemoEvent extends ApplicationEvent {
 }
 
 ```
-## 注册事件监听器的两种方式
-
-注册`ApplicationListener`的两种方式：
-
-1. 在任意的一个bean 方法上标注 `@EventListener` 注解。方法只能有一个参数，该参数就是事件对象
-2. 一个 bean 实现 `ApplicationListener` 接口
-
-两种注册事件监听器的区别：
-
-1. Spring 发布时间默认是通过 `ApplicationEventMulticaster` 进行广播的，该实例里面注册了IOC容器中类型 `ApplicationListener` 的 bean，当发布事件时 是遍历实例里所有的 `ApplicationListener` ,判断是否能适配，可以适配就回调`ApplicationListener#onApplicationEvent` 也就是要想`ApplicationListener` 能被回调，首先要注册到`ApplicationEventMulticaster` 中
-2. 实现 `ApplicationListener` 接口的方式，是在实例化单例bean之前就注册到 `ApplicationEventMulticaster` 中
-3. `@EventListener` 是在所有单例bean都注册到IOC容器后，才解析的。
-
-注：所以如果在IOC容器创建单例bean的过程中发布事件，`@EventListener` 的方式是收不到的
-
+### ApplicationListener和@EventListener的区别
 
 ```java
 @ComponentScan
@@ -4939,6 +4981,7 @@ class SingleObject implements InitializingBean {
     }
 }
 ```
+
 ## @Bean 如何解析的
 
 ```java
@@ -5998,7 +6041,353 @@ public class ValidatedTest {
 }
 ```
 
+## @EnableLoadTimeWeaving
 
+> ### 前置知识
+>
+> [Instrumentation Doc](https://docs.oracle.com/javase/7/docs/api/java/lang/instrument/Instrumentation.html)：Instrumentation 是一个JVM实例 暴露出来的全局上下文对象，所有的class都会使用 Instrumentation 做处理然后再加载到JVM中
+>
+> 有两种方法可以获得 Instruments 接口的实例:
+>
+> - 以指示代理类的方式启动 JVM 时。在这种情况下，将一个 Instruments 实例传递给代理类的主方法。
+> - 当 JVM 在启动 JVM 之后提供启动代理的机制时。在这种情况下，将一个 Instruments 实例传递给代理代码的 agentmain 方法。这些机制在包规范中进行了描述。一旦代理获取了 Instruments 实例，代理可以随时调用该实例上的方法。
+>
+> [ClassFileTransformer Doc](https://docs.oracle.com/javase/7/docs/api/java/lang/instrument/ClassFileTransformer.html) : 往 Instrumentation 注册 ClassFileTransformer  从而可以转换class文件，转换发生在 JVM 定义类之前。
+
+### 示例代码
+
+#### @EnableLoadTimeWeaving 和`<context:load-time-weaver/>`
+
+`META-INF/aop.xml`
+
+```xml
+<?xml version="1.0"?>
+<aspectj>
+    <weaver options="-verbose -debug -showWeaveInfo">
+        <include within="cn..*"/>
+    </weaver>
+
+    <aspects>
+        <!-- weave in just this aspect -->
+        <aspect name="cn.haitaoss.javaconfig.EnableLoadTimeWeaving.Test.ProfilingAspect"/>
+    </aspects>
+
+</aspectj>
+```
+
+`spring5.xml`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation=
+               "http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+    <context:load-time-weaver aspectj-weaving="on"/>
+    <!--    <context:load-time-weaver/>-->
+    <context:component-scan base-package="cn.haitaoss.javaconfig.EnableLoadTimeWeaving"/>
+</beans>
+```
+
+```java
+// 添加 ClassFileTransformer 的时机太晚了，导致有些class的加载拦截不到，从而出现 Aspectj 加载期织入 失效
+@EnableLoadTimeWeaving
+@Component
+@ComponentScan
+public class Test {
+    public void a() {
+        System.out.println("Test.a...");
+    }
+
+    @Component
+    public static class Bean {
+        public void a() {
+            System.out.println("Bean.a...");
+        }
+    }
+
+    @Aspect
+    public static class ProfilingAspect {
+
+        @DeclareParents(value = "cn.haitaoss.javaconfig.EnableLoadTimeWeaving.*", defaultImpl = LogAdvice.class)
+        private Runnable advice;
+
+        @Around("execution(public * cn.haitaoss..*(..))")
+        public Object profile(ProceedingJoinPoint pjp) throws Throwable {
+            System.out.println("<----ProfilingAspect.before---->");
+            Object proceed = pjp.proceed();
+            System.out.println("<----ProfilingAspect.after---->");
+            return proceed;
+        }
+
+        public static class LogAdvice implements Runnable {
+
+            @Override
+            public void run() {
+                System.out.println("invoke...");
+            }
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+      	// VM参数 javaagent:/Users/haitao/Desktop/spring-framework/spring-instrument/build/libs/spring-instrument-5.3.10.jar
+        // Java配置类的方式
+        /*ApplicationContext context = new AnnotationConfigApplicationContext(Test.class) {
+            @Override
+            protected void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) {
+                // 在 invokeBeanFactoryPostProcessors 之前就开启 AspectJ织入 ，从而保证每个bean都能被拦截到
+                AspectJWeavingEnabler.enableAspectJWeaving(null, beanFactory.getBeanClassLoader());
+            }
+        };*/
+        // xml配置文件的方式
+        ApplicationContext context = new ClassPathXmlApplicationContext("spring5.xml");
+
+        System.out.println("=====");
+        context.getBean(Test.class)
+                .a();
+        context.getBean(Bean.class)
+                .a();
+        System.out.println("=====");
+        new Test().a();
+        new Bean().a();
+        System.out.println("=====");
+        System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
+
+        /**
+         *  Instrumentation 是一个JVM实例 暴露出来的全局上下文对象，所有的class都会使用 Instrumentation 做处理然后再加载到JVM中
+         *
+         *  不同的ClassLoader 但都属于一个JVM实例，所以下面两个类的加载都会经过 Instrumentation 处理
+         * */
+        context.getClassLoader()
+                .loadClass("cn.haitaoss.javaconfig.EnableLoadTimeWeaving.AService");
+        new ClassLoader() {}.loadClass("cn.haitaoss.javaconfig.EnableLoadTimeWeaving.AService");
+    }
+}
+```
+
+#### 自定义ClassFileTransformer
+
+```java
+@Component
+@Order(Integer.MAX_VALUE)
+public class MyBeanFactoryPostProcessor implements BeanFactoryPostProcessor, LoadTimeWeaverAware {
+    private LoadTimeWeaver loadTimeWeaver;
+    private String dir = "/Users/haitao/Desktop/";
+    //    private String dir = "C:\\Users\\RDS\\Desktop\\code\\";
+
+    @Override
+    public void setLoadTimeWeaver(LoadTimeWeaver loadTimeWeaver) {
+        this.loadTimeWeaver = loadTimeWeaver;
+        extendTransformer();
+    }
+
+    @Override
+    public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {}
+
+    private void extendTransformer() {
+        // 添加自定义了 ClassFileTransformer
+        loadTimeWeaver.addTransformer(new ClassFileTransformer() {
+            @Override
+            public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
+                                    ProtectionDomain protectionDomain,
+                                    byte[] classfileBuffer) throws IllegalClassFormatException {
+                // 包名包含 haitaoss
+                if (className.contains("haitaoss")) {
+                    File file = new File(dir + className + ".class");
+                    new File(file.getParent()).mkdirs();
+                    try (FileOutputStream fileOutputStream = new FileOutputStream(file)) {
+                        // 输出本地文件中
+                        fileOutputStream.write(classfileBuffer);
+                        fileOutputStream.flush();
+                    } catch (Exception e) {
+                        System.err.println(e.getMessage());
+                    }
+                }
+                // 表示不转换
+                return null;
+            }
+        });
+    }
+}
+```
+
+### 类图
+
+![EnableLoadTimeWeaving类图](.README_imgs/EnableLoadTimeWeaving类图.png)
+
+### 使用@EnableLoadTimeWeaving 会发生什么
+
+```java
+    /**
+     * @EnableLoadTimeWeaving 注解会 @Import(LoadTimeWeavingConfiguration.class)
+     * 也就是 {@link LoadTimeWeavingConfiguration} 会注册到BeanFactory中
+     *
+     * 而 LoadTimeWeavingConfiguration
+     *  1. 会使用 @Autowired(required = false)拿到 {@link LoadTimeWeavingConfigurer} 类型的bean，作为其属性
+     *      `this.ltwConfigurer = ltwConfigurer;`
+     *
+     *  2. 会通过 @Bean 注册 LoadTimeWeaver 到BeanFactory中
+     *
+     *      2.1 实例化 LoadTimeWeaver
+     *          LoadTimeWeaver loadTimeWeaver = null;
+     *          if this.ltwConfigurer != null
+     *              loadTimeWeaver = this.ltwConfigurer.getLoadTimeWeaver();
+     *          if (loadTimeWeaver == null)
+     * 		    	loadTimeWeaver = new DefaultContextLoadTimeWeaver(this.beanClassLoader);
+     *
+     * 	    2.2 启动Aspectj织入
+     * 	        `AspectJWeavingEnabler.enableAspectJWeaving(loadTimeWeaver, this.beanClassLoader);`
+     * 	            `weaverToUse.addTransformer(new AspectJClassBypassingClassFileTransformer(new ClassPreProcessorAgentAdapter()));`
+     * 	        也就是间接的往 Instrumentation 中注册 {@link ClassFileTransformer} ，从而能拦截到 class文件加载到JVM的过程，在加载之前通过 Aspectj 对
+     *          class文件进行修改增加增强逻辑
+     *
+     * 	    2.3 返回bean
+     * 	        `return loadTimeWeaver`
+     *
+     *
+     * 在执行BeanFactory后置处理器时
+     *  {@link AbstractApplicationContext#invokeBeanFactoryPostProcessors(ConfigurableListableBeanFactory)}
+     *      1. 回调 BeanDefinitionRegistryPostProcessor 和 BeanFactoryPostProcessor 的方法。就是完成了配置类的解析注册到BeanFactory中。
+     *      2. 判断容器中是否存在 LoadTimeWeaver 这个bean，有就添加一个后置处理，用于暴露LoadTimeWeaver给其他bean
+     *          `beanFactory.addBeanPostProcessor(new LoadTimeWeaverAwareProcessor(beanFactory));`
+     *
+     *  Tips: 添加 ClassFileTransformer 的时机太晚了，导致有些class的加载拦截不到，从而出现 Aspectj 加载期织入 失效
+     * */
+```
+
+### 使用`<context:load-time-weaver/>`会发生什么
+
+```java
+    /**
+     * <context:load-time-weaver aspectj-weaving="on"/>
+     *
+     * 1. 在 刷新BeanFactory时会解析 `<context:load-time-weaver/>` 标签，解析的结果是注册两个bean到BeanDefinitionMap中
+     *  {@link AbstractApplicationContext#refresh()}
+     *  {@link AbstractRefreshableApplicationContext#refreshBeanFactory()}
+     *  {@link LoadTimeWeaverBeanDefinitionParser#doParse(Element, ParserContext, BeanDefinitionBuilder)}
+     *      会注册 AspectJWeavingEnabler 和 DefaultContextLoadTimeWeaver 到 BeanDefinitionMap 中
+     *
+     *      注：
+     *          AspectJWeavingEnabler 实现 LoadTimeWeaverAware、BeanFactoryPostProcessor
+     *          DefaultContextLoadTimeWeaver 实现 BeanClassLoaderAware
+     *
+     *
+     * 2. 在准备BeanFactory时
+     *  {@link AbstractApplicationContext#prepareBeanFactory(ConfigurableListableBeanFactory)}
+     *      判断容器中存在 DefaultContextLoadTimeWeaver 就给BeanFactory注册 LoadTimeWeaverAwareProcessor 后置处理器
+     *      `{@link beanFactory.addBeanPostProcessor(new LoadTimeWeaverAwareProcessor (beanFactory));}`
+     *  注：
+     *      LoadTimeWeaverAwareProcessor 是一个BeanPostProcessor，是用来暴露 LoadTimeWeaver 对象给bean的一个后置处理器，
+     *      而 {@link LoadTimeWeaver#addTransformer(ClassFileTransformer)} 方法可以间接的往
+     *      {@link Instrumentation} 中注册 {@link ClassFileTransformer} ，从而能拦截到 class文件加载到JVM的过程，拦截到了就可以修改。
+     *      Tips：LoadTimeWeaver 是 Instrumentation 的一个包装对象
+     *
+     * 3. 在调用BeanFactory后置处理器时
+     *      3.1 实例化 BeanFactory后置处理器 AspectJWeavingEnabler
+     *          AspectJWeavingEnabler 的实例化会被 {@link LoadTimeWeaverAwareProcessor#postProcessBeforeInitialization(Object, String)} 处理
+     *          而 postProcessBeforeInitialization 会 getBean(DefaultContextLoadTimeWeaver)，也就是会实例化 DefaultContextLoadTimeWeaver
+     *          而 DefaultContextLoadTimeWeaver 的实例化会设置属性
+     *              `this.loadTimeWeaver = new InstrumentationLoadTimeWeaver(classLoader);` 说白了就是暴露出 {@link Instrumentation} 对象
+     *          然后将 DefaultContextLoadTimeWeaver 实例作为参数回调 {@link AspectJWeavingEnabler#setLoadTimeWeaver(LoadTimeWeaver)}
+     *          也就是 AspectJWeavingEnabler 有 DefaultContextLoadTimeWeaver 的引用
+     *
+     *      3.2 回调BeanFactory后置处理器方法
+     *          {@link AspectJWeavingEnabler#postProcessBeanFactory(ConfigurableListableBeanFactory)}
+     *          {@link AspectJWeavingEnabler#enableAspectJWeaving(LoadTimeWeaver, ClassLoader)}
+     *          `loadTimeWeaver.addTransformer(new AspectJClassBypassingClassFileTransformer(new ClassPreProcessorAgentAdapter()));`
+     *              也就是间接的往 Instrumentation 中注册 {@link ClassFileTransformer} ，从而能拦截到 class文件加载到JVM的过程，在加载之前通过 Aspectj 对
+     *              class文件进行修改增加增强逻辑
+     *
+     *
+     * Tips：在实例化单例bean之前就往 Instrumentation 中添加了 AspectJClassBypassingClassFileTransformer，所以能确保能实现 Aspectj加载器织入
+     * */
+```
+
+
+
+## SmartLifecycle & Lifecycle
+
+[触发的代码逻辑](#AbstractApplicationContext#finishRefresh)
+
+```java
+@Component
+public class Test {
+    
+    public static void main(String[] args) {
+        /** 
+         * 构造器会执行 context.refresh() 
+         * 
+         * refresh 只会触发 SmartLifecycle.isAutoStartup() == true 的bean的 Lifecycle.start() 
+         * */
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(Test.class);
+        System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
+
+        //context.start(); // 会回调所有 Lifecycle.start()
+    }
+    
+    @Component("baseLifecycle")
+    public static class BaseLifecycle implements Lifecycle {
+        public BaseLifecycle() {
+            System.out.println(this.getClass().getSimpleName() + "...");
+        }
+
+        @Override
+        public void start() {
+            System.out.println(this.getClass().getSimpleName() + ".start()");
+        }
+
+        @Override
+        public void stop() {
+            System.out.println(this.getClass().getSimpleName() + ".stop()");
+        }
+
+        @Override
+        public boolean isRunning() {
+            return false;
+        }
+    }
+
+    @Component("MyLifecycle2")
+    public static class MyLifecycle2 extends BaseLifecycle {
+    }
+
+    @Component
+    @DependsOn("MyLifecycle2") // 通过依赖的方式，触发 Lifecycle 类型的回调
+    public static class MySmartLifecycle1 extends BaseLifecycle implements SmartLifecycle {
+        /*@Autowired
+        private Lifecycle baseLifecycle;*/
+
+        @Override
+        public boolean isAutoStartup() {
+            return SmartLifecycle.super.isAutoStartup();
+            // return false;
+        }
+
+        @Override
+        public int getPhase() {
+            // return SmartLifecycle.super.getPhase();
+            return 1;
+        }
+    }
+
+    @Component
+    public static class MySmartLifecycle2 extends BaseLifecycle implements SmartLifecycle {
+        @Override
+        public boolean isAutoStartup() {
+            return SmartLifecycle.super.isAutoStartup();
+            // return false;
+        }
+
+        @Override
+        public int getPhase() {
+            // return SmartLifecycle.super.getPhase();
+            return 2;
+        }
+    }
+}
+```
 
 # Spring好用的工具类
 
