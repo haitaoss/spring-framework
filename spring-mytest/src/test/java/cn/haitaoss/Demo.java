@@ -1,5 +1,6 @@
 package cn.haitaoss;
 
+import com.sun.tools.attach.VirtualMachine;
 import lombok.Data;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.Advisor;
@@ -38,6 +39,16 @@ import java.util.function.Function;
 public class Demo {
 
 
+    @Test
+    public void test_agent() throws Exception {
+        // 通过目标Java程序的PID 建立拿到其jvm实例
+        VirtualMachine virtualMachine = VirtualMachine.attach("PID");
+        // 使用jvm实例动态的加载agent
+        virtualMachine.loadAgentPath("/path/agent.jar", "args");
+        // 断开连接
+        virtualMachine.detach();
+    }
+
     private String name;
 
     @Test
@@ -54,7 +65,8 @@ public class Demo {
             inputStream.read(buff);
             fos.write(buff);
         } catch (Exception e) {
-        } finally {}
+        } finally {
+        }
 
     }
 
@@ -157,13 +169,16 @@ public class Demo {
         System.out.println("primaryConstructor = " + primaryConstructor);
     }
 
-    interface interfaceA<T> {}
+    interface interfaceA<T> {
+    }
 
     @Test
     public void test泛型接口工具() {
         {
-            class A<T> {}
-            class B extends A<String> implements interfaceA<Integer> {}
+            class A<T> {
+            }
+            class B extends A<String> implements interfaceA<Integer> {
+            }
 
             Class<?> t1 = GenericTypeResolver.resolveTypeArgument(B.class, A.class);
             System.out.println(t1);

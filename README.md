@@ -6047,12 +6047,41 @@ public class ValidatedTest {
 >
 > [Instrumentation Doc](https://docs.oracle.com/javase/7/docs/api/java/lang/instrument/Instrumentation.html)：Instrumentation 是一个JVM实例 暴露出来的全局上下文对象，所有的class都会使用 Instrumentation 做处理然后再加载到JVM中
 >
-> 有两种方法可以获得 Instruments 接口的实例:
+> 有两种方法可以获得 **Instrumentation** 接口的实例:
 >
-> - 以指示代理类的方式启动 JVM 时。在这种情况下，将一个 Instruments 实例传递给代理类的主方法。
-> - 当 JVM 在启动 JVM 之后提供启动代理的机制时。在这种情况下，将一个 Instruments 实例传递给代理代码的 agentmain 方法。这些机制在包规范中进行了描述。一旦代理获取了 Instruments 实例，代理可以随时调用该实例上的方法。
+> 1. 执行程序时指定agent。在这种情况下，JVM会将一个 *Instrumentation* 实例传递给代理类的`premain`方法。
+>
+>    `java -javaagent:/path/spring-instrument-5.3.10.jar Main`
+>
+> 2. 程序启动后，使用工具类动态的添加agent，JVM会将一个 *Instrumentation* 实例传递给代理类的`agentmain`方法
+>
+>    ```java
+>    @Test
+>    public void test_agent() throws Exception {
+>        // 通过目标Java程序的PID 建立拿到其jvm实例
+>        VirtualMachine virtualMachine = VirtualMachine.attach("PID");
+>        // 使用jvm实例动态的加载agent
+>        virtualMachine.loadAgentPath("/path/agent.jar", "args");
+>        // 断开连接
+>        virtualMachine.detach();
+>    }
+>    ```
 >
 > [ClassFileTransformer Doc](https://docs.oracle.com/javase/7/docs/api/java/lang/instrument/ClassFileTransformer.html) : 往 Instrumentation 注册 ClassFileTransformer  从而可以转换class文件，转换发生在 JVM 定义类之前。
+>
+> **注：agent.jar 可以参考 Spring的 `spring-instrument-5.3.10.jar`**
+>
+> ### 个人理解
+>
+> **Instrumentation** 是一个JVM实例 暴露出来的全局上下文对象，所有的class都会使用 Instrumentation 做处理然后再加载到JVM中。
+>
+> 想拿到 Instrumentation 对象，可以写一个类，JVM在执行Main方法前会 传入Instrumentation作为参数回调我们指定的方法，这样子我们写的代码就有了 Instrumentation 的引用了。
+>
+> Instrumentation的使用很简单，可以 Instrumentation.addTransformer(ClassFileTransformer) 。而 **ClassFileTransformer** 是开发人员自己定义的类。
+>
+> 在 字节码文件 加载到 JVM之前 ，JVM会回调我们使用 Instrumentation.addTransformer(ClassFileTransformer) 添加的 ClassFileTransformer 类，所以开发人员就能控制字节码文件
+>
+> 我们在 ClassFileTransformer 的方法里面可以修改字节码的内容(增加、删除、修改 字段或者方法都可以)
 
 ### 示例代码
 
@@ -6220,89 +6249,89 @@ public class MyBeanFactoryPostProcessor implements BeanFactoryPostProcessor, Loa
 ### 使用@EnableLoadTimeWeaving 会发生什么
 
 ```java
-    /**
-     * @EnableLoadTimeWeaving 注解会 @Import(LoadTimeWeavingConfiguration.class)
-     * 也就是 {@link LoadTimeWeavingConfiguration} 会注册到BeanFactory中
-     *
-     * 而 LoadTimeWeavingConfiguration
-     *  1. 会使用 @Autowired(required = false)拿到 {@link LoadTimeWeavingConfigurer} 类型的bean，作为其属性
-     *      `this.ltwConfigurer = ltwConfigurer;`
-     *
-     *  2. 会通过 @Bean 注册 LoadTimeWeaver 到BeanFactory中
-     *
-     *      2.1 实例化 LoadTimeWeaver
-     *          LoadTimeWeaver loadTimeWeaver = null;
-     *          if this.ltwConfigurer != null
-     *              loadTimeWeaver = this.ltwConfigurer.getLoadTimeWeaver();
-     *          if (loadTimeWeaver == null)
-     * 		    	loadTimeWeaver = new DefaultContextLoadTimeWeaver(this.beanClassLoader);
-     *
-     * 	    2.2 启动Aspectj织入
-     * 	        `AspectJWeavingEnabler.enableAspectJWeaving(loadTimeWeaver, this.beanClassLoader);`
-     * 	            `weaverToUse.addTransformer(new AspectJClassBypassingClassFileTransformer(new ClassPreProcessorAgentAdapter()));`
-     * 	        也就是间接的往 Instrumentation 中注册 {@link ClassFileTransformer} ，从而能拦截到 class文件加载到JVM的过程，在加载之前通过 Aspectj 对
-     *          class文件进行修改增加增强逻辑
-     *
-     * 	    2.3 返回bean
-     * 	        `return loadTimeWeaver`
-     *
-     *
-     * 在执行BeanFactory后置处理器时
-     *  {@link AbstractApplicationContext#invokeBeanFactoryPostProcessors(ConfigurableListableBeanFactory)}
-     *      1. 回调 BeanDefinitionRegistryPostProcessor 和 BeanFactoryPostProcessor 的方法。就是完成了配置类的解析注册到BeanFactory中。
-     *      2. 判断容器中是否存在 LoadTimeWeaver 这个bean，有就添加一个后置处理，用于暴露LoadTimeWeaver给其他bean
-     *          `beanFactory.addBeanPostProcessor(new LoadTimeWeaverAwareProcessor(beanFactory));`
-     *
-     *  Tips: 添加 ClassFileTransformer 的时机太晚了，导致有些class的加载拦截不到，从而出现 Aspectj 加载期织入 失效
-     * */
+/**
+* @EnableLoadTimeWeaving 注解会 @Import(LoadTimeWeavingConfiguration.class)
+* 也就是 {@link LoadTimeWeavingConfiguration} 会注册到BeanFactory中
+*
+* 而 LoadTimeWeavingConfiguration
+*  1. 会使用 @Autowired(required = false)拿到 {@link LoadTimeWeavingConfigurer} 类型的bean，作为其属性
+*      `this.ltwConfigurer = ltwConfigurer;`
+*
+*  2. 会通过 @Bean 注册 LoadTimeWeaver 到BeanFactory中
+*
+*      2.1 实例化 LoadTimeWeaver
+*          LoadTimeWeaver loadTimeWeaver = null;
+*          if this.ltwConfigurer != null
+*              loadTimeWeaver = this.ltwConfigurer.getLoadTimeWeaver();
+*          if (loadTimeWeaver == null)
+* 		    	loadTimeWeaver = new DefaultContextLoadTimeWeaver(this.beanClassLoader);
+*
+* 	    2.2 启动Aspectj织入
+* 	        `AspectJWeavingEnabler.enableAspectJWeaving(loadTimeWeaver, this.beanClassLoader);`
+* 	            `weaverToUse.addTransformer(new AspectJClassBypassingClassFileTransformer(new ClassPreProcessorAgentAdapter()));`
+* 	        也就是间接的往 Instrumentation 中注册 {@link ClassFileTransformer} ，从而能拦截到 class文件加载到JVM的过程，在加载之前通过 Aspectj 对
+*          class文件进行修改增加增强逻辑
+*
+* 	    2.3 返回bean
+* 	        `return loadTimeWeaver`
+*
+*
+* 在执行BeanFactory后置处理器时
+*  {@link AbstractApplicationContext#invokeBeanFactoryPostProcessors(ConfigurableListableBeanFactory)}
+*      1. 回调 BeanDefinitionRegistryPostProcessor 和 BeanFactoryPostProcessor 的方法。就是完成了配置类的解析注册到BeanFactory中。
+*      2. 判断容器中是否存在 LoadTimeWeaver 这个bean，有就添加一个后置处理，用于暴露LoadTimeWeaver给其他bean
+*          `beanFactory.addBeanPostProcessor(new LoadTimeWeaverAwareProcessor(beanFactory));`
+*
+*  Tips: 添加 ClassFileTransformer 的时机太晚了，导致有些class的加载拦截不到，从而出现 Aspectj 加载期织入 失效
+* */
 ```
 
 ### 使用`<context:load-time-weaver/>`会发生什么
 
 ```java
-    /**
-     * <context:load-time-weaver aspectj-weaving="on"/>
-     *
-     * 1. 在 刷新BeanFactory时会解析 `<context:load-time-weaver/>` 标签，解析的结果是注册两个bean到BeanDefinitionMap中
-     *  {@link AbstractApplicationContext#refresh()}
-     *  {@link AbstractRefreshableApplicationContext#refreshBeanFactory()}
-     *  {@link LoadTimeWeaverBeanDefinitionParser#doParse(Element, ParserContext, BeanDefinitionBuilder)}
-     *      会注册 AspectJWeavingEnabler 和 DefaultContextLoadTimeWeaver 到 BeanDefinitionMap 中
-     *
-     *      注：
-     *          AspectJWeavingEnabler 实现 LoadTimeWeaverAware、BeanFactoryPostProcessor
-     *          DefaultContextLoadTimeWeaver 实现 BeanClassLoaderAware
-     *
-     *
-     * 2. 在准备BeanFactory时
-     *  {@link AbstractApplicationContext#prepareBeanFactory(ConfigurableListableBeanFactory)}
-     *      判断容器中存在 DefaultContextLoadTimeWeaver 就给BeanFactory注册 LoadTimeWeaverAwareProcessor 后置处理器
-     *      `{@link beanFactory.addBeanPostProcessor(new LoadTimeWeaverAwareProcessor (beanFactory));}`
-     *  注：
-     *      LoadTimeWeaverAwareProcessor 是一个BeanPostProcessor，是用来暴露 LoadTimeWeaver 对象给bean的一个后置处理器，
-     *      而 {@link LoadTimeWeaver#addTransformer(ClassFileTransformer)} 方法可以间接的往
-     *      {@link Instrumentation} 中注册 {@link ClassFileTransformer} ，从而能拦截到 class文件加载到JVM的过程，拦截到了就可以修改。
-     *      Tips：LoadTimeWeaver 是 Instrumentation 的一个包装对象
-     *
-     * 3. 在调用BeanFactory后置处理器时
-     *      3.1 实例化 BeanFactory后置处理器 AspectJWeavingEnabler
-     *          AspectJWeavingEnabler 的实例化会被 {@link LoadTimeWeaverAwareProcessor#postProcessBeforeInitialization(Object, String)} 处理
-     *          而 postProcessBeforeInitialization 会 getBean(DefaultContextLoadTimeWeaver)，也就是会实例化 DefaultContextLoadTimeWeaver
-     *          而 DefaultContextLoadTimeWeaver 的实例化会设置属性
-     *              `this.loadTimeWeaver = new InstrumentationLoadTimeWeaver(classLoader);` 说白了就是暴露出 {@link Instrumentation} 对象
-     *          然后将 DefaultContextLoadTimeWeaver 实例作为参数回调 {@link AspectJWeavingEnabler#setLoadTimeWeaver(LoadTimeWeaver)}
-     *          也就是 AspectJWeavingEnabler 有 DefaultContextLoadTimeWeaver 的引用
-     *
-     *      3.2 回调BeanFactory后置处理器方法
-     *          {@link AspectJWeavingEnabler#postProcessBeanFactory(ConfigurableListableBeanFactory)}
-     *          {@link AspectJWeavingEnabler#enableAspectJWeaving(LoadTimeWeaver, ClassLoader)}
-     *          `loadTimeWeaver.addTransformer(new AspectJClassBypassingClassFileTransformer(new ClassPreProcessorAgentAdapter()));`
-     *              也就是间接的往 Instrumentation 中注册 {@link ClassFileTransformer} ，从而能拦截到 class文件加载到JVM的过程，在加载之前通过 Aspectj 对
-     *              class文件进行修改增加增强逻辑
-     *
-     *
-     * Tips：在实例化单例bean之前就往 Instrumentation 中添加了 AspectJClassBypassingClassFileTransformer，所以能确保能实现 Aspectj加载器织入
-     * */
+/**
+ * <context:load-time-weaver aspectj-weaving="on"/>
+ *
+ * 1. 在 刷新BeanFactory时会解析 `<context:load-time-weaver/>` 标签，解析的结果是注册两个bean到BeanDefinitionMap中
+ *  {@link AbstractApplicationContext#refresh()}
+ *  {@link AbstractRefreshableApplicationContext#refreshBeanFactory()}
+ *  {@link LoadTimeWeaverBeanDefinitionParser#doParse(Element, ParserContext, BeanDefinitionBuilder)}
+ *      会注册 AspectJWeavingEnabler 和 DefaultContextLoadTimeWeaver 到 BeanDefinitionMap 中
+ *
+ *      注：
+ *          AspectJWeavingEnabler 实现 LoadTimeWeaverAware、BeanFactoryPostProcessor
+ *          DefaultContextLoadTimeWeaver 实现 BeanClassLoaderAware
+ *
+ *
+ * 2. 在准备BeanFactory时
+ *  {@link AbstractApplicationContext#prepareBeanFactory(ConfigurableListableBeanFactory)}
+ *      判断容器中存在 DefaultContextLoadTimeWeaver 就给BeanFactory注册 LoadTimeWeaverAwareProcessor 后置处理器
+ *      `{@link beanFactory.addBeanPostProcessor(new LoadTimeWeaverAwareProcessor (beanFactory));}`
+ *  注：
+ *      LoadTimeWeaverAwareProcessor 是一个BeanPostProcessor，是用来暴露 LoadTimeWeaver 对象给bean的一个后置处理器，
+ *      而 {@link LoadTimeWeaver#addTransformer(ClassFileTransformer)} 方法可以间接的往
+ *      {@link Instrumentation} 中注册 {@link ClassFileTransformer} ，从而能拦截到 class文件加载到JVM的过程，拦截到了就可以修改。
+ *      Tips：LoadTimeWeaver 是 Instrumentation 的一个包装对象
+ *
+ * 3. 在调用BeanFactory后置处理器时
+ *      3.1 实例化 BeanFactory后置处理器 AspectJWeavingEnabler
+ *          AspectJWeavingEnabler 的实例化会被 {@link LoadTimeWeaverAwareProcessor#postProcessBeforeInitialization(Object, String)} 处理
+ *          而 postProcessBeforeInitialization 会 getBean(DefaultContextLoadTimeWeaver)，也就是会实例化 DefaultContextLoadTimeWeaver
+ *          而 DefaultContextLoadTimeWeaver 的实例化会设置属性
+ *              `this.loadTimeWeaver = new InstrumentationLoadTimeWeaver(classLoader);` 说白了就是暴露出 {@link Instrumentation} 对象
+ *          然后将 DefaultContextLoadTimeWeaver 实例作为参数回调 {@link AspectJWeavingEnabler#setLoadTimeWeaver(LoadTimeWeaver)}
+ *          也就是 AspectJWeavingEnabler 有 DefaultContextLoadTimeWeaver 的引用
+ *
+ *      3.2 回调BeanFactory后置处理器方法
+ *          {@link AspectJWeavingEnabler#postProcessBeanFactory(ConfigurableListableBeanFactory)}
+ *          {@link AspectJWeavingEnabler#enableAspectJWeaving(LoadTimeWeaver, ClassLoader)}
+ *          `loadTimeWeaver.addTransformer(new AspectJClassBypassingClassFileTransformer(new ClassPreProcessorAgentAdapter()));`
+ *              也就是间接的往 Instrumentation 中注册 {@link ClassFileTransformer} ，从而能拦截到 class文件加载到JVM的过程，在加载之前通过 Aspectj 对
+ *              class文件进行修改增加增强逻辑
+ *
+ *
+ * Tips：在实例化单例bean之前就往 Instrumentation 中添加了 AspectJClassBypassingClassFileTransformer，所以能确保能实现 Aspectj加载器织入
+ * */
 ```
 
 
