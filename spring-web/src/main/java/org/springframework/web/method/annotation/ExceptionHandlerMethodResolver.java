@@ -16,13 +16,6 @@
 
 package org.springframework.web.method.annotation;
 
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.springframework.core.ExceptionDepthComparator;
 import org.springframework.core.MethodIntrospector;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -31,6 +24,9 @@ import org.springframework.util.Assert;
 import org.springframework.util.ConcurrentReferenceHashMap;
 import org.springframework.util.ReflectionUtils.MethodFilter;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+
+import java.lang.reflect.Method;
+import java.util.*;
 
 /**
  * Discovers {@linkplain ExceptionHandler @ExceptionHandler} methods in a given class,
@@ -44,159 +40,174 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
  */
 public class ExceptionHandlerMethodResolver {
 
-	/**
-	 * A filter for selecting {@code @ExceptionHandler} methods.
-	 */
-	public static final MethodFilter EXCEPTION_HANDLER_METHODS = method ->
-			AnnotatedElementUtils.hasAnnotation(method, ExceptionHandler.class);
+    /**
+     * A filter for selecting {@code @ExceptionHandler} methods.
+     */
+    public static final MethodFilter EXCEPTION_HANDLER_METHODS = method -> AnnotatedElementUtils.hasAnnotation(
+            method, ExceptionHandler.class);
 
-	private static final Method NO_MATCHING_EXCEPTION_HANDLER_METHOD;
+    private static final Method NO_MATCHING_EXCEPTION_HANDLER_METHOD;
 
-	static {
-		try {
-			NO_MATCHING_EXCEPTION_HANDLER_METHOD =
-					ExceptionHandlerMethodResolver.class.getDeclaredMethod("noMatchingExceptionHandler");
-		}
-		catch (NoSuchMethodException ex) {
-			throw new IllegalStateException("Expected method not found: " + ex);
-		}
-	}
-
-
-	private final Map<Class<? extends Throwable>, Method> mappedMethods = new HashMap<>(16);
-
-	private final Map<Class<? extends Throwable>, Method> exceptionLookupCache = new ConcurrentReferenceHashMap<>(16);
+    static {
+        try {
+            NO_MATCHING_EXCEPTION_HANDLER_METHOD = ExceptionHandlerMethodResolver.class.getDeclaredMethod(
+                    "noMatchingExceptionHandler");
+        } catch (NoSuchMethodException ex) {
+            throw new IllegalStateException("Expected method not found: " + ex);
+        }
+    }
 
 
-	/**
-	 * A constructor that finds {@link ExceptionHandler} methods in the given type.
-	 * @param handlerType the type to introspect
-	 */
-	public ExceptionHandlerMethodResolver(Class<?> handlerType) {
-		for (Method method : MethodIntrospector.selectMethods(handlerType, EXCEPTION_HANDLER_METHODS)) {
-			for (Class<? extends Throwable> exceptionType : detectExceptionMappings(method)) {
-				addExceptionMapping(exceptionType, method);
-			}
-		}
-	}
+    private final Map<Class<? extends Throwable>, Method> mappedMethods = new HashMap<>(16);
+
+    private final Map<Class<? extends Throwable>, Method> exceptionLookupCache = new ConcurrentReferenceHashMap<>(16);
 
 
-	/**
-	 * Extract exception mappings from the {@code @ExceptionHandler} annotation first,
-	 * and then as a fallback from the method signature itself.
-	 */
-	@SuppressWarnings("unchecked")
-	private List<Class<? extends Throwable>> detectExceptionMappings(Method method) {
-		List<Class<? extends Throwable>> result = new ArrayList<>();
-		detectAnnotationExceptionMappings(method, result);
-		if (result.isEmpty()) {
-			for (Class<?> paramType : method.getParameterTypes()) {
-				if (Throwable.class.isAssignableFrom(paramType)) {
-					result.add((Class<? extends Throwable>) paramType);
-				}
-			}
-		}
-		if (result.isEmpty()) {
-			throw new IllegalStateException("No exception types mapped to " + method);
-		}
-		return result;
-	}
+    /**
+     * A constructor that finds {@link ExceptionHandler} methods in the given type.
+     *
+     * @param handlerType the type to introspect
+     */
+    public ExceptionHandlerMethodResolver(Class<?> handlerType) {
+        // 遍历有@ExceptionHandler 注解的方法
+        for (Method method : MethodIntrospector.selectMethods(handlerType, EXCEPTION_HANDLER_METHODS)) {
+            // 拿到@ExceptionHandler(Exception.class)，没有注解值，就通过方法参数获取 Throwable 类型
+            for (Class<? extends Throwable> exceptionType : detectExceptionMappings(method)) {
+                // 注册映射关系
+                addExceptionMapping(exceptionType, method);
+            }
+        }
+    }
 
-	private void detectAnnotationExceptionMappings(Method method, List<Class<? extends Throwable>> result) {
-		ExceptionHandler ann = AnnotatedElementUtils.findMergedAnnotation(method, ExceptionHandler.class);
-		Assert.state(ann != null, "No ExceptionHandler annotation");
-		result.addAll(Arrays.asList(ann.value()));
-	}
 
-	private void addExceptionMapping(Class<? extends Throwable> exceptionType, Method method) {
-		Method oldMethod = this.mappedMethods.put(exceptionType, method);
-		if (oldMethod != null && !oldMethod.equals(method)) {
-			throw new IllegalStateException("Ambiguous @ExceptionHandler method mapped for [" +
-					exceptionType + "]: {" + oldMethod + ", " + method + "}");
-		}
-	}
+    /**
+     * Extract exception mappings from the {@code @ExceptionHandler} annotation first,
+     * and then as a fallback from the method signature itself.
+     */
+    @SuppressWarnings("unchecked")
+    private List<Class<? extends Throwable>> detectExceptionMappings(Method method) {
+        List<Class<? extends Throwable>> result = new ArrayList<>();
+        // 拿到@ExceptionHandler(Exception.class) 记录在 result 中
+        detectAnnotationExceptionMappings(method, result);
+        // 兜底操作
+        if (result.isEmpty()) {
+            // 遍历方法参数
+            for (Class<?> paramType : method.getParameterTypes()) {
+                if (Throwable.class.isAssignableFrom(paramType)) {
+                    // 记录起来
+                    result.add((Class<? extends Throwable>) paramType);
+                }
+            }
+        }
+        if (result.isEmpty()) {
+            throw new IllegalStateException("No exception types mapped to " + method);
+        }
+        return result;
+    }
 
-	/**
-	 * Whether the contained type has any exception mappings.
-	 */
-	public boolean hasExceptionMappings() {
-		return !this.mappedMethods.isEmpty();
-	}
+    private void detectAnnotationExceptionMappings(Method method, List<Class<? extends Throwable>> result) {
+        ExceptionHandler ann = AnnotatedElementUtils.findMergedAnnotation(method, ExceptionHandler.class);
+        Assert.state(ann != null, "No ExceptionHandler annotation");
+        result.addAll(Arrays.asList(ann.value()));
+    }
 
-	/**
-	 * Find a {@link Method} to handle the given exception.
-	 * <p>Uses {@link ExceptionDepthComparator} if more than one match is found.
-	 * @param exception the exception
-	 * @return a Method to handle the exception, or {@code null} if none found
-	 */
-	@Nullable
-	public Method resolveMethod(Exception exception) {
-		return resolveMethodByThrowable(exception);
-	}
+    private void addExceptionMapping(Class<? extends Throwable> exceptionType, Method method) {
+        Method oldMethod = this.mappedMethods.put(exceptionType, method);
+        /**
+         * 不允许一个方法有 重复的异常类型
+         * 不允许一个类中 多个方法对应一个异常类型
+         * */
+        if (oldMethod != null && !oldMethod.equals(method)) {
+            throw new IllegalStateException(
+                    "Ambiguous @ExceptionHandler method mapped for [" + exceptionType + "]: {" + oldMethod + ", " + method + "}");
+        }
+    }
 
-	/**
-	 * Find a {@link Method} to handle the given Throwable.
-	 * <p>Uses {@link ExceptionDepthComparator} if more than one match is found.
-	 * @param exception the exception
-	 * @return a Method to handle the exception, or {@code null} if none found
-	 * @since 5.0
-	 */
-	@Nullable
-	public Method resolveMethodByThrowable(Throwable exception) {
-		Method method = resolveMethodByExceptionType(exception.getClass());
-		if (method == null) {
-			Throwable cause = exception.getCause();
-			if (cause != null) {
-				method = resolveMethodByThrowable(cause);
-			}
-		}
-		return method;
-	}
+    /**
+     * Whether the contained type has any exception mappings.
+     */
+    public boolean hasExceptionMappings() {
+        return !this.mappedMethods.isEmpty();
+    }
 
-	/**
-	 * Find a {@link Method} to handle the given exception type. This can be
-	 * useful if an {@link Exception} instance is not available (e.g. for tools).
-	 * <p>Uses {@link ExceptionDepthComparator} if more than one match is found.
-	 * @param exceptionType the exception type
-	 * @return a Method to handle the exception, or {@code null} if none found
-	 */
-	@Nullable
-	public Method resolveMethodByExceptionType(Class<? extends Throwable> exceptionType) {
-		Method method = this.exceptionLookupCache.get(exceptionType);
-		if (method == null) {
-			method = getMappedMethod(exceptionType);
-			this.exceptionLookupCache.put(exceptionType, method);
-		}
-		return (method != NO_MATCHING_EXCEPTION_HANDLER_METHOD ? method : null);
-	}
+    /**
+     * Find a {@link Method} to handle the given exception.
+     * <p>Uses {@link ExceptionDepthComparator} if more than one match is found.
+     *
+     * @param exception the exception
+     * @return a Method to handle the exception, or {@code null} if none found
+     */
+    @Nullable
+    public Method resolveMethod(Exception exception) {
+        return resolveMethodByThrowable(exception);
+    }
 
-	/**
-	 * Return the {@link Method} mapped to the given exception type, or
-	 * {@link #NO_MATCHING_EXCEPTION_HANDLER_METHOD} if none.
-	 */
-	private Method getMappedMethod(Class<? extends Throwable> exceptionType) {
-		List<Class<? extends Throwable>> matches = new ArrayList<>();
-		for (Class<? extends Throwable> mappedException : this.mappedMethods.keySet()) {
-			if (mappedException.isAssignableFrom(exceptionType)) {
-				matches.add(mappedException);
-			}
-		}
-		if (!matches.isEmpty()) {
-			if (matches.size() > 1) {
-				matches.sort(new ExceptionDepthComparator(exceptionType));
-			}
-			return this.mappedMethods.get(matches.get(0));
-		}
-		else {
-			return NO_MATCHING_EXCEPTION_HANDLER_METHOD;
-		}
-	}
+    /**
+     * Find a {@link Method} to handle the given Throwable.
+     * <p>Uses {@link ExceptionDepthComparator} if more than one match is found.
+     *
+     * @param exception the exception
+     * @return a Method to handle the exception, or {@code null} if none found
+     * @since 5.0
+     */
+    @Nullable
+    public Method resolveMethodByThrowable(Throwable exception) {
+        // 解析，看是否有处理这个异常的方法
+        Method method = resolveMethodByExceptionType(exception.getClass());
+        if (method == null) {
+            Throwable cause = exception.getCause();
+            if (cause != null) {
+                // 递归处理
+                method = resolveMethodByThrowable(cause);
+            }
+        }
+        return method;
+    }
 
-	/**
-	 * For the {@link #NO_MATCHING_EXCEPTION_HANDLER_METHOD} constant.
- 	 */
-	@SuppressWarnings("unused")
-	private void noMatchingExceptionHandler() {
-	}
+    /**
+     * Find a {@link Method} to handle the given exception type. This can be
+     * useful if an {@link Exception} instance is not available (e.g. for tools).
+     * <p>Uses {@link ExceptionDepthComparator} if more than one match is found.
+     *
+     * @param exceptionType the exception type
+     * @return a Method to handle the exception, or {@code null} if none found
+     */
+    @Nullable
+    public Method resolveMethodByExceptionType(Class<? extends Throwable> exceptionType) {
+        Method method = this.exceptionLookupCache.get(exceptionType);
+        if (method == null) {
+            method = getMappedMethod(exceptionType);
+            this.exceptionLookupCache.put(exceptionType, method);
+        }
+        return (method != NO_MATCHING_EXCEPTION_HANDLER_METHOD ? method : null);
+    }
+
+    /**
+     * Return the {@link Method} mapped to the given exception type, or
+     * {@link #NO_MATCHING_EXCEPTION_HANDLER_METHOD} if none.
+     */
+    private Method getMappedMethod(Class<? extends Throwable> exceptionType) {
+        List<Class<? extends Throwable>> matches = new ArrayList<>();
+        for (Class<? extends Throwable> mappedException : this.mappedMethods.keySet()) {
+            if (mappedException.isAssignableFrom(exceptionType)) {
+                matches.add(mappedException);
+            }
+        }
+        if (!matches.isEmpty()) {
+            if (matches.size() > 1) {
+                matches.sort(new ExceptionDepthComparator(exceptionType));
+            }
+            return this.mappedMethods.get(matches.get(0));
+        } else {
+            return NO_MATCHING_EXCEPTION_HANDLER_METHOD;
+        }
+    }
+
+    /**
+     * For the {@link #NO_MATCHING_EXCEPTION_HANDLER_METHOD} constant.
+     */
+    @SuppressWarnings("unused")
+    private void noMatchingExceptionHandler() {
+    }
 
 }

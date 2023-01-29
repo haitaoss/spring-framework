@@ -1,0 +1,168 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AbstractUrlBasedView {
+  - url: String?
+  + getUrl(): String?
+  + setUrl(String?): void
+  # isUrlRequired(): boolean
+  + checkResource(Locale): boolean
+  + afterPropertiesSet(): void
+  + toString(): String
+}
+class AbstractView {
+  - contentType: String?
+  - beanName: String?
+  - exposeContextBeansAsAttributes: boolean
+  - staticAttributes: Map<String, Object>
+  + DEFAULT_CONTENT_TYPE: String
+  - exposePathVariables: boolean
+  - requestContextAttribute: String?
+  - OUTPUT_BYTE_ARRAY_INITIAL_SIZE: int
+  - exposedContextBeanNames: Set<String>?
+  + setAttributes(Properties): void
+  # formatViewName(): String
+  + setExposedContextBeanNames(String[]): void
+  # createRequestContext(HttpServletRequest, HttpServletResponse, Map<String, Object>): RequestContext
+  + setRequestContextAttribute(String?): void
+  + isExposePathVariables(): boolean
+  + setExposePathVariables(boolean): void
+  # renderMergedOutputModel(Map<String, Object>, HttpServletRequest, HttpServletResponse): void
+  + getAttributesMap(): Map<String, Object>
+  # prepareResponse(HttpServletRequest, HttpServletResponse): void
+  + toString(): String
+  # writeToResponse(HttpServletResponse, ByteArrayOutputStream): void
+  # setResponseContentType(HttpServletRequest, HttpServletResponse): void
+  + setAttributesCSV(String?): void
+  # getRequestToExpose(HttpServletRequest): HttpServletRequest
+  + setAttributesMap(Map<String, ?>?): void
+  # exposeModelAsRequestAttributes(Map<String, Object>, HttpServletRequest): void
+  + setContentType(String?): void
+  + getContentType(): String?
+  + addStaticAttribute(String, Object): void
+  + setExposeContextBeansAsAttributes(boolean): void
+  + setBeanName(String?): void
+  + getBeanName(): String?
+  + render(Map<String, ?>?, HttpServletRequest, HttpServletResponse): void
+  # createTemporaryOutputStream(): ByteArrayOutputStream
+  # createMergedOutputModel(Map<String, ?>?, HttpServletRequest, HttpServletResponse): Map<String, Object>
+  + getStaticAttributes(): Map<String, Object>
+  # generatesDownloadContent(): boolean
+  + getRequestContextAttribute(): String?
+}
+interface ApplicationContextAware << interface >> {
+  + setApplicationContext(ApplicationContext): void
+}
+class ApplicationObjectSupport {
+  - applicationContext: ApplicationContext?
+  # logger: Log
+  - messageSourceAccessor: MessageSourceAccessor?
+  # requiredContextClass(): Class<?>
+  + getApplicationContext(): ApplicationContext?
+  # isContextRequired(): boolean
+  # initApplicationContext(ApplicationContext): void
+  # obtainApplicationContext(): ApplicationContext
+  + setApplicationContext(ApplicationContext?): void
+  # initApplicationContext(): void
+  # getMessageSourceAccessor(): MessageSourceAccessor?
+}
+interface Aware << interface >>
+interface BeanNameAware << interface >> {
+  + setBeanName(String): void
+}
+interface InitializingBean << interface >> {
+  + afterPropertiesSet(): void
+}
+class InternalResourceView {
+  - alwaysInclude: boolean
+  - preventDispatchLoop: boolean
+  # useInclude(HttpServletRequest, HttpServletResponse): boolean
+  # renderMergedOutputModel(Map<String, Object>, HttpServletRequest, HttpServletResponse): void
+  + setPreventDispatchLoop(boolean): void
+  # prepareForRendering(HttpServletRequest, HttpServletResponse): String
+  # getRequestDispatcher(HttpServletRequest, String): RequestDispatcher?
+  # isContextRequired(): boolean
+  + setAlwaysInclude(boolean): void
+  # exposeHelpers(HttpServletRequest): void
+}
+class RedirectView {
+  - encodingScheme: String?
+  - statusCode: HttpStatus?
+  - hosts: String[]?
+  - exposeModelAttributes: boolean
+  - contextRelative: boolean
+  - http10Compatible: boolean
+  - propagateQueryParams: boolean
+  - URI_TEMPLATE_VARIABLE_PATTERN: Pattern
+  - expandUriTemplateVariables: boolean
+  # queryProperties(Map<String, Object>): Map<String, Object>
+  + setStatusCode(HttpStatus): void
+  # sendRedirect(HttpServletRequest, HttpServletResponse, String, boolean): void
+  # renderMergedOutputModel(Map<String, Object>, HttpServletRequest, HttpServletResponse): void
+  # isEligibleValue(Object?): boolean
+  + getHosts(): String[]?
+  + isPropagateQueryProperties(): boolean
+  + setHosts(String[]?): void
+  # isRemoteHost(String): boolean
+  + setPropagateQueryParams(boolean): void
+  # getHttp11StatusCode(HttpServletRequest, HttpServletResponse, String): HttpStatus
+  + setExpandUriTemplateVariables(boolean): void
+  # appendQueryProperties(StringBuilder, Map<String, Object>, String): void
+  # updateTargetUrl(String, Map<String, Object>, HttpServletRequest, HttpServletResponse): String
+  + setExposeModelAttributes(boolean): void
+  # createTargetUrl(Map<String, Object>, HttpServletRequest): String
+  # isContextRequired(): boolean
+  + setContextRelative(boolean): void
+  # replaceUriTemplateVariables(String, Map<String, Object>, Map<String, String>, String): StringBuilder
+  + setEncodingScheme(String): void
+  - getContextPath(HttpServletRequest): String
+  - getCurrentRequestUriVariables(HttpServletRequest): Map<String, String>
+  # appendCurrentQueryParams(StringBuilder, HttpServletRequest): void
+  + setHttp10Compatible(boolean): void
+  # isEligibleProperty(String, Object?): boolean
+  # urlEncode(String, String): String
+  + isRedirectView(): boolean
+}
+interface ServletContextAware << interface >> {
+  + setServletContext(ServletContext): void
+}
+interface SmartView << interface >> {
+  + isRedirectView(): boolean
+}
+interface View << interface >> {
+  + RESPONSE_STATUS_ATTRIBUTE: String
+  + PATH_VARIABLES: String
+  + SELECTED_CONTENT_TYPE: String
+  + render(Map<String, ?>?, HttpServletRequest, HttpServletResponse): void
+  + getContentType(): String?
+}
+class WebApplicationObjectSupport {
+  - servletContext: ServletContext?
+  # getServletContext(): ServletContext?
+  + setServletContext(ServletContext): void
+  # getTempDir(): File
+  # initApplicationContext(ApplicationContext): void
+  # isContextRequired(): boolean
+  # getWebApplicationContext(): WebApplicationContext?
+  # initServletContext(ServletContext): void
+}
+
+AbstractUrlBasedView         -[#000082,plain]-^  AbstractView
+AbstractUrlBasedView         -[#008200,dashed]-^  InitializingBean
+AbstractView                 -[#008200,dashed]-^  BeanNameAware
+AbstractView                 -[#008200,dashed]-^  View
+AbstractView                 -[#000082,plain]-^  WebApplicationObjectSupport
+ApplicationContextAware      -[#008200,plain]-^  Aware
+ApplicationObjectSupport     -[#008200,dashed]-^  ApplicationContextAware
+BeanNameAware                -[#008200,plain]-^  Aware
+InternalResourceView         -[#000082,plain]-^  AbstractUrlBasedView
+RedirectView                 -[#000082,plain]-^  AbstractUrlBasedView
+RedirectView                 -[#008200,dashed]-^  SmartView
+ServletContextAware          -[#008200,plain]-^  Aware
+SmartView                    -[#008200,plain]-^  View
+WebApplicationObjectSupport  -[#000082,plain]-^  ApplicationObjectSupport
+WebApplicationObjectSupport  -[#008200,dashed]-^  ServletContextAware
+@enduml

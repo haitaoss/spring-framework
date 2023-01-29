@@ -16,12 +16,6 @@
 
 package org.springframework.web.servlet.mvc.method.annotation;
 
-import java.io.IOException;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.MediaType;
@@ -31,6 +25,12 @@ import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.lang.Nullable;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.method.ControllerAdviceBean;
+
+import java.io.IOException;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Invokes {@link RequestBodyAdvice} and {@link ResponseBodyAdvice} where each
@@ -42,141 +42,148 @@ import org.springframework.web.method.ControllerAdviceBean;
  */
 class RequestResponseBodyAdviceChain implements RequestBodyAdvice, ResponseBodyAdvice<Object> {
 
-	private final List<Object> requestBodyAdvice = new ArrayList<>(4);
+    private final List<Object> requestBodyAdvice = new ArrayList<>(4);
 
-	private final List<Object> responseBodyAdvice = new ArrayList<>(4);
-
-
-	/**
-	 * Create an instance from a list of objects that are either of type
-	 * {@code ControllerAdviceBean} or {@code RequestBodyAdvice}.
-	 */
-	public RequestResponseBodyAdviceChain(@Nullable List<Object> requestResponseBodyAdvice) {
-		this.requestBodyAdvice.addAll(getAdviceByType(requestResponseBodyAdvice, RequestBodyAdvice.class));
-		this.responseBodyAdvice.addAll(getAdviceByType(requestResponseBodyAdvice, ResponseBodyAdvice.class));
-	}
-
-	@SuppressWarnings("unchecked")
-	static <T> List<T> getAdviceByType(@Nullable List<Object> requestResponseBodyAdvice, Class<T> adviceType) {
-		if (requestResponseBodyAdvice != null) {
-			List<T> result = new ArrayList<>();
-			for (Object advice : requestResponseBodyAdvice) {
-				Class<?> beanType = (advice instanceof ControllerAdviceBean ?
-						((ControllerAdviceBean) advice).getBeanType() : advice.getClass());
-				if (beanType != null && adviceType.isAssignableFrom(beanType)) {
-					result.add((T) advice);
-				}
-			}
-			return result;
-		}
-		return Collections.emptyList();
-	}
+    private final List<Object> responseBodyAdvice = new ArrayList<>(4);
 
 
-	@Override
-	public boolean supports(MethodParameter param, Type type, Class<? extends HttpMessageConverter<?>> converterType) {
-		throw new UnsupportedOperationException("Not implemented");
-	}
+    /**
+     * Create an instance from a list of objects that are either of type
+     * {@code ControllerAdviceBean} or {@code RequestBodyAdvice}.
+     */
+    public RequestResponseBodyAdviceChain(@Nullable List<Object> requestResponseBodyAdvice) {
+        this.requestBodyAdvice.addAll(getAdviceByType(requestResponseBodyAdvice, RequestBodyAdvice.class));
+        this.responseBodyAdvice.addAll(getAdviceByType(requestResponseBodyAdvice, ResponseBodyAdvice.class));
+    }
 
-	@Override
-	public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
-		throw new UnsupportedOperationException("Not implemented");
-	}
-
-	@Override
-	public HttpInputMessage beforeBodyRead(HttpInputMessage request, MethodParameter parameter,
-			Type targetType, Class<? extends HttpMessageConverter<?>> converterType) throws IOException {
-
-		for (RequestBodyAdvice advice : getMatchingAdvice(parameter, RequestBodyAdvice.class)) {
-			if (advice.supports(parameter, targetType, converterType)) {
-				request = advice.beforeBodyRead(request, parameter, targetType, converterType);
-			}
-		}
-		return request;
-	}
-
-	@Override
-	public Object afterBodyRead(Object body, HttpInputMessage inputMessage, MethodParameter parameter,
-			Type targetType, Class<? extends HttpMessageConverter<?>> converterType) {
-
-		for (RequestBodyAdvice advice : getMatchingAdvice(parameter, RequestBodyAdvice.class)) {
-			if (advice.supports(parameter, targetType, converterType)) {
-				body = advice.afterBodyRead(body, inputMessage, parameter, targetType, converterType);
-			}
-		}
-		return body;
-	}
-
-	@Override
-	@Nullable
-	public Object beforeBodyWrite(@Nullable Object body, MethodParameter returnType, MediaType contentType,
-			Class<? extends HttpMessageConverter<?>> converterType,
-			ServerHttpRequest request, ServerHttpResponse response) {
-
-		return processBody(body, returnType, contentType, converterType, request, response);
-	}
-
-	@Override
-	@Nullable
-	public Object handleEmptyBody(@Nullable Object body, HttpInputMessage inputMessage, MethodParameter parameter,
-			Type targetType, Class<? extends HttpMessageConverter<?>> converterType) {
-
-		for (RequestBodyAdvice advice : getMatchingAdvice(parameter, RequestBodyAdvice.class)) {
-			if (advice.supports(parameter, targetType, converterType)) {
-				body = advice.handleEmptyBody(body, inputMessage, parameter, targetType, converterType);
-			}
-		}
-		return body;
-	}
+    @SuppressWarnings("unchecked")
+    static <T> List<T> getAdviceByType(@Nullable List<Object> requestResponseBodyAdvice, Class<T> adviceType) {
+        if (requestResponseBodyAdvice != null) {
+            List<T> result = new ArrayList<>();
+            for (Object advice : requestResponseBodyAdvice) {
+                Class<?> beanType = (advice instanceof ControllerAdviceBean ? ((ControllerAdviceBean) advice).getBeanType() : advice.getClass());
+                if (beanType != null && adviceType.isAssignableFrom(beanType)) {
+                    result.add((T) advice);
+                }
+            }
+            return result;
+        }
+        return Collections.emptyList();
+    }
 
 
-	@SuppressWarnings("unchecked")
-	@Nullable
-	private <T> Object processBody(@Nullable Object body, MethodParameter returnType, MediaType contentType,
-			Class<? extends HttpMessageConverter<?>> converterType,
-			ServerHttpRequest request, ServerHttpResponse response) {
+    @Override
+    public boolean supports(MethodParameter param, Type type, Class<? extends HttpMessageConverter<?>> converterType) {
+        throw new UnsupportedOperationException("Not implemented");
+    }
 
-		for (ResponseBodyAdvice<?> advice : getMatchingAdvice(returnType, ResponseBodyAdvice.class)) {
-			if (advice.supports(returnType, converterType)) {
-				body = ((ResponseBodyAdvice<T>) advice).beforeBodyWrite((T) body, returnType,
-						contentType, converterType, request, response);
-			}
-		}
-		return body;
-	}
+    @Override
+    public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
+        throw new UnsupportedOperationException("Not implemented");
+    }
 
-	@SuppressWarnings("unchecked")
-	private <A> List<A> getMatchingAdvice(MethodParameter parameter, Class<? extends A> adviceType) {
-		List<Object> availableAdvice = getAdvice(adviceType);
-		if (CollectionUtils.isEmpty(availableAdvice)) {
-			return Collections.emptyList();
-		}
-		List<A> result = new ArrayList<>(availableAdvice.size());
-		for (Object advice : availableAdvice) {
-			if (advice instanceof ControllerAdviceBean) {
-				ControllerAdviceBean adviceBean = (ControllerAdviceBean) advice;
-				if (!adviceBean.isApplicableToBeanType(parameter.getContainingClass())) {
-					continue;
-				}
-				advice = adviceBean.resolveBean();
-			}
-			if (adviceType.isAssignableFrom(advice.getClass())) {
-				result.add((A) advice);
-			}
-		}
-		return result;
-	}
+    @Override
+    public HttpInputMessage beforeBodyRead(HttpInputMessage request, MethodParameter parameter, Type targetType,
+                                           Class<? extends HttpMessageConverter<?>> converterType) throws IOException {
 
-	private List<Object> getAdvice(Class<?> adviceType) {
-		if (RequestBodyAdvice.class == adviceType) {
-			return this.requestBodyAdvice;
-		}
-		else if (ResponseBodyAdvice.class == adviceType) {
-			return this.responseBodyAdvice;
-		}
-		else {
-			throw new IllegalArgumentException("Unexpected adviceType: " + adviceType);
-		}
-	}
+        for (RequestBodyAdvice advice : getMatchingAdvice(parameter, RequestBodyAdvice.class)) {
+            if (advice.supports(parameter, targetType, converterType)) {
+                request = advice.beforeBodyRead(request, parameter, targetType, converterType);
+            }
+        }
+        return request;
+    }
+
+    @Override
+    public Object afterBodyRead(Object body, HttpInputMessage inputMessage, MethodParameter parameter, Type targetType,
+                                Class<? extends HttpMessageConverter<?>> converterType) {
+
+        for (RequestBodyAdvice advice : getMatchingAdvice(parameter, RequestBodyAdvice.class)) {
+            if (advice.supports(parameter, targetType, converterType)) {
+                body = advice.afterBodyRead(body, inputMessage, parameter, targetType, converterType);
+            }
+        }
+        return body;
+    }
+
+    @Override
+    @Nullable
+    public Object beforeBodyWrite(@Nullable Object body, MethodParameter returnType, MediaType contentType,
+                                  Class<? extends HttpMessageConverter<?>> converterType, ServerHttpRequest request,
+                                  ServerHttpResponse response) {
+
+        // 处理 body
+        return processBody(body, returnType, contentType, converterType, request, response);
+    }
+
+    @Override
+    @Nullable
+    public Object handleEmptyBody(@Nullable Object body, HttpInputMessage inputMessage, MethodParameter parameter,
+                                  Type targetType, Class<? extends HttpMessageConverter<?>> converterType) {
+
+        for (RequestBodyAdvice advice : getMatchingAdvice(parameter, RequestBodyAdvice.class)) {
+            if (advice.supports(parameter, targetType, converterType)) {
+                body = advice.handleEmptyBody(body, inputMessage, parameter, targetType, converterType);
+            }
+        }
+        return body;
+    }
+
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private <T> Object processBody(@Nullable Object body, MethodParameter returnType, MediaType contentType,
+                                   Class<? extends HttpMessageConverter<?>> converterType, ServerHttpRequest request,
+                                   ServerHttpResponse response) {
+
+        // 遍历匹配
+        for (ResponseBodyAdvice<?> advice : getMatchingAdvice(returnType, ResponseBodyAdvice.class)) {
+            // 支持
+            if (advice.supports(returnType, converterType)) {
+                // 回调方法，可以对body的内容做改动
+                body = ((ResponseBodyAdvice<T>) advice).beforeBodyWrite((T) body, returnType, contentType,
+                        converterType, request, response
+                );
+            }
+        }
+        return body;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <A> List<A> getMatchingAdvice(MethodParameter parameter, Class<? extends A> adviceType) {
+        // 拿到适配的通知
+        List<Object> availableAdvice = getAdvice(adviceType);
+        // 为空就直接返回
+        if (CollectionUtils.isEmpty(availableAdvice)) {
+            return Collections.emptyList();
+        }
+        List<A> result = new ArrayList<>(availableAdvice.size());
+        for (Object advice : availableAdvice) {
+            // 是这个类型的，需要判断是否支持
+            if (advice instanceof ControllerAdviceBean) {
+                ControllerAdviceBean adviceBean = (ControllerAdviceBean) advice;
+                // 不支持就跳过
+                if (!adviceBean.isApplicableToBeanType(parameter.getContainingClass())) {
+                    continue;
+                }
+                advice = adviceBean.resolveBean();
+            }
+            // 类型匹配就可以
+            if (adviceType.isAssignableFrom(advice.getClass())) {
+                result.add((A) advice);
+            }
+        }
+        return result;
+    }
+
+    private List<Object> getAdvice(Class<?> adviceType) {
+        if (RequestBodyAdvice.class == adviceType) {
+            return this.requestBodyAdvice;
+        } else if (ResponseBodyAdvice.class == adviceType) {
+            return this.responseBodyAdvice;
+        } else {
+            throw new IllegalArgumentException("Unexpected adviceType: " + adviceType);
+        }
+    }
 
 }

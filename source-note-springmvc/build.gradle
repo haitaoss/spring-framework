@@ -1,0 +1,47 @@
+plugins {
+    id 'java'
+    id 'war'
+}
+
+group 'cn.haitaoss'
+version '5.3.10'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // 测试依赖
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+
+    // Spring
+    implementation project(":spring-context")
+    implementation project(":spring-context-support")
+    implementation project(":spring-web")
+    implementation project(":spring-webmvc")
+
+    // lombok
+    annotationProcessor 'org.projectlombok:lombok:1.18.2'
+    compileOnly 'org.projectlombok:lombok:1.18.2'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.2'
+    testCompileOnly 'org.projectlombok:lombok:1.18.2'
+
+    // 嵌入式tomcat
+    optional 'org.apache.tomcat.embed:tomcat-embed-core:9.0.52'
+    optional 'org.apache.tomcat.embed:tomcat-embed-jasper:9.0.52'
+//    optional "javax.servlet:javax.servlet-api"
+
+    // JSR303校验  https://hibernate.org/validator/releases/7.0/
+    optional("javax.validation:validation-api:1.1.0.Final")
+    optional("org.hibernate:hibernate-validator:5.4.3.Final")
+    optional("org.glassfish:javax.el:3.0.1-b08")
+
+    // 序列化请求体的
+    optional("com.fasterxml.jackson.core:jackson-databind")
+
+}
+
+test {
+    useJUnitPlatform()
+}

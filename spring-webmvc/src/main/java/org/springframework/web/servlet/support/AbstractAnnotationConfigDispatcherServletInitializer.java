@@ -42,59 +42,64 @@ import org.springframework.web.context.support.AnnotationConfigWebApplicationCon
  * @since 3.2
  */
 public abstract class AbstractAnnotationConfigDispatcherServletInitializer
-		extends AbstractDispatcherServletInitializer {
+        extends AbstractDispatcherServletInitializer {
 
-	/**
-	 * {@inheritDoc}
-	 * <p>This implementation creates an {@link AnnotationConfigWebApplicationContext},
-	 * providing it the annotated classes returned by {@link #getRootConfigClasses()}.
-	 * Returns {@code null} if {@link #getRootConfigClasses()} returns {@code null}.
-	 */
-	@Override
-	@Nullable
-	protected WebApplicationContext createRootApplicationContext() {
-		Class<?>[] configClasses = getRootConfigClasses();
-		if (!ObjectUtils.isEmpty(configClasses)) {
-			AnnotationConfigWebApplicationContext context = new AnnotationConfigWebApplicationContext();
-			context.register(configClasses);
-			return context;
-		}
-		else {
-			return null;
-		}
-	}
+    /**
+     * {@inheritDoc}
+     * <p>This implementation creates an {@link AnnotationConfigWebApplicationContext},
+     * providing it the annotated classes returned by {@link #getRootConfigClasses()}.
+     * Returns {@code null} if {@link #getRootConfigClasses()} returns {@code null}.
+     */
+    @Override
+    @Nullable
+    protected WebApplicationContext createRootApplicationContext() {
+        Class<?>[] configClasses = getRootConfigClasses();
+        // 配置类不为空
+        if (!ObjectUtils.isEmpty(configClasses)) {
+            // 实例化一个IOC容器
+            AnnotationConfigWebApplicationContext context = new AnnotationConfigWebApplicationContext();
+            // 注册配置类
+            context.register(configClasses);
+            // 返回
+            return context;
+        } else {
+            return null;
+        }
+    }
 
-	/**
-	 * {@inheritDoc}
-	 * <p>This implementation creates an {@link AnnotationConfigWebApplicationContext},
-	 * providing it the annotated classes returned by {@link #getServletConfigClasses()}.
-	 */
-	@Override
-	protected WebApplicationContext createServletApplicationContext() {
-		AnnotationConfigWebApplicationContext context = new AnnotationConfigWebApplicationContext();
-		Class<?>[] configClasses = getServletConfigClasses();
-		if (!ObjectUtils.isEmpty(configClasses)) {
-			context.register(configClasses);
-		}
-		return context;
-	}
+    /**
+     * {@inheritDoc}
+     * <p>This implementation creates an {@link AnnotationConfigWebApplicationContext},
+     * providing it the annotated classes returned by {@link #getServletConfigClasses()}.
+     */
+    @Override
+    protected WebApplicationContext createServletApplicationContext() {
+        AnnotationConfigWebApplicationContext context = new AnnotationConfigWebApplicationContext();
+        Class<?>[] configClasses = getServletConfigClasses();
+        // 存在配置类
+        if (!ObjectUtils.isEmpty(configClasses)) {
+            // 注册配置类
+            context.register(configClasses);
+        }
+        return context;
+    }
 
-	/**
-	 * Specify {@code @Configuration} and/or {@code @Component} classes for the
-	 * {@linkplain #createRootApplicationContext() root application context}.
-	 * @return the configuration for the root application context, or {@code null}
-	 * if creation and registration of a root context is not desired
-	 */
-	@Nullable
-	protected abstract Class<?>[] getRootConfigClasses();
+    /**
+     * Specify {@code @Configuration} and/or {@code @Component} classes for the
+     * {@linkplain #createRootApplicationContext() root application context}.
+     * @return the configuration for the root application context, or {@code null}
+     * if creation and registration of a root context is not desired
+     */
+    @Nullable
+    protected abstract Class<?>[] getRootConfigClasses();
 
-	/**
-	 * Specify {@code @Configuration} and/or {@code @Component} classes for the
-	 * {@linkplain #createServletApplicationContext() Servlet application context}.
-	 * @return the configuration for the Servlet application context, or
-	 * {@code null} if all configuration is specified through root config classes.
-	 */
-	@Nullable
-	protected abstract Class<?>[] getServletConfigClasses();
+    /**
+     * Specify {@code @Configuration} and/or {@code @Component} classes for the
+     * {@linkplain #createServletApplicationContext() Servlet application context}.
+     * @return the configuration for the Servlet application context, or
+     * {@code null} if all configuration is specified through root config classes.
+     */
+    @Nullable
+    protected abstract Class<?>[] getServletConfigClasses();
 
 }

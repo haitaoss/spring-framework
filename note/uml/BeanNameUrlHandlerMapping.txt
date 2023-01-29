@@ -1,0 +1,164 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AbstractDetectingUrlHandlerMapping {
+  - detectHandlersInAncestorContexts: boolean
+  + setDetectHandlersInAncestorContexts(boolean): void
+  # detectHandlers(): void
+  # determineUrlsForHandler(String): String[]
+  + initApplicationContext(): void
+}
+class AbstractHandlerMapping {
+  - patternParser: PathPatternParser?
+  - order: int
+  - pathMatcher: PathMatcher
+  - interceptors: List<Object>
+  - adaptedInterceptors: List<HandlerInterceptor>
+  # mappingsLogger: Log
+  - corsConfigurationSource: CorsConfigurationSource?
+  - defaultHandler: Object?
+  - urlPathHelper: UrlPathHelper
+  - corsProcessor: CorsProcessor
+  - beanName: String?
+  + setUrlPathHelper(UrlPathHelper): void
+  + getCorsProcessor(): CorsProcessor
+  + usesPathPatterns(): boolean
+  + getUrlPathHelper(): UrlPathHelper
+  # detectMappedInterceptors(List<HandlerInterceptor>): void
+  + setPathMatcher(PathMatcher): void
+  + getDefaultHandler(): Object?
+  + setPatternParser(PathPatternParser): void
+  + setBeanName(String): void
+  + getCorsConfigurationSource(): CorsConfigurationSource?
+  + setCorsConfigurationSource(CorsConfigurationSource): void
+  + setDefaultHandler(Object?): void
+  # getHandlerInternal(HttpServletRequest): Object?
+  + setUrlDecode(boolean): void
+  # initApplicationContext(): void
+  # extendInterceptors(List<Object>): void
+  # initInterceptors(): void
+  + getHandler(HttpServletRequest): HandlerExecutionChain?
+  # hasCorsConfigurationSource(Object): boolean
+  + getPatternParser(): PathPatternParser?
+  + setCorsConfigurations(Map<String, CorsConfiguration>): void
+  # getCorsHandlerExecutionChain(HttpServletRequest, HandlerExecutionChain, CorsConfiguration?): HandlerExecutionChain
+  # getMappedInterceptors(): MappedInterceptor[]?
+  + setAlwaysUseFullPath(boolean): void
+  # getAdaptedInterceptors(): HandlerInterceptor[]?
+  # getCorsConfiguration(Object, HttpServletRequest): CorsConfiguration?
+  # adaptInterceptor(Object): HandlerInterceptor
+  + setRemoveSemicolonContent(boolean): void
+  # getHandlerExecutionChain(Object, HttpServletRequest): HandlerExecutionChain
+  + getPathMatcher(): PathMatcher
+  + setInterceptors(Object[]): void
+  + setCorsProcessor(CorsProcessor): void
+  # initLookupPath(HttpServletRequest): String
+  + getOrder(): int
+  # formatMappingName(): String
+  + setOrder(int): void
+}
+class AbstractUrlHandlerMapping {
+  - lazyInitHandlers: boolean
+  - rootHandler: Object?
+  - pathPatternHandlerMap: Map<PathPattern, Object>
+  - useTrailingSlashMatch: boolean
+  - handlerMap: Map<String, Object>
+  # registerHandler(String, Object): void
+  # getHandlerInternal(HttpServletRequest): Object?
+  - getDirectMatch(String, HttpServletRequest): Object?
+  # buildPathExposingHandler(Object, String, String, Map<String, String>?): Object
+  + setRootHandler(Object?): void
+  + getPathPatternHandlerMap(): Map<PathPattern, Object>
+  + match(HttpServletRequest, String): RequestMatchResult?
+  + setLazyInitHandlers(boolean): void
+  # registerHandler(String[], String): void
+  # validateHandler(Object, HttpServletRequest): void
+  - getHandlerDescription(Object): String
+  + setPatternParser(PathPatternParser): void
+  # exposePathWithinMapping(String, String, HttpServletRequest): void
+  + getHandlerMap(): Map<String, Object>
+  # lookupHandler(RequestPath, String, HttpServletRequest): Object?
+  + useTrailingSlashMatch(): boolean
+  + getRootHandler(): Object?
+  + setUseTrailingSlashMatch(boolean): void
+  # exposeUriTemplateVariables(Map<String, String>, HttpServletRequest): void
+  # lookupHandler(String, HttpServletRequest): Object?
+  # supportsTypeLevelMappings(): boolean
+}
+interface ApplicationContextAware << interface >> {
+  + setApplicationContext(ApplicationContext): void
+}
+class ApplicationObjectSupport {
+  - applicationContext: ApplicationContext?
+  # logger: Log
+  - messageSourceAccessor: MessageSourceAccessor?
+  # requiredContextClass(): Class<?>
+  # getMessageSourceAccessor(): MessageSourceAccessor?
+  + getApplicationContext(): ApplicationContext?
+  # initApplicationContext(ApplicationContext): void
+  # obtainApplicationContext(): ApplicationContext
+  # initApplicationContext(): void
+  # isContextRequired(): boolean
+  + setApplicationContext(ApplicationContext?): void
+}
+interface Aware << interface >>
+interface BeanNameAware << interface >> {
+  + setBeanName(String): void
+}
+class BeanNameUrlHandlerMapping {
+  # determineUrlsForHandler(String): String[]
+}
+interface HandlerMapping << interface >> {
+  + PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE: String
+  + URI_TEMPLATE_VARIABLES_ATTRIBUTE: String
+  + PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE: String
+  + INTROSPECT_TYPE_LEVEL_MAPPING: String
+  + LOOKUP_PATH: String
+  + MATRIX_VARIABLES_ATTRIBUTE: String
+  + BEST_MATCHING_HANDLER_ATTRIBUTE: String
+  + BEST_MATCHING_PATTERN_ATTRIBUTE: String
+  + usesPathPatterns(): boolean
+  + getHandler(HttpServletRequest): HandlerExecutionChain?
+}
+interface MatchableHandlerMapping << interface >> {
+  + getPatternParser(): PathPatternParser?
+  + match(HttpServletRequest, String): RequestMatchResult?
+}
+interface Ordered << interface >> {
+  + HIGHEST_PRECEDENCE: int
+  + LOWEST_PRECEDENCE: int
+  + getOrder(): int
+}
+interface ServletContextAware << interface >> {
+  + setServletContext(ServletContext): void
+}
+class WebApplicationObjectSupport {
+  - servletContext: ServletContext?
+  # getServletContext(): ServletContext?
+  # initApplicationContext(ApplicationContext): void
+  # isContextRequired(): boolean
+  # getTempDir(): File
+  # initServletContext(ServletContext): void
+  # getWebApplicationContext(): WebApplicationContext?
+  + setServletContext(ServletContext): void
+}
+
+AbstractDetectingUrlHandlerMapping  -[#000082,plain]-^  AbstractUrlHandlerMapping
+AbstractHandlerMapping              -[#008200,dashed]-^  BeanNameAware
+AbstractHandlerMapping              -[#008200,dashed]-^  HandlerMapping
+AbstractHandlerMapping              -[#008200,dashed]-^  Ordered
+AbstractHandlerMapping              -[#000082,plain]-^  WebApplicationObjectSupport
+AbstractUrlHandlerMapping           -[#000082,plain]-^  AbstractHandlerMapping
+AbstractUrlHandlerMapping           -[#008200,dashed]-^  MatchableHandlerMapping
+ApplicationContextAware             -[#008200,plain]-^  Aware
+ApplicationObjectSupport            -[#008200,dashed]-^  ApplicationContextAware
+BeanNameAware                       -[#008200,plain]-^  Aware
+BeanNameUrlHandlerMapping           -[#000082,plain]-^  AbstractDetectingUrlHandlerMapping
+MatchableHandlerMapping             -[#008200,plain]-^  HandlerMapping
+ServletContextAware                 -[#008200,plain]-^  Aware
+WebApplicationObjectSupport         -[#000082,plain]-^  ApplicationObjectSupport
+WebApplicationObjectSupport         -[#008200,dashed]-^  ServletContextAware
+@enduml

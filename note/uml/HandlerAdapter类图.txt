@@ -1,0 +1,142 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AbstractHandlerMethodAdapter {
+  - order: int
+  # getLastModifiedInternal(HttpServletRequest, HandlerMethod): long
+  + supports(Object): boolean
+  # handleInternal(HttpServletRequest, HttpServletResponse, HandlerMethod): ModelAndView?
+  # supportsInternal(HandlerMethod): boolean
+  + setOrder(int): void
+  + handle(HttpServletRequest, HttpServletResponse, Object): ModelAndView?
+  + getOrder(): int
+  + getLastModified(HttpServletRequest, Object): long
+}
+interface ApplicationContextAware << interface >> {
+  + setApplicationContext(ApplicationContext): void
+}
+interface HandlerAdapter << interface >> {
+  + getLastModified(HttpServletRequest, Object): long
+  + supports(Object): boolean
+  + handle(HttpServletRequest, HttpServletResponse, Object): ModelAndView?
+}
+class HandlerFunctionAdapter {
+  - order: int
+  - logger: Log
+  - asyncRequestTimeout: Long?
+  + getOrder(): int
+  + setAsyncRequestTimeout(long): void
+  + setOrder(int): void
+  + supports(Object): boolean
+  - getServerRequest(HttpServletRequest): ServerRequest
+  + handle(HttpServletRequest, HttpServletResponse, Object): ModelAndView?
+  - handleAsync(WebAsyncManager): ServerResponse?
+  - getWebAsyncManager(HttpServletRequest, HttpServletResponse): WebAsyncManager
+  + getLastModified(HttpServletRequest, Object): long
+}
+class HttpRequestHandlerAdapter {
+  + supports(Object): boolean
+  + handle(HttpServletRequest, HttpServletResponse, Object): ModelAndView?
+  + getLastModified(HttpServletRequest, Object): long
+}
+interface InitializingBean << interface >> {
+  + afterPropertiesSet(): void
+}
+class RequestMappingHandlerAdapter {
+  - customArgumentResolvers: List<HandlerMethodArgumentResolver>?
+  - argumentResolvers: HandlerMethodArgumentResolverComposite?
+  - messageConverters: List<HttpMessageConverter<?>>
+  - modelAndViewResolvers: List<ModelAndViewResolver>?
+  - asyncRequestTimeout: Long?
+  + MODEL_ATTRIBUTE_METHODS: MethodFilter
+  + INIT_BINDER_METHODS: MethodFilter
+  - sessionAttributeStore: SessionAttributeStore
+  - webBindingInitializer: WebBindingInitializer?
+  - beanFactory: ConfigurableBeanFactory?
+  - contentNegotiationManager: ContentNegotiationManager
+  - requestResponseBodyAdvice: List<Object>
+  - initBinderArgumentResolvers: HandlerMethodArgumentResolverComposite?
+  - synchronizeOnSession: boolean
+  - callableInterceptors: CallableProcessingInterceptor[]
+  - deferredResultInterceptors: DeferredResultProcessingInterceptor[]
+  - reactiveAdapterRegistry: ReactiveAdapterRegistry
+  - modelAttributeCache: Map<Class<?>, Set<Method>>
+  - modelAttributeAdviceCache: Map<ControllerAdviceBean, Set<Method>>
+  - initBinderAdviceCache: Map<ControllerAdviceBean, Set<Method>>
+  - ignoreDefaultModelOnRedirect: boolean
+  - shouldIgnoreXml: boolean
+  - returnValueHandlers: HandlerMethodReturnValueHandlerComposite?
+  - cacheSecondsForSessionAttributeHandlers: int
+  - customReturnValueHandlers: List<HandlerMethodReturnValueHandler>?
+  - taskExecutor: AsyncTaskExecutor
+  - sessionAttributesHandlerCache: Map<Class<?>, SessionAttributesHandler>
+  - parameterNameDiscoverer: ParameterNameDiscoverer
+  - initBinderCache: Map<Class<?>, Set<Method>>
+  - getDataBinderFactory(HandlerMethod): WebDataBinderFactory
+  # createInvocableHandlerMethod(HandlerMethod): ServletInvocableHandlerMethod
+  # getLastModifiedInternal(HttpServletRequest, HandlerMethod): long
+  + setWebBindingInitializer(WebBindingInitializer?): void
+  + setBeanFactory(BeanFactory): void
+  + setParameterNameDiscoverer(ParameterNameDiscoverer): void
+  + afterPropertiesSet(): void
+  - getDefaultArgumentResolvers(): List<HandlerMethodArgumentResolver>
+  + setContentNegotiationManager(ContentNegotiationManager): void
+  + setCustomArgumentResolvers(List<HandlerMethodArgumentResolver>?): void
+  # createDataBinderFactory(List<InvocableHandlerMethod>): InitBinderDataBinderFactory
+  - createInitBinderMethod(Object, Method): InvocableHandlerMethod
+  + setModelAndViewResolvers(List<ModelAndViewResolver>?): void
+  + getReturnValueHandlers(): List<HandlerMethodReturnValueHandler>?
+  + setAsyncRequestTimeout(long): void
+  + setIgnoreDefaultModelOnRedirect(boolean): void
+  + getCustomReturnValueHandlers(): List<HandlerMethodReturnValueHandler>?
+  + setTaskExecutor(AsyncTaskExecutor): void
+  # handleInternal(HttpServletRequest, HttpServletResponse, HandlerMethod): ModelAndView?
+  + setCacheSecondsForSessionAttributeHandlers(int): void
+  + getMessageConverters(): List<HttpMessageConverter<?>>
+  + setResponseBodyAdvice(List<ResponseBodyAdvice<?>>?): void
+  + setReactiveAdapterRegistry(ReactiveAdapterRegistry): void
+  + getArgumentResolvers(): List<HandlerMethodArgumentResolver>?
+  - getModelFactory(HandlerMethod, WebDataBinderFactory): ModelFactory
+  + setCallableInterceptors(List<CallableProcessingInterceptor>): void
+  + setReturnValueHandlers(List<HandlerMethodReturnValueHandler>?): void
+  + setArgumentResolvers(List<HandlerMethodArgumentResolver>?): void
+  + getReactiveAdapterRegistry(): ReactiveAdapterRegistry
+  + setMessageConverters(List<HttpMessageConverter<?>>): void
+  - getDefaultInitBinderArgumentResolvers(): List<HandlerMethodArgumentResolver>
+  # invokeHandlerMethod(HttpServletRequest, HttpServletResponse, HandlerMethod): ModelAndView?
+  - getModelAndView(ModelAndViewContainer, ModelFactory, NativeWebRequest): ModelAndView?
+  + getInitBinderArgumentResolvers(): List<HandlerMethodArgumentResolver>?
+  # supportsInternal(HandlerMethod): boolean
+  + setSynchronizeOnSession(boolean): void
+  - getDefaultReturnValueHandlers(): List<HandlerMethodReturnValueHandler>
+  - getSessionAttributesHandler(HandlerMethod): SessionAttributesHandler
+  + setSessionAttributeStore(SessionAttributeStore): void
+  + setInitBinderArgumentResolvers(List<HandlerMethodArgumentResolver>?): void
+  + getCustomArgumentResolvers(): List<HandlerMethodArgumentResolver>?
+  + setCustomReturnValueHandlers(List<HandlerMethodReturnValueHandler>?): void
+  + getModelAndViewResolvers(): List<ModelAndViewResolver>?
+  # getBeanFactory(): ConfigurableBeanFactory?
+  - createModelAttributeMethod(WebDataBinderFactory, Object, Method): InvocableHandlerMethod
+  + setRequestBodyAdvice(List<RequestBodyAdvice>?): void
+  - initControllerAdviceCache(): void
+  - getBodyAdviceCount(Class<?>): int
+  + getWebBindingInitializer(): WebBindingInitializer?
+  + setDeferredResultInterceptors(List<DeferredResultProcessingInterceptor>): void
+}
+class SimpleControllerHandlerAdapter {
+  + handle(HttpServletRequest, HttpServletResponse, Object): ModelAndView?
+  + getLastModified(HttpServletRequest, Object): long
+  + supports(Object): boolean
+}
+
+AbstractHandlerMethodAdapter    -[#008200,dashed]-^  ApplicationContextAware
+AbstractHandlerMethodAdapter    -[#008200,dashed]-^  HandlerAdapter
+HandlerFunctionAdapter          -[#008200,dashed]-^  HandlerAdapter
+HttpRequestHandlerAdapter       -[#008200,dashed]-^  HandlerAdapter
+RequestMappingHandlerAdapter    -[#000082,plain]-^  AbstractHandlerMethodAdapter
+RequestMappingHandlerAdapter    -[#008200,dashed]-^  InitializingBean
+SimpleControllerHandlerAdapter  -[#008200,dashed]-^  HandlerAdapter
+@enduml

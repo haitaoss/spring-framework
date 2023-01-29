@@ -1,0 +1,89 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class HandlerMethod {
+  - resolvedFromHandlerMethod: HandlerMethod?
+  - bean: Object
+  - responseStatusReason: String?
+  - beanFactory: BeanFactory?
+  - parameters: MethodParameter[]
+  - method: Method
+  - responseStatus: HttpStatus?
+  # logger: Log
+  - description: String
+  - bridgedMethod: Method
+  - interfaceParameterAnnotations: List<Annotation[][]>?
+  - beanType: Class<?>
+  - messageSource: MessageSource?
+  # formatArgumentError(MethodParameter, String): String
+  + isVoid(): boolean
+  - initMethodParameters(): MethodParameter[]
+  + equals(Object?): boolean
+  + createWithResolvedBean(): HandlerMethod
+  # getBridgedMethod(): Method
+  # assertTargetBean(Method, Object, Object[]): void
+  + getReturnValueType(Object?): MethodParameter
+  # findProvidedArgument(MethodParameter, Object[]?): Object?
+  + getResolvedFromHandlerMethod(): HandlerMethod?
+  + getMethodParameters(): MethodParameter[]
+  - initDescription(Class<?>, Method): String
+  # formatInvokeError(String, Object[]): String
+  + getBean(): Object
+  + getMethod(): Method
+  # getResponseStatus(): HttpStatus?
+  - getInterfaceParameterAnnotations(): List<Annotation[][]>
+  + hashCode(): int
+  + getReturnType(): MethodParameter
+  - evaluateResponseStatus(): void
+  + hasMethodAnnotation(Class<A>): boolean
+  + toString(): String
+  - isOverrideFor(Method): boolean
+  + getBeanType(): Class<?>
+  # getResponseStatusReason(): String?
+  + getMethodAnnotation(Class<A>): A?
+  + getShortLogMessage(): String
+}
+interface HandlerMethodArgumentResolver << interface >> {
+  + resolveArgument(MethodParameter, ModelAndViewContainer?, NativeWebRequest, WebDataBinderFactory?): Object?
+  + supportsParameter(MethodParameter): boolean
+}
+interface HandlerMethodReturnValueHandler << interface >> {
+  + supportsReturnType(MethodParameter): boolean
+  + handleReturnValue(Object?, MethodParameter, ModelAndViewContainer, NativeWebRequest): void
+}
+class InvocableHandlerMethod {
+  - dataBinderFactory: WebDataBinderFactory?
+  - resolvers: HandlerMethodArgumentResolverComposite
+  - EMPTY_ARGS: Object[]
+  - parameterNameDiscoverer: ParameterNameDiscoverer
+  + setDataBinderFactory(WebDataBinderFactory): void
+  + invokeForRequest(NativeWebRequest, ModelAndViewContainer?, Object[]): Object?
+  # getMethodArgumentValues(NativeWebRequest, ModelAndViewContainer?, Object[]): Object[]
+  # doInvoke(Object[]): Object?
+  + setParameterNameDiscoverer(ParameterNameDiscoverer): void
+  + setHandlerMethodArgumentResolvers(HandlerMethodArgumentResolverComposite): void
+}
+class ServletInvocableHandlerMethod {
+  - returnValueHandlers: HandlerMethodReturnValueHandlerComposite?
+  - CALLABLE_METHOD: Method
+  - isRequestNotModified(ServletWebRequest): boolean
+  + invokeAndHandle(ServletWebRequest, ModelAndViewContainer, Object[]): void
+  - disableContentCachingIfNecessary(ServletWebRequest): void
+  - formatErrorForReturnValue(Object?): String
+  ~ wrapConcurrentResult(Object): ServletInvocableHandlerMethod
+  + setHandlerMethodReturnValueHandlers(HandlerMethodReturnValueHandlerComposite): void
+  - setResponseStatus(ServletWebRequest): void
+}
+interface WebDataBinderFactory << interface >> {
+  + createBinder(NativeWebRequest, Object?, String): WebDataBinder
+}
+
+InvocableHandlerMethod           -[#000082,plain]-^  HandlerMethod
+ServletInvocableHandlerMethod    -[#000082,plain]-^  InvocableHandlerMethod
+InvocableHandlerMethod *-- WebDataBinderFactory
+InvocableHandlerMethod *-- HandlerMethodArgumentResolver
+ServletInvocableHandlerMethod *-- HandlerMethodReturnValueHandler
+@enduml

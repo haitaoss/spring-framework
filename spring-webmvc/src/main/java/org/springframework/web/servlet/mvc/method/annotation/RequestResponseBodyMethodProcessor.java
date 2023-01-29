@@ -16,12 +16,6 @@
 
 package org.springframework.web.servlet.mvc.method.annotation;
 
-import java.io.IOException;
-import java.lang.reflect.Type;
-import java.util.List;
-
-import javax.servlet.http.HttpServletRequest;
-
 import org.springframework.core.Conventions;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -42,8 +36,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.method.annotation.ModelFactory;
 import org.springframework.web.method.support.ModelAndViewContainer;
 import org.springframework.web.servlet.mvc.support.DefaultHandlerExceptionResolver;
+
+import javax.servlet.http.HttpServletRequest;
+import java.io.IOException;
+import java.lang.reflect.Type;
+import java.util.List;
 
 /**
  * Resolves method arguments annotated with {@code @RequestBody} and handles return
@@ -64,123 +64,139 @@ import org.springframework.web.servlet.mvc.support.DefaultHandlerExceptionResolv
  */
 public class RequestResponseBodyMethodProcessor extends AbstractMessageConverterMethodProcessor {
 
-	/**
-	 * Basic constructor with converters only. Suitable for resolving
-	 * {@code @RequestBody}. For handling {@code @ResponseBody} consider also
-	 * providing a {@code ContentNegotiationManager}.
-	 */
-	public RequestResponseBodyMethodProcessor(List<HttpMessageConverter<?>> converters) {
-		super(converters);
-	}
+    /**
+     * Basic constructor with converters only. Suitable for resolving
+     * {@code @RequestBody}. For handling {@code @ResponseBody} consider also
+     * providing a {@code ContentNegotiationManager}.
+     */
+    public RequestResponseBodyMethodProcessor(List<HttpMessageConverter<?>> converters) {
+        super(converters);
+    }
 
-	/**
-	 * Basic constructor with converters and {@code ContentNegotiationManager}.
-	 * Suitable for resolving {@code @RequestBody} and handling
-	 * {@code @ResponseBody} without {@code Request~} or
-	 * {@code ResponseBodyAdvice}.
-	 */
-	public RequestResponseBodyMethodProcessor(List<HttpMessageConverter<?>> converters,
-			@Nullable ContentNegotiationManager manager) {
+    /**
+     * Basic constructor with converters and {@code ContentNegotiationManager}.
+     * Suitable for resolving {@code @RequestBody} and handling
+     * {@code @ResponseBody} without {@code Request~} or
+     * {@code ResponseBodyAdvice}.
+     */
+    public RequestResponseBodyMethodProcessor(List<HttpMessageConverter<?>> converters,
+                                              @Nullable ContentNegotiationManager manager) {
 
-		super(converters, manager);
-	}
+        super(converters, manager);
+    }
 
-	/**
-	 * Complete constructor for resolving {@code @RequestBody} method arguments.
-	 * For handling {@code @ResponseBody} consider also providing a
-	 * {@code ContentNegotiationManager}.
-	 * @since 4.2
-	 */
-	public RequestResponseBodyMethodProcessor(List<HttpMessageConverter<?>> converters,
-			@Nullable List<Object> requestResponseBodyAdvice) {
+    /**
+     * Complete constructor for resolving {@code @RequestBody} method arguments.
+     * For handling {@code @ResponseBody} consider also providing a
+     * {@code ContentNegotiationManager}.
+     *
+     * @since 4.2
+     */
+    public RequestResponseBodyMethodProcessor(List<HttpMessageConverter<?>> converters,
+                                              @Nullable List<Object> requestResponseBodyAdvice) {
 
-		super(converters, null, requestResponseBodyAdvice);
-	}
+        super(converters, null, requestResponseBodyAdvice);
+    }
 
-	/**
-	 * Complete constructor for resolving {@code @RequestBody} and handling
-	 * {@code @ResponseBody}.
-	 */
-	public RequestResponseBodyMethodProcessor(List<HttpMessageConverter<?>> converters,
-			@Nullable ContentNegotiationManager manager, @Nullable List<Object> requestResponseBodyAdvice) {
+    /**
+     * Complete constructor for resolving {@code @RequestBody} and handling
+     * {@code @ResponseBody}.
+     */
+    public RequestResponseBodyMethodProcessor(List<HttpMessageConverter<?>> converters,
+                                              @Nullable ContentNegotiationManager manager,
+                                              @Nullable List<Object> requestResponseBodyAdvice) {
 
-		super(converters, manager, requestResponseBodyAdvice);
-	}
+        super(converters, manager, requestResponseBodyAdvice);
+    }
 
 
-	@Override
-	public boolean supportsParameter(MethodParameter parameter) {
-		return parameter.hasParameterAnnotation(RequestBody.class);
-	}
+    @Override
+    public boolean supportsParameter(MethodParameter parameter) {
+        return parameter.hasParameterAnnotation(RequestBody.class);
+    }
 
-	@Override
-	public boolean supportsReturnType(MethodParameter returnType) {
-		return (AnnotatedElementUtils.hasAnnotation(returnType.getContainingClass(), ResponseBody.class) ||
-				returnType.hasMethodAnnotation(ResponseBody.class));
-	}
+    @Override
+    public boolean supportsReturnType(MethodParameter returnType) {
+        return (AnnotatedElementUtils.hasAnnotation(
+                returnType.getContainingClass(), ResponseBody.class) || returnType.hasMethodAnnotation(
+                ResponseBody.class));
+    }
 
-	/**
-	 * Throws MethodArgumentNotValidException if validation fails.
-	 * @throws HttpMessageNotReadableException if {@link RequestBody#required()}
-	 * is {@code true} and there is no body content or if there is no suitable
-	 * converter to read the content with.
-	 */
-	@Override
-	public Object resolveArgument(MethodParameter parameter, @Nullable ModelAndViewContainer mavContainer,
-			NativeWebRequest webRequest, @Nullable WebDataBinderFactory binderFactory) throws Exception {
+    /**
+     * Throws MethodArgumentNotValidException if validation fails.
+     *
+     * @throws HttpMessageNotReadableException if {@link RequestBody#required()}
+     *                                         is {@code true} and there is no body content or if there is no suitable
+     *                                         converter to read the content with.
+     */
+    @Override
+    public Object resolveArgument(MethodParameter parameter, @Nullable ModelAndViewContainer mavContainer,
+                                  NativeWebRequest webRequest,
+                                  @Nullable WebDataBinderFactory binderFactory) throws Exception {
 
-		parameter = parameter.nestedIfOptional();
-		Object arg = readWithMessageConverters(webRequest, parameter, parameter.getNestedGenericParameterType());
-		String name = Conventions.getVariableNameForParameter(parameter);
+        // 参数类型
+        parameter = parameter.nestedIfOptional();
+        // 解析请求体拿到参数值
+        Object arg = readWithMessageConverters(webRequest, parameter, parameter.getNestedGenericParameterType());
+        // 参数的name
+        String name = Conventions.getVariableNameForParameter(parameter);
 
-		if (binderFactory != null) {
-			WebDataBinder binder = binderFactory.createBinder(webRequest, arg, name);
-			if (arg != null) {
-				validateIfApplicable(binder, parameter);
-				if (binder.getBindingResult().hasErrors() && isBindExceptionRequired(binder, parameter)) {
-					throw new MethodArgumentNotValidException(parameter, binder.getBindingResult());
-				}
-			}
-			if (mavContainer != null) {
-				mavContainer.addAttribute(BindingResult.MODEL_KEY_PREFIX + name, binder.getBindingResult());
-			}
-		}
+        if (binderFactory != null) {
+            // 构造 WebDataBinder
+            WebDataBinder binder = binderFactory.createBinder(webRequest, arg, name);
+            if (arg != null) {
+                // 进行 JSR303 校验
+                validateIfApplicable(binder, parameter);
+                if (binder.getBindingResult()
+                        .hasErrors() && isBindExceptionRequired(binder, parameter)) {
+                    throw new MethodArgumentNotValidException(parameter, binder.getBindingResult());
+                }
+            }
+            if (mavContainer != null) {
+                mavContainer.addAttribute(BindingResult.MODEL_KEY_PREFIX + name, binder.getBindingResult());
+            }
+        }
 
-		return adaptArgumentIfNecessary(arg, parameter);
-	}
+        // 装饰一下返回的类型
+        return adaptArgumentIfNecessary(arg, parameter);
+    }
 
-	@Override
-	protected <T> Object readWithMessageConverters(NativeWebRequest webRequest, MethodParameter parameter,
-			Type paramType) throws IOException, HttpMediaTypeNotSupportedException, HttpMessageNotReadableException {
+    @Override
+    protected <T> Object readWithMessageConverters(NativeWebRequest webRequest, MethodParameter parameter,
+                                                   Type paramType) throws IOException, HttpMediaTypeNotSupportedException, HttpMessageNotReadableException {
 
-		HttpServletRequest servletRequest = webRequest.getNativeRequest(HttpServletRequest.class);
-		Assert.state(servletRequest != null, "No HttpServletRequest");
-		ServletServerHttpRequest inputMessage = new ServletServerHttpRequest(servletRequest);
+        HttpServletRequest servletRequest = webRequest.getNativeRequest(HttpServletRequest.class);
+        Assert.state(servletRequest != null, "No HttpServletRequest");
+        ServletServerHttpRequest inputMessage = new ServletServerHttpRequest(servletRequest);
 
-		Object arg = readWithMessageConverters(inputMessage, parameter, paramType);
-		if (arg == null && checkRequired(parameter)) {
-			throw new HttpMessageNotReadableException("Required request body is missing: " +
-					parameter.getExecutable().toGenericString(), inputMessage);
-		}
-		return arg;
-	}
+        // 解析请求体
+        Object arg = readWithMessageConverters(inputMessage, parameter, paramType);
+        if (arg == null && checkRequired(parameter)) {
+            throw new HttpMessageNotReadableException("Required request body is missing: " + parameter.getExecutable()
+                    .toGenericString(), inputMessage);
+        }
+        return arg;
+    }
 
-	protected boolean checkRequired(MethodParameter parameter) {
-		RequestBody requestBody = parameter.getParameterAnnotation(RequestBody.class);
-		return (requestBody != null && requestBody.required() && !parameter.isOptional());
-	}
+    protected boolean checkRequired(MethodParameter parameter) {
+        RequestBody requestBody = parameter.getParameterAnnotation(RequestBody.class);
+        return (requestBody != null && requestBody.required() && !parameter.isOptional());
+    }
 
-	@Override
-	public void handleReturnValue(@Nullable Object returnValue, MethodParameter returnType,
-			ModelAndViewContainer mavContainer, NativeWebRequest webRequest)
-			throws IOException, HttpMediaTypeNotAcceptableException, HttpMessageNotWritableException {
+    @Override
+    public void handleReturnValue(@Nullable Object returnValue, MethodParameter returnType,
+                                  ModelAndViewContainer mavContainer,
+                                  NativeWebRequest webRequest) throws IOException, HttpMediaTypeNotAcceptableException, HttpMessageNotWritableException {
+        /**
+         * 标记为 ture，表示不需要做视图的解析了
+         * {@link RequestMappingHandlerAdapter#getModelAndView(ModelAndViewContainer, ModelFactory, NativeWebRequest)}
+         * */
+        mavContainer.setRequestHandled(true);
+        ServletServerHttpRequest inputMessage = createInputMessage(webRequest);
+        ServletServerHttpResponse outputMessage = createOutputMessage(webRequest);
 
-		mavContainer.setRequestHandled(true);
-		ServletServerHttpRequest inputMessage = createInputMessage(webRequest);
-		ServletServerHttpResponse outputMessage = createOutputMessage(webRequest);
-
-		// Try even with null return value. ResponseBodyAdvice could get involved.
-		writeWithMessageConverters(returnValue, returnType, inputMessage, outputMessage);
-	}
+        // Try even with null return value. ResponseBodyAdvice could get involved.
+        writeWithMessageConverters(returnValue, returnType, inputMessage, outputMessage);
+    }
 
 }

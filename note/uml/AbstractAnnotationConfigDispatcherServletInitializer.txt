@@ -1,0 +1,40 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AbstractAnnotationConfigDispatcherServletInitializer {
+  # createServletApplicationContext(): WebApplicationContext
+  # createRootApplicationContext(): WebApplicationContext?
+   servletConfigClasses: Class<?>[]?
+   rootConfigClasses: Class<?>[]?
+}
+class AbstractContextLoaderInitializer {
+  + onStartup(ServletContext): void
+  # registerContextLoaderListener(ServletContext): void
+  # createRootApplicationContext(): WebApplicationContext?
+   rootApplicationContextInitializers: ApplicationContextInitializer<?>[]?
+}
+class AbstractDispatcherServletInitializer {
+  + onStartup(ServletContext): void
+  # customizeRegistration(Dynamic): void
+  # createDispatcherServlet(WebApplicationContext): FrameworkServlet
+  # registerDispatcherServlet(ServletContext): void
+  # createServletApplicationContext(): WebApplicationContext
+  # registerServletFilter(ServletContext, Filter): Dynamic
+   servletApplicationContextInitializers: ApplicationContextInitializer<?>[]?
+   servletName: String
+   servletFilters: Filter[]?
+   asyncSupported: boolean
+   dispatcherTypes: EnumSet<DispatcherType>
+   servletMappings: String[]
+}
+interface WebApplicationInitializer << interface >> {
+  + onStartup(ServletContext): void
+}
+
+AbstractAnnotationConfigDispatcherServletInitializer  -[#000082,plain]-^  AbstractDispatcherServletInitializer
+AbstractContextLoaderInitializer                      -[#008200,dashed]-^  WebApplicationInitializer
+AbstractDispatcherServletInitializer                  -[#000082,plain]-^  AbstractContextLoaderInitializer
+@enduml

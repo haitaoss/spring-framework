@@ -1,0 +1,40 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AbstractFlashMapManager {
+  - flashMapTimeout: int
+  # logger: Log
+  - urlPathHelper: UrlPathHelper
+  - DEFAULT_FLASH_MAPS_MUTEX: Object
+  # updateFlashMaps(List<FlashMap>, HttpServletRequest, HttpServletResponse): void
+  - getOriginatingRequestParams(HttpServletRequest): MultiValueMap<String, String>
+  - decodeAndNormalizePath(String?, HttpServletRequest): String?
+  + getFlashMapTimeout(): int
+  + saveOutputFlashMap(FlashMap, HttpServletRequest, HttpServletResponse): void
+  # getFlashMapsMutex(HttpServletRequest): Object?
+  # isFlashMapForRequest(FlashMap, HttpServletRequest): boolean
+  + retrieveAndUpdate(HttpServletRequest, HttpServletResponse): FlashMap?
+  + setFlashMapTimeout(int): void
+  + getUrlPathHelper(): UrlPathHelper
+  - getExpiredFlashMaps(List<FlashMap>): List<FlashMap>
+  # retrieveFlashMaps(HttpServletRequest): List<FlashMap>?
+  + setUrlPathHelper(UrlPathHelper): void
+  - getMatchingFlashMap(List<FlashMap>, HttpServletRequest): FlashMap?
+}
+interface FlashMapManager << interface >> {
+  + retrieveAndUpdate(HttpServletRequest, HttpServletResponse): FlashMap?
+  + saveOutputFlashMap(FlashMap, HttpServletRequest, HttpServletResponse): void
+}
+class SessionFlashMapManager {
+  - FLASH_MAPS_SESSION_ATTRIBUTE: String
+  # updateFlashMaps(List<FlashMap>, HttpServletRequest, HttpServletResponse): void
+  # retrieveFlashMaps(HttpServletRequest): List<FlashMap>?
+  # getFlashMapsMutex(HttpServletRequest): Object?
+}
+
+AbstractFlashMapManager  -[#008200,dashed]-^  FlashMapManager
+SessionFlashMapManager   -[#000082,plain]-^  AbstractFlashMapManager
+@enduml

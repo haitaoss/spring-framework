@@ -1,0 +1,131 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AbstractHandlerExceptionResolver {
+  - HEADER_CACHE_CONTROL: String
+  - preventResponseCaching: boolean
+  - order: int
+  - mappedHandlerClasses: Class<?>[]?
+  - mappedHandlers: Set<?>?
+  # logger: Log
+  - warnLogger: Log?
+  # prepareResponse(Exception, HttpServletResponse): void
+  + setOrder(int): void
+  + getOrder(): int
+  # doResolveException(HttpServletRequest, HttpServletResponse, Object?, Exception): ModelAndView?
+  + setWarnLogCategory(String): void
+  + setMappedHandlers(Set<?>): void
+  + setMappedHandlerClasses(Class<?>[]): void
+  + resolveException(HttpServletRequest, HttpServletResponse, Object?, Exception): ModelAndView?
+  + setPreventResponseCaching(boolean): void
+  # logException(Exception, HttpServletRequest): void
+  # hasHandlerMappings(): boolean
+  # shouldApplyTo(HttpServletRequest, Object?): boolean
+  # buildLogMessage(Exception, HttpServletRequest): String
+  # preventCaching(HttpServletResponse): void
+}
+class AbstractHandlerMethodExceptionResolver {
+  # hasGlobalExceptionHandlers(): boolean
+  # shouldApplyTo(HttpServletRequest, Object?): boolean
+  # doResolveException(HttpServletRequest, HttpServletResponse, Object?, Exception): ModelAndView?
+  # doResolveHandlerMethodException(HttpServletRequest, HttpServletResponse, HandlerMethod?, Exception): ModelAndView?
+}
+interface ApplicationContextAware << interface >> {
+  + setApplicationContext(ApplicationContext): void
+}
+interface Aware << interface >>
+class DefaultHandlerExceptionResolver {
+  + PAGE_NOT_FOUND_LOG_CATEGORY: String
+  # pageNotFoundLogger: Log
+  # handleMissingServletRequestParameter(MissingServletRequestParameterException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+  # handleHttpMessageNotReadable(HttpMessageNotReadableException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+  # handleHttpMessageNotWritable(HttpMessageNotWritableException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+  # handleMissingServletRequestPartException(MissingServletRequestPartException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+  # handleConversionNotSupported(ConversionNotSupportedException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+  # handleAsyncRequestTimeoutException(AsyncRequestTimeoutException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+  # handleMissingPathVariable(MissingPathVariableException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+  # handleHttpMediaTypeNotAcceptable(HttpMediaTypeNotAcceptableException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+  # handleTypeMismatch(TypeMismatchException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+  # handleHttpRequestMethodNotSupported(HttpRequestMethodNotSupportedException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+  # handleNoHandlerFoundException(NoHandlerFoundException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+  # sendServerError(Exception, HttpServletRequest, HttpServletResponse): void
+  # handleBindException(BindException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+  # handleMethodArgumentNotValidException(MethodArgumentNotValidException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+  # doResolveException(HttpServletRequest, HttpServletResponse, Object?, Exception): ModelAndView?
+  # handleHttpMediaTypeNotSupported(HttpMediaTypeNotSupportedException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+  # handleServletRequestBindingException(ServletRequestBindingException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+}
+class ExceptionHandlerExceptionResolver {
+  - exceptionHandlerAdviceCache: Map<ControllerAdviceBean, ExceptionHandlerMethodResolver>
+  - argumentResolvers: HandlerMethodArgumentResolverComposite?
+  - exceptionHandlerCache: Map<Class<?>, ExceptionHandlerMethodResolver>
+  - customArgumentResolvers: List<HandlerMethodArgumentResolver>?
+  - shouldIgnoreXml: boolean
+  - returnValueHandlers: HandlerMethodReturnValueHandlerComposite?
+  - contentNegotiationManager: ContentNegotiationManager
+  - customReturnValueHandlers: List<HandlerMethodReturnValueHandler>?
+  - messageConverters: List<HttpMessageConverter<?>>
+  - applicationContext: ApplicationContext?
+  - responseBodyAdvice: List<Object>
+  # getDefaultArgumentResolvers(): List<HandlerMethodArgumentResolver>
+  - initExceptionHandlerAdviceCache(): void
+  + getExceptionHandlerAdviceCache(): Map<ControllerAdviceBean, ExceptionHandlerMethodResolver>
+  + setApplicationContext(ApplicationContext?): void
+  # getExceptionHandlerMethod(HandlerMethod?, Exception): ServletInvocableHandlerMethod?
+  + getArgumentResolvers(): HandlerMethodArgumentResolverComposite?
+  + setCustomReturnValueHandlers(List<HandlerMethodReturnValueHandler>?): void
+  # doResolveHandlerMethodException(HttpServletRequest, HttpServletResponse, HandlerMethod?, Exception): ModelAndView?
+  + setResponseBodyAdvice(List<ResponseBodyAdvice<?>>?): void
+  + getApplicationContext(): ApplicationContext?
+  + setContentNegotiationManager(ContentNegotiationManager): void
+  + getContentNegotiationManager(): ContentNegotiationManager
+  + setCustomArgumentResolvers(List<HandlerMethodArgumentResolver>?): void
+  + getReturnValueHandlers(): HandlerMethodReturnValueHandlerComposite?
+  + getMessageConverters(): List<HttpMessageConverter<?>>
+  # hasGlobalExceptionHandlers(): boolean
+  # getDefaultReturnValueHandlers(): List<HandlerMethodReturnValueHandler>
+  + setArgumentResolvers(List<HandlerMethodArgumentResolver>?): void
+  + getCustomArgumentResolvers(): List<HandlerMethodArgumentResolver>?
+  + getCustomReturnValueHandlers(): List<HandlerMethodReturnValueHandler>?
+  + setMessageConverters(List<HttpMessageConverter<?>>): void
+  + setReturnValueHandlers(List<HandlerMethodReturnValueHandler>?): void
+  + afterPropertiesSet(): void
+}
+interface HandlerExceptionResolver << interface >> {
+  + resolveException(HttpServletRequest, HttpServletResponse, Object?, Exception): ModelAndView?
+}
+interface InitializingBean << interface >> {
+  + afterPropertiesSet(): void
+}
+interface MessageSourceAware << interface >> {
+  + setMessageSource(MessageSource): void
+}
+interface Ordered << interface >> {
+  + HIGHEST_PRECEDENCE: int
+  + LOWEST_PRECEDENCE: int
+  + getOrder(): int
+}
+class ResponseStatusExceptionResolver {
+  - messageSource: MessageSource?
+  # applyStatusAndReason(int, String?, HttpServletResponse): ModelAndView
+  # resolveResponseStatus(ResponseStatus, HttpServletRequest, HttpServletResponse, Object?, Exception): ModelAndView
+  # resolveResponseStatusException(ResponseStatusException, HttpServletRequest, HttpServletResponse, Object?): ModelAndView
+  + setMessageSource(MessageSource): void
+  # doResolveException(HttpServletRequest, HttpServletResponse, Object?, Exception): ModelAndView?
+}
+
+AbstractHandlerExceptionResolver        -[#008200,dashed]-^  HandlerExceptionResolver
+AbstractHandlerExceptionResolver        -[#008200,dashed]-^  Ordered
+AbstractHandlerMethodExceptionResolver  -[#000082,plain]-^  AbstractHandlerExceptionResolver
+ApplicationContextAware                 -[#008200,plain]-^  Aware
+DefaultHandlerExceptionResolver         -[#000082,plain]-^  AbstractHandlerExceptionResolver
+ExceptionHandlerExceptionResolver       -[#000082,plain]-^  AbstractHandlerMethodExceptionResolver
+ExceptionHandlerExceptionResolver       -[#008200,dashed]-^  ApplicationContextAware
+ExceptionHandlerExceptionResolver       -[#008200,dashed]-^  InitializingBean
+MessageSourceAware                      -[#008200,plain]-^  Aware
+ResponseStatusExceptionResolver         -[#000082,plain]-^  AbstractHandlerExceptionResolver
+ResponseStatusExceptionResolver         -[#008200,dashed]-^  MessageSourceAware
+@enduml

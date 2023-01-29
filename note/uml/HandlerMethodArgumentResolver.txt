@@ -1,0 +1,84 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AbstractMessageConverterMethodArgumentResolver {
+  - SUPPORTED_METHODS: Set<HttpMethod>
+  # logger: Log
+  # messageConverters: List<HttpMessageConverter<?>>
+  - advice: RequestResponseBodyAdviceChain
+  - NO_VALUE: Object
+  # isBindExceptionRequired(WebDataBinder, MethodParameter): boolean
+  # readWithMessageConverters(HttpInputMessage, MethodParameter, Type): Object?
+  ~ getAdvice(): RequestResponseBodyAdviceChain
+  # validateIfApplicable(WebDataBinder, MethodParameter): void
+  # adaptArgumentIfNecessary(Object?, MethodParameter): Object?
+  # createInputMessage(NativeWebRequest): ServletServerHttpRequest
+  # readWithMessageConverters(NativeWebRequest, MethodParameter, Type): Object?
+  # getSupportedMediaTypes(Class<?>): List<MediaType>
+}
+class AbstractNamedValueMethodArgumentResolver {
+  - configurableBeanFactory: ConfigurableBeanFactory?
+  - expressionContext: BeanExpressionContext?
+  - namedValueInfoCache: Map<MethodParameter, NamedValueInfo>
+  # createNamedValueInfo(MethodParameter): NamedValueInfo
+  + resolveArgument(MethodParameter, ModelAndViewContainer?, NativeWebRequest, WebDataBinderFactory?): Object?
+  # handleMissingValue(String, MethodParameter): void
+  - resolveEmbeddedValuesAndExpressions(String): Object?
+  # resolveName(String, MethodParameter, NativeWebRequest): Object?
+  - updateNamedValueInfo(MethodParameter, NamedValueInfo): NamedValueInfo
+  # handleResolvedValue(Object?, String, MethodParameter, ModelAndViewContainer?, NativeWebRequest): void
+  - getNamedValueInfo(MethodParameter): NamedValueInfo
+  # handleMissingValue(String, MethodParameter, NativeWebRequest): void
+  # handleMissingValueAfterConversion(String, MethodParameter, NativeWebRequest): void
+  - handleNullValue(String, Object?, Class<?>): Object?
+}
+interface HandlerMethodArgumentResolver << interface >> {
+  + resolveArgument(MethodParameter, ModelAndViewContainer?, NativeWebRequest, WebDataBinderFactory?): Object?
+  + supportsParameter(MethodParameter): boolean
+}
+class ModelAttributeMethodProcessor {
+  # logger: Log
+  - annotationNotRequired: boolean
+  # createAttribute(String, MethodParameter, WebDataBinderFactory, NativeWebRequest): Object
+  # isBindExceptionRequired(MethodParameter): boolean
+  # bindRequestParameters(WebDataBinder, NativeWebRequest): void
+  + resolveArgument(MethodParameter, ModelAndViewContainer?, NativeWebRequest, WebDataBinderFactory?): Object?
+  # isBindExceptionRequired(WebDataBinder, MethodParameter): boolean
+  # validateValueIfApplicable(WebDataBinder, MethodParameter, Class<?>, String, Object?): void
+  # validateIfApplicable(WebDataBinder, MethodParameter): void
+  + supportsReturnType(MethodParameter): boolean
+  # constructAttribute(Constructor<?>, String, MethodParameter, WebDataBinderFactory, NativeWebRequest): Object
+  + handleReturnValue(Object?, MethodParameter, ModelAndViewContainer, NativeWebRequest): void
+  + supportsParameter(MethodParameter): boolean
+  + resolveConstructorArgument(String, Class<?>, NativeWebRequest): Object?
+}
+class RequestParamMethodArgumentResolver {
+  - STRING_TYPE_DESCRIPTOR: TypeDescriptor
+  - useDefaultResolution: boolean
+  # handleMissingValueAfterConversion(String, MethodParameter, NativeWebRequest): void
+  # formatUriValue(ConversionService?, TypeDescriptor?, Object?): String?
+  + supportsParameter(MethodParameter): boolean
+  # handleMissingValue(String, MethodParameter, NativeWebRequest): void
+  # resolveName(String, MethodParameter, NativeWebRequest): Object?
+  # handleMissingValueInternal(String, MethodParameter, NativeWebRequest, boolean): void
+  # createNamedValueInfo(MethodParameter): NamedValueInfo
+  + contributeMethodArgument(MethodParameter, Object?, UriComponentsBuilder, Map<String, Object>, ConversionService): void
+}
+class RequestResponseBodyMethodProcessor {
+  # checkRequired(MethodParameter): boolean
+  + resolveArgument(MethodParameter, ModelAndViewContainer?, NativeWebRequest, WebDataBinderFactory?): Object?
+  + supportsReturnType(MethodParameter): boolean
+  # readWithMessageConverters(NativeWebRequest, MethodParameter, Type): Object?
+  + supportsParameter(MethodParameter): boolean
+  + handleReturnValue(Object?, MethodParameter, ModelAndViewContainer, NativeWebRequest): void
+}
+
+AbstractMessageConverterMethodArgumentResolver  -[#008200,dashed]-^  HandlerMethodArgumentResolver
+AbstractNamedValueMethodArgumentResolver        -[#008200,dashed]-^  HandlerMethodArgumentResolver
+ModelAttributeMethodProcessor                   -[#008200,dashed]-^  HandlerMethodArgumentResolver
+RequestParamMethodArgumentResolver              -[#000082,plain]-^  AbstractNamedValueMethodArgumentResolver
+RequestResponseBodyMethodProcessor              -[#000082,plain]-^  AbstractMessageConverterMethodArgumentResolver
+@enduml

@@ -1,0 +1,137 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AbstractGenericHttpMessageConverter<T> {
+  # supports(Class<?>): boolean
+  + canRead(Type, Class<?>?, MediaType?): boolean
+  + write(T, Type?, MediaType?, HttpOutputMessage): void
+  # writeInternal(T, Type?, HttpOutputMessage): void
+  # writeInternal(T, HttpOutputMessage): void
+  + canWrite(Type?, Class<?>, MediaType?): boolean
+}
+class AbstractHttpMessageConverter<T> {
+  - supportedMediaTypes: List<MediaType>
+  # logger: Log
+  - defaultCharset: Charset?
+  # addDefaultHeaders(HttpHeaders, T, MediaType?): void
+  # canWrite(MediaType?): boolean
+  # getContentLength(T, MediaType?): Long?
+  + canRead(Class<?>, MediaType?): boolean
+  # writeInternal(T, HttpOutputMessage): void
+  + write(T, MediaType?, HttpOutputMessage): void
+  # supports(Class<?>): boolean
+  # canRead(MediaType?): boolean
+  + setDefaultCharset(Charset?): void
+  + read(Class<T>, HttpInputMessage): T
+  + getDefaultCharset(): Charset?
+  # readInternal(Class<T>, HttpInputMessage): T
+  + getSupportedMediaTypes(): List<MediaType>
+  + canWrite(Class<?>, MediaType?): boolean
+  + setSupportedMediaTypes(List<MediaType>): void
+  # getDefaultContentType(T): MediaType?
+}
+class AbstractJsonHttpMessageConverter {
+  + DEFAULT_CHARSET: Charset
+  - jsonPrefix: String?
+  # readInternal(Type, Reader): Object
+  - getCharset(HttpHeaders): Charset
+  - getWriter(HttpOutputMessage): Writer
+  # writeInternal(Object, Type?, HttpOutputMessage): void
+  + setJsonPrefix(String): void
+  # readInternal(Class<?>, HttpInputMessage): Object
+  # writeInternal(Object, Type?, Writer): void
+  + read(Type, Class<?>?, HttpInputMessage): Object
+  - readResolved(Type, HttpInputMessage): Object
+  + setPrefixJson(boolean): void
+  - getReader(HttpInputMessage): Reader
+}
+class AbstractMessageConverterMethodArgumentResolver {
+  - SUPPORTED_METHODS: Set<HttpMethod>
+  # logger: Log
+  # messageConverters: List<HttpMessageConverter<?>>
+  - advice: RequestResponseBodyAdviceChain
+  - NO_VALUE: Object
+  # isBindExceptionRequired(WebDataBinder, MethodParameter): boolean
+  # readWithMessageConverters(HttpInputMessage, MethodParameter, Type): Object?
+  ~ getAdvice(): RequestResponseBodyAdviceChain
+  # validateIfApplicable(WebDataBinder, MethodParameter): void
+  # adaptArgumentIfNecessary(Object?, MethodParameter): Object?
+  # createInputMessage(NativeWebRequest): ServletServerHttpRequest
+  # readWithMessageConverters(NativeWebRequest, MethodParameter, Type): Object?
+  # getSupportedMediaTypes(Class<?>): List<MediaType>
+}
+interface GenericHttpMessageConverter<T> << interface >> {
+  + canRead(Type, Class<?>?, MediaType?): boolean
+  + canWrite(Type?, Class<?>, MediaType?): boolean
+  + read(Type, Class<?>?, HttpInputMessage): T
+  + write(T, Type?, MediaType?, HttpOutputMessage): void
+}
+interface HttpMessageConverter<T> << interface >> {
+  + write(T, MediaType?, HttpOutputMessage): void
+  + canWrite(Class<?>, MediaType?): boolean
+  + canRead(Class<?>, MediaType?): boolean
+  + getSupportedMediaTypes(): List<MediaType>
+  + getSupportedMediaTypes(Class<?>): List<MediaType>
+  + read(Class<T>, HttpInputMessage): T
+}
+class JsonbHttpMessageConverter {
+  - jsonb: Jsonb
+  + getJsonb(): Jsonb
+  + setJsonb(Jsonb): void
+  # writeInternal(Object, Type?, Writer): void
+  # readInternal(Type, Reader): Object
+}
+interface RequestBodyAdvice << interface >> {
+  + supports(MethodParameter, Type, Class<HttpMessageConverter<?>>): boolean
+  + afterBodyRead(Object, HttpInputMessage, MethodParameter, Type, Class<HttpMessageConverter<?>>): Object
+  + beforeBodyRead(HttpInputMessage, MethodParameter, Type, Class<HttpMessageConverter<?>>): HttpInputMessage
+  + handleEmptyBody(Object?, HttpInputMessage, MethodParameter, Type, Class<HttpMessageConverter<?>>): Object?
+}
+class RequestResponseBodyAdviceChain {
+  - requestBodyAdvice: List<Object>
+  - responseBodyAdvice: List<Object>
+  + beforeBodyWrite(Object?, MethodParameter, MediaType, Class<HttpMessageConverter<?>>, ServerHttpRequest, ServerHttpResponse): Object?
+  - processBody(Object?, MethodParameter, MediaType, Class<HttpMessageConverter<?>>, ServerHttpRequest, ServerHttpResponse): Object?
+  + handleEmptyBody(Object?, HttpInputMessage, MethodParameter, Type, Class<HttpMessageConverter<?>>): Object?
+  + beforeBodyRead(HttpInputMessage, MethodParameter, Type, Class<HttpMessageConverter<?>>): HttpInputMessage
+  - getMatchingAdvice(MethodParameter, Class<A>): List<A>
+  - getAdvice(Class<?>): List<Object>
+  + supports(MethodParameter, Class<HttpMessageConverter<?>>): boolean
+  + afterBodyRead(Object, HttpInputMessage, MethodParameter, Type, Class<HttpMessageConverter<?>>): Object
+  ~ getAdviceByType(List<Object>?, Class<T>): List<T>
+  + supports(MethodParameter, Type, Class<HttpMessageConverter<?>>): boolean
+}
+interface ResponseBodyAdvice<T> << interface >> {
+  + supports(MethodParameter, Class<HttpMessageConverter<?>>): boolean
+  + beforeBodyWrite(T?, MethodParameter, MediaType, Class<HttpMessageConverter<?>>, ServerHttpRequest, ServerHttpResponse): T?
+}
+class StringHttpMessageConverter {
+  + DEFAULT_CHARSET: Charset
+  - writeAcceptCharset: boolean
+  - APPLICATION_PLUS_JSON: MediaType
+  - availableCharsets: List<Charset>?
+  + setWriteAcceptCharset(boolean): void
+  - getContentTypeCharset(MediaType?): Charset
+  # getAcceptedCharsets(): List<Charset>
+  # addDefaultHeaders(HttpHeaders, String, MediaType?): void
+  # writeInternal(String, HttpOutputMessage): void
+  # readInternal(Class<String>, HttpInputMessage): String
+  # getContentLength(String, MediaType?): Long?
+  + supports(Class<?>): boolean
+}
+
+AbstractGenericHttpMessageConverter             -[#000082,plain]-^  AbstractHttpMessageConverter
+AbstractGenericHttpMessageConverter             -[#008200,dashed]-^  GenericHttpMessageConverter
+AbstractHttpMessageConverter                    -[#008200,dashed]-^  HttpMessageConverter
+AbstractJsonHttpMessageConverter                -[#000082,plain]-^  AbstractGenericHttpMessageConverter
+GenericHttpMessageConverter                     -[#008200,plain]-^  HttpMessageConverter
+JsonbHttpMessageConverter                       -[#000082,plain]-^  AbstractJsonHttpMessageConverter
+RequestResponseBodyAdviceChain                  -[#008200,dashed]-^  RequestBodyAdvice
+RequestResponseBodyAdviceChain                  -[#008200,dashed]-^  ResponseBodyAdvice
+StringHttpMessageConverter                      -[#000082,plain]-^  AbstractHttpMessageConverter
+AbstractMessageConverterMethodArgumentResolver *-- HttpMessageConverter
+AbstractMessageConverterMethodArgumentResolver *-- RequestResponseBodyAdviceChain
+@enduml

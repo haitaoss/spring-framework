@@ -1,0 +1,124 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+interface ApplicationContextAware << interface >> {
+  + setApplicationContext(ApplicationContext): void
+}
+interface Aware << interface >>
+class DispatcherServlet {
+  # render(ModelAndView, HttpServletRequest, HttpServletResponse): void
+  # doService(HttpServletRequest, HttpServletResponse): void
+  # doDispatch(HttpServletRequest, HttpServletResponse): void
+  # processHandlerException(HttpServletRequest, HttpServletResponse, Object?, Exception): ModelAndView?
+  # onRefresh(ApplicationContext): void
+}
+interface EnvironmentAware << interface >> {
+  + setEnvironment(Environment): void
+}
+interface EnvironmentCapable << interface >> {
+  + getEnvironment(): Environment
+}
+class FrameworkServlet {
+  - webApplicationContext: WebApplicationContext?
+  - contextInitializers: List<ApplicationContextInitializer<ConfigurableApplicationContext>>
+  # configureAndRefreshWebApplicationContext(ConfigurableWebApplicationContext): void
+  + refresh(): void
+  # initWebApplicationContext(): WebApplicationContext
+  + onApplicationEvent(ContextRefreshedEvent): void
+  # doService(HttpServletRequest, HttpServletResponse): void
+  - initContextHolders(HttpServletRequest, LocaleContext?, RequestAttributes?): void
+  # onRefresh(ApplicationContext): void
+  # doGet(HttpServletRequest, HttpServletResponse): void
+  + getContextConfigLocation(): String?
+  # processRequest(HttpServletRequest, HttpServletResponse): void
+  # doDelete(HttpServletRequest, HttpServletResponse): void
+  # initFrameworkServlet(): void
+  # doPost(HttpServletRequest, HttpServletResponse): void
+  # doOptions(HttpServletRequest, HttpServletResponse): void
+  # createWebApplicationContext(WebApplicationContext?): WebApplicationContext
+  # doPut(HttpServletRequest, HttpServletResponse): void
+  # postProcessWebApplicationContext(ConfigurableWebApplicationContext): void
+  # initServletBean(): void
+  + destroy(): void
+  # service(HttpServletRequest, HttpServletResponse): void
+}
+class GenericServlet {
+  + getServletConfig(): ServletConfig
+  + getInitParameter(String): String
+  + getInitParameterNames(): Enumeration<String>
+  + init(ServletConfig): void
+  + service(ServletRequest, ServletResponse): void
+  + getServletContext(): ServletContext
+  + init(): void
+  + destroy(): void
+}
+class HttpServlet {
+  - METHOD_DELETE: String
+  - HEADER_IFMODSINCE: String
+  - METHOD_HEAD: String
+  - METHOD_GET: String
+  - METHOD_POST: String
+  - METHOD_OPTIONS: String
+  - HEADER_LASTMOD: String
+  - METHOD_PUT: String
+  - METHOD_TRACE: String
+  - LSTRING_FILE: String
+  - lStrings: ResourceBundle
+  # doTrace(HttpServletRequest, HttpServletResponse): void
+  # service(HttpServletRequest, HttpServletResponse): void
+  - maybeSetLastModified(HttpServletResponse, long): void
+  # doPut(HttpServletRequest, HttpServletResponse): void
+  # doDelete(HttpServletRequest, HttpServletResponse): void
+  # doHead(HttpServletRequest, HttpServletResponse): void
+  # doGet(HttpServletRequest, HttpServletResponse): void
+  # getLastModified(HttpServletRequest): long
+  # doOptions(HttpServletRequest, HttpServletResponse): void
+  # doPost(HttpServletRequest, HttpServletResponse): void
+  - getAllDeclaredMethods(Class<HttpServlet>): Method[]
+  + service(ServletRequest, ServletResponse): void
+}
+class HttpServletBean {
+  - environment: ConfigurableEnvironment?
+  - requiredProperties: Set<String>
+  # logger: Log
+  # initServletBean(): void
+  # createEnvironment(): ConfigurableEnvironment
+  + getServletName(): String?
+  # addRequiredProperty(String): void
+  + getEnvironment(): ConfigurableEnvironment
+  + init(): void
+  # initBeanWrapper(BeanWrapper): void
+  + setEnvironment(Environment): void
+}
+interface Serializable << interface >>
+interface Servlet << interface >> {
+  + getServletConfig(): ServletConfig
+  + init(ServletConfig): void
+  + service(ServletRequest, ServletResponse): void
+  + getServletInfo(): String
+  + destroy(): void
+}
+interface ServletConfig << interface >> {
+  + getInitParameter(String): String
+  + getServletContext(): ServletContext
+  + getServletName(): String
+  + getInitParameterNames(): Enumeration<String>
+}
+
+ApplicationContextAware  -[#008200,plain]-^  Aware
+DispatcherServlet        -[#000082,plain]-^  FrameworkServlet
+EnvironmentAware         -[#008200,plain]-^  Aware
+FrameworkServlet         -[#008200,dashed]-^  ApplicationContextAware
+FrameworkServlet         -[#000082,plain]-^  HttpServletBean
+GenericServlet           -[#008200,dashed]-^  Serializable
+GenericServlet           -[#008200,dashed]-^  Servlet
+GenericServlet           -[#008200,dashed]-^  ServletConfig
+HttpServlet              -[#000082,plain]-^  GenericServlet
+HttpServletBean          -[#008200,dashed]-^  EnvironmentAware
+HttpServletBean          -[#008200,dashed]-^  EnvironmentCapable
+HttpServletBean          -[#000082,plain]-^  HttpServlet
+HttpServletBean          -[#999900,dotted]-  SuppressWarnings
+@enduml

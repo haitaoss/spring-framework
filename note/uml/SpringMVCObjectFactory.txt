@@ -1,0 +1,43 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+class RequestObjectFactory {
+  + getObject(): ServletRequest
+  + toString(): String
+}
+class ResponseObjectFactory {
+  + toString(): String
+  + getObject(): ServletResponse
+}
+class SessionObjectFactory {
+  + getObject(): HttpSession
+  + toString(): String
+}
+class WebRequestObjectFactory {
+  + toString(): String
+  + getObject(): WebRequest
+}
+
+
+class RequestContextHolder {
+  - jsfPresent: boolean
+  - inheritableRequestAttributesHolder: ThreadLocal<RequestAttributes>
+  - requestAttributesHolder: ThreadLocal<RequestAttributes>
+  + setRequestAttributes(RequestAttributes?): void
+  + setRequestAttributes(RequestAttributes?, boolean): void
+  + currentRequestAttributes(): RequestAttributes
+  + resetRequestAttributes(): void
+  + getRequestAttributes(): RequestAttributes?
+}
+
+RequestObjectFactory     -[#008200,dashed]-^  ObjectFactory
+ResponseObjectFactory    -[#008200,dashed]-^  ObjectFactory
+SessionObjectFactory     -[#008200,dashed]-^  ObjectFactory
+WebRequestObjectFactory  -[#008200,dashed]-^  ObjectFactory
+RequestObjectFactory *-- RequestContextHolder
+ResponseObjectFactory *-- RequestContextHolder
+SessionObjectFactory *-- RequestContextHolder
+WebRequestObjectFactory *-- RequestContextHolder
+@enduml

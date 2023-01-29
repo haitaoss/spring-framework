@@ -437,9 +437,11 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
         if (this.earlyApplicationEvents != null) {
             this.earlyApplicationEvents.add(applicationEvent);
         } else {
+            // 发布事件给当前IOC容器注册的 ApplicationListener
             getApplicationEventMulticaster().multicastEvent(applicationEvent, eventType);
         }
 
+        // 把事件发布到父容器中
         // Publish event via parent context as well...
         if (this.parent != null) {
             if (this.parent instanceof AbstractApplicationContext) {

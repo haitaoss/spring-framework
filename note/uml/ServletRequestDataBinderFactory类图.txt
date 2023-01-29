@@ -1,0 +1,33 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class DefaultDataBinderFactory {
+  - initializer: WebBindingInitializer?
+  + createBinder(NativeWebRequest, Object?, String): WebDataBinder
+  # createBinderInstance(Object?, String, NativeWebRequest): WebDataBinder
+  # initBinder(WebDataBinder, NativeWebRequest): void
+}
+class InitBinderDataBinderFactory {
+  - binderMethods: List<InvocableHandlerMethod>
+  # isBinderMethodApplicable(HandlerMethod, WebDataBinder): boolean
+  + initBinder(WebDataBinder, NativeWebRequest): void
+}
+class ServletRequestDataBinderFactory {
+  # createBinderInstance(Object?, String, NativeWebRequest): ServletRequestDataBinder
+}
+interface WebBindingInitializer << interface >> {
+  + initBinder(WebDataBinder, WebRequest): void
+  + initBinder(WebDataBinder): void
+}
+interface WebDataBinderFactory << interface >> {
+  + createBinder(NativeWebRequest, Object?, String): WebDataBinder
+}
+
+DefaultDataBinderFactory         -[#008200,dashed]-^  WebDataBinderFactory
+InitBinderDataBinderFactory      -[#000082,plain]-^  DefaultDataBinderFactory
+ServletRequestDataBinderFactory  -[#000082,plain]-^  InitBinderDataBinderFactory
+DefaultDataBinderFactory *-- WebBindingInitializer
+@enduml

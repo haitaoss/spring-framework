@@ -1,0 +1,43 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+interface ApplicationContextAware << interface >> {
+  + setApplicationContext(ApplicationContext): void
+}
+class ApplicationObjectSupport {
+  # logger: Log
+  - messageSourceAccessor: MessageSourceAccessor?
+  - applicationContext: ApplicationContext?
+  # requiredContextClass(): Class<?>
+  # initApplicationContext(ApplicationContext): void
+  # initApplicationContext(): void
+  # getMessageSourceAccessor(): MessageSourceAccessor?
+  + getApplicationContext(): ApplicationContext?
+  # isContextRequired(): boolean
+  # obtainApplicationContext(): ApplicationContext
+  + setApplicationContext(ApplicationContext?): void
+}
+interface Aware << interface >>
+interface ServletContextAware << interface >> {
+  + setServletContext(ServletContext): void
+}
+class WebApplicationObjectSupport {
+  - servletContext: ServletContext?
+  # getWebApplicationContext(): WebApplicationContext?
+  # isContextRequired(): boolean
+  # initServletContext(ServletContext): void
+  # getTempDir(): File
+  # initApplicationContext(ApplicationContext): void
+  # getServletContext(): ServletContext?
+  + setServletContext(ServletContext): void
+}
+
+ApplicationContextAware      -[#008200,plain]-^  Aware
+ApplicationObjectSupport     -[#008200,dashed]-^  ApplicationContextAware
+ServletContextAware          -[#008200,plain]-^  Aware
+WebApplicationObjectSupport  -[#000082,plain]-^  ApplicationObjectSupport
+WebApplicationObjectSupport  -[#008200,dashed]-^  ServletContextAware
+@enduml

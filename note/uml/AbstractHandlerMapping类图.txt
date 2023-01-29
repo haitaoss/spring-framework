@@ -1,0 +1,73 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AbstractHandlerMapping {
+  - NO_OP_HANDLER: WebHandler
+  - corsConfigurationSource: CorsConfigurationSource?
+  - order: int
+  # mappingsLogger: Log
+  - corsProcessor: CorsProcessor
+  - patternParser: PathPatternParser
+  - beanName: String?
+  # formatMappingName(): String
+  # getCorsConfiguration(Object, ServerWebExchange): CorsConfiguration?
+  + setUseCaseSensitiveMatch(boolean): void
+  + getCorsProcessor(): CorsProcessor
+  + getHandler(ServerWebExchange): Mono<Object>
+  + getPathPatternParser(): PathPatternParser
+  + setUseTrailingSlashMatch(boolean): void
+  + setCorsConfigurations(Map<String, CorsConfiguration>): void
+  + getOrder(): int
+  + setOrder(int): void
+  # getHandlerInternal(ServerWebExchange): Mono<?>
+  # hasCorsConfigurationSource(Object): boolean
+  + setCorsConfigurationSource(CorsConfigurationSource): void
+  + setCorsProcessor(CorsProcessor): void
+  + setBeanName(String): void
+}
+interface ApplicationContextAware << interface >> {
+  + setApplicationContext(ApplicationContext): void
+}
+class ApplicationObjectSupport {
+  # logger: Log
+  - applicationContext: ApplicationContext?
+  - messageSourceAccessor: MessageSourceAccessor?
+  # initApplicationContext(): void
+  + getApplicationContext(): ApplicationContext?
+  # getMessageSourceAccessor(): MessageSourceAccessor?
+  # isContextRequired(): boolean
+  # obtainApplicationContext(): ApplicationContext
+  + setApplicationContext(ApplicationContext?): void
+  # initApplicationContext(ApplicationContext): void
+  # requiredContextClass(): Class<?>
+}
+interface Aware << interface >>
+interface BeanNameAware << interface >> {
+  + setBeanName(String): void
+}
+interface HandlerMapping << interface >> {
+  + URI_TEMPLATE_VARIABLES_ATTRIBUTE: String
+  + BEST_MATCHING_PATTERN_ATTRIBUTE: String
+  + PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE: String
+  + BEST_MATCHING_HANDLER_ATTRIBUTE: String
+  + MATRIX_VARIABLES_ATTRIBUTE: String
+  + PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE: String
+  + getHandler(ServerWebExchange): Mono<Object>
+}
+interface Ordered << interface >> {
+  + LOWEST_PRECEDENCE: int
+  + HIGHEST_PRECEDENCE: int
+  + getOrder(): int
+}
+
+AbstractHandlerMapping    -[#000082,plain]-^  ApplicationObjectSupport
+AbstractHandlerMapping    -[#008200,dashed]-^  BeanNameAware
+AbstractHandlerMapping    -[#008200,dashed]-^  HandlerMapping
+AbstractHandlerMapping    -[#008200,dashed]-^  Ordered
+ApplicationContextAware   -[#008200,plain]-^  Aware
+ApplicationObjectSupport  -[#008200,dashed]-^  ApplicationContextAware
+BeanNameAware             -[#008200,plain]-^  Aware
+@enduml

@@ -16,19 +16,14 @@
 
 package org.springframework.web.method;
 
-import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.function.Predicate;
-
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.lang.Nullable;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
+
+import java.lang.annotation.Annotation;
+import java.util.*;
+import java.util.function.Predicate;
 
 /**
  * A {@code Predicate} to match request handling component types if
@@ -50,163 +45,181 @@ import org.springframework.util.StringUtils;
  */
 public final class HandlerTypePredicate implements Predicate<Class<?>> {
 
-	private final Set<String> basePackages;
+    private final Set<String> basePackages;
 
-	private final List<Class<?>> assignableTypes;
+    private final List<Class<?>> assignableTypes;
 
-	private final List<Class<? extends Annotation>> annotations;
-
-
-	/**
-	 * Private constructor. See static factory methods.
-	 */
-	private HandlerTypePredicate(Set<String> basePackages, List<Class<?>> assignableTypes,
-			List<Class<? extends Annotation>> annotations) {
-
-		this.basePackages = Collections.unmodifiableSet(basePackages);
-		this.assignableTypes = Collections.unmodifiableList(assignableTypes);
-		this.annotations = Collections.unmodifiableList(annotations);
-	}
+    private final List<Class<? extends Annotation>> annotations;
 
 
-	@Override
-	public boolean test(@Nullable Class<?> controllerType) {
-		if (!hasSelectors()) {
-			return true;
-		}
-		else if (controllerType != null) {
-			for (String basePackage : this.basePackages) {
-				if (controllerType.getName().startsWith(basePackage)) {
-					return true;
-				}
-			}
-			for (Class<?> clazz : this.assignableTypes) {
-				if (ClassUtils.isAssignable(clazz, controllerType)) {
-					return true;
-				}
-			}
-			for (Class<? extends Annotation> annotationClass : this.annotations) {
-				if (AnnotationUtils.findAnnotation(controllerType, annotationClass) != null) {
-					return true;
-				}
-			}
-		}
-		return false;
-	}
+    /**
+     * Private constructor. See static factory methods.
+     */
+    private HandlerTypePredicate(Set<String> basePackages, List<Class<?>> assignableTypes,
+                                 List<Class<? extends Annotation>> annotations) {
 
-	private boolean hasSelectors() {
-		return (!this.basePackages.isEmpty() || !this.assignableTypes.isEmpty() || !this.annotations.isEmpty());
-	}
+        this.basePackages = Collections.unmodifiableSet(basePackages);
+        this.assignableTypes = Collections.unmodifiableList(assignableTypes);
+        this.annotations = Collections.unmodifiableList(annotations);
+    }
 
 
-	// Static factory methods
+    @Override
+    public boolean test(@Nullable Class<?> controllerType) {
+        // 没有过滤条件(basePackages、assignableTypes、annotations)，那就直接返回true
+        if (!hasSelectors()) {
+            return true;
+        } else if (controllerType != null) {
+            // 包名校验
+            for (String basePackage : this.basePackages) {
+                if (controllerType.getName()
+                        .startsWith(basePackage)) {
+                    return true;
+                }
+            }
+            // 类型校验
+            for (Class<?> clazz : this.assignableTypes) {
+                if (ClassUtils.isAssignable(clazz, controllerType)) {
+                    return true;
+                }
+            }
+            // 注解校验
+            for (Class<? extends Annotation> annotationClass : this.annotations) {
+                if (AnnotationUtils.findAnnotation(controllerType, annotationClass) != null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
-	/**
-	 * {@code Predicate} that applies to any handlers.
-	 */
-	public static HandlerTypePredicate forAnyHandlerType() {
-		return new HandlerTypePredicate(
-				Collections.emptySet(), Collections.emptyList(), Collections.emptyList());
-	}
-
-	/**
-	 * Match handlers declared under a base package, e.g. "org.example".
-	 * @param packages one or more base package names
-	 */
-	public static HandlerTypePredicate forBasePackage(String... packages) {
-		return new Builder().basePackage(packages).build();
-	}
-
-	/**
-	 * Type-safe alternative to {@link #forBasePackage(String...)} to specify a
-	 * base package through a class.
-	 * @param packageClasses one or more base package classes
-	 */
-	public static HandlerTypePredicate forBasePackageClass(Class<?>... packageClasses) {
-		return new Builder().basePackageClass(packageClasses).build();
-	}
-
-	/**
-	 * Match handlers that are assignable to a given type.
-	 * @param types one or more handler super types
-	 */
-	public static HandlerTypePredicate forAssignableType(Class<?>... types) {
-		return new Builder().assignableType(types).build();
-	}
-
-	/**
-	 * Match handlers annotated with a specific annotation.
-	 * @param annotations one or more annotations to check for
-	 */
-	@SafeVarargs
-	public static HandlerTypePredicate forAnnotation(Class<? extends Annotation>... annotations) {
-		return new Builder().annotation(annotations).build();
-	}
-
-	/**
-	 * Return a builder for a {@code HandlerTypePredicate}.
-	 */
-	public static Builder builder() {
-		return new Builder();
-	}
+    private boolean hasSelectors() {
+        return (!this.basePackages.isEmpty() || !this.assignableTypes.isEmpty() || !this.annotations.isEmpty());
+    }
 
 
-	/**
-	 * A {@link HandlerTypePredicate} builder.
-	 */
-	public static class Builder {
+    // Static factory methods
 
-		private final Set<String> basePackages = new LinkedHashSet<>();
+    /**
+     * {@code Predicate} that applies to any handlers.
+     */
+    public static HandlerTypePredicate forAnyHandlerType() {
+        return new HandlerTypePredicate(Collections.emptySet(), Collections.emptyList(), Collections.emptyList());
+    }
 
-		private final List<Class<?>> assignableTypes = new ArrayList<>();
+    /**
+     * Match handlers declared under a base package, e.g. "org.example".
+     *
+     * @param packages one or more base package names
+     */
+    public static HandlerTypePredicate forBasePackage(String... packages) {
+        return new Builder().basePackage(packages)
+                .build();
+    }
 
-		private final List<Class<? extends Annotation>> annotations = new ArrayList<>();
+    /**
+     * Type-safe alternative to {@link #forBasePackage(String...)} to specify a
+     * base package through a class.
+     *
+     * @param packageClasses one or more base package classes
+     */
+    public static HandlerTypePredicate forBasePackageClass(Class<?>... packageClasses) {
+        return new Builder().basePackageClass(packageClasses)
+                .build();
+    }
 
-		/**
-		 * Match handlers declared under a base package, e.g. "org.example".
-		 * @param packages one or more base package classes
-		 */
-		public Builder basePackage(String... packages) {
-			Arrays.stream(packages).filter(StringUtils::hasText).forEach(this::addBasePackage);
-			return this;
-		}
+    /**
+     * Match handlers that are assignable to a given type.
+     *
+     * @param types one or more handler super types
+     */
+    public static HandlerTypePredicate forAssignableType(Class<?>... types) {
+        return new Builder().assignableType(types)
+                .build();
+    }
 
-		/**
-		 * Type-safe alternative to {@link #forBasePackage(String...)} to specify a
-		 * base package through a class.
-		 * @param packageClasses one or more base package names
-		 */
-		public Builder basePackageClass(Class<?>... packageClasses) {
-			Arrays.stream(packageClasses).forEach(clazz -> addBasePackage(ClassUtils.getPackageName(clazz)));
-			return this;
-		}
+    /**
+     * Match handlers annotated with a specific annotation.
+     *
+     * @param annotations one or more annotations to check for
+     */
+    @SafeVarargs
+    public static HandlerTypePredicate forAnnotation(Class<? extends Annotation>... annotations) {
+        return new Builder().annotation(annotations)
+                .build();
+    }
 
-		private void addBasePackage(String basePackage) {
-			this.basePackages.add(basePackage.endsWith(".") ? basePackage : basePackage + ".");
-		}
+    /**
+     * Return a builder for a {@code HandlerTypePredicate}.
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
 
-		/**
-		 * Match handlers that are assignable to a given type.
-		 * @param types one or more handler super types
-		 */
-		public Builder assignableType(Class<?>... types) {
-			this.assignableTypes.addAll(Arrays.asList(types));
-			return this;
-		}
 
-		/**
-		 * Match types that are annotated with one of the given annotations.
-		 * @param annotations one or more annotations to check for
-		 */
-		@SuppressWarnings("unchecked")
-		public final Builder annotation(Class<? extends Annotation>... annotations) {
-			this.annotations.addAll(Arrays.asList(annotations));
-			return this;
-		}
+    /**
+     * A {@link HandlerTypePredicate} builder.
+     */
+    public static class Builder {
 
-		public HandlerTypePredicate build() {
-			return new HandlerTypePredicate(this.basePackages, this.assignableTypes, this.annotations);
-		}
-	}
+        private final Set<String> basePackages = new LinkedHashSet<>();
+
+        private final List<Class<?>> assignableTypes = new ArrayList<>();
+
+        private final List<Class<? extends Annotation>> annotations = new ArrayList<>();
+
+        /**
+         * Match handlers declared under a base package, e.g. "org.example".
+         *
+         * @param packages one or more base package classes
+         */
+        public Builder basePackage(String... packages) {
+            Arrays.stream(packages)
+                    .filter(StringUtils::hasText)
+                    .forEach(this::addBasePackage);
+            return this;
+        }
+
+        /**
+         * Type-safe alternative to {@link #forBasePackage(String...)} to specify a
+         * base package through a class.
+         *
+         * @param packageClasses one or more base package names
+         */
+        public Builder basePackageClass(Class<?>... packageClasses) {
+            Arrays.stream(packageClasses)
+                    .forEach(clazz -> addBasePackage(ClassUtils.getPackageName(clazz)));
+            return this;
+        }
+
+        private void addBasePackage(String basePackage) {
+            this.basePackages.add(basePackage.endsWith(".") ? basePackage : basePackage + ".");
+        }
+
+        /**
+         * Match handlers that are assignable to a given type.
+         *
+         * @param types one or more handler super types
+         */
+        public Builder assignableType(Class<?>... types) {
+            this.assignableTypes.addAll(Arrays.asList(types));
+            return this;
+        }
+
+        /**
+         * Match types that are annotated with one of the given annotations.
+         *
+         * @param annotations one or more annotations to check for
+         */
+        @SuppressWarnings("unchecked")
+        public final Builder annotation(Class<? extends Annotation>... annotations) {
+            this.annotations.addAll(Arrays.asList(annotations));
+            return this;
+        }
+
+        public HandlerTypePredicate build() {
+            return new HandlerTypePredicate(this.basePackages, this.assignableTypes, this.annotations);
+        }
+    }
 
 }

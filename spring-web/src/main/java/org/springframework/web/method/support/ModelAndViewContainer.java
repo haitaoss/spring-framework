@@ -16,10 +16,6 @@
 
 package org.springframework.web.method.support;
 
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.Nullable;
 import org.springframework.ui.Model;
@@ -27,6 +23,10 @@ import org.springframework.ui.ModelMap;
 import org.springframework.validation.support.BindingAwareModelMap;
 import org.springframework.web.bind.support.SessionStatus;
 import org.springframework.web.bind.support.SimpleSessionStatus;
+
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Records model and view related decisions made by
@@ -70,6 +70,11 @@ public class ModelAndViewContainer {
 
 	private final SessionStatus sessionStatus = new SimpleSessionStatus();
 
+	/**
+	 * 请求处理了。
+	 * true：表示不需要视图解析器进行视图的转发。比如使用了@ResponseBody
+	 * false：表示没处理，需要 使用视图解析器解析返回的视图名称
+	 */
 	private boolean requestHandled = false;
 
 

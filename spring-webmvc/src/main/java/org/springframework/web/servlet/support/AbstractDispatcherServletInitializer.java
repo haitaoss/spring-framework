@@ -16,16 +16,6 @@
 
 package org.springframework.web.servlet.support;
 
-import java.util.EnumSet;
-
-import javax.servlet.DispatcherType;
-import javax.servlet.Filter;
-import javax.servlet.FilterRegistration;
-import javax.servlet.FilterRegistration.Dynamic;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRegistration;
-
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.core.Conventions;
 import org.springframework.lang.Nullable;
@@ -35,6 +25,10 @@ import org.springframework.web.context.AbstractContextLoaderInitializer;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.DispatcherServlet;
 import org.springframework.web.servlet.FrameworkServlet;
+
+import javax.servlet.*;
+import javax.servlet.FilterRegistration.Dynamic;
+import java.util.EnumSet;
 
 /**
  * Base class for {@link org.springframework.web.WebApplicationInitializer}
@@ -52,179 +46,215 @@ import org.springframework.web.servlet.FrameworkServlet;
  */
 public abstract class AbstractDispatcherServletInitializer extends AbstractContextLoaderInitializer {
 
-	/**
-	 * The default servlet name. Can be customized by overriding {@link #getServletName}.
-	 */
-	public static final String DEFAULT_SERVLET_NAME = "dispatcher";
+    /**
+     * The default servlet name. Can be customized by overriding {@link #getServletName}.
+     */
+    public static final String DEFAULT_SERVLET_NAME = "dispatcher";
 
 
-	@Override
-	public void onStartup(ServletContext servletContext) throws ServletException {
-		super.onStartup(servletContext);
-		registerDispatcherServlet(servletContext);
-	}
+    @Override
+    public void onStartup(ServletContext servletContext) throws ServletException {
+        /**
+         * 很简单。
+         *
+         * 如果存在 RootConfigClasses 就创建出一个 IOC容器，并构造出 Listener 装饰，然后将 Listener 注册到 servletContext 中
+         * 		AnnotationConfigWebApplicationContext context = new AnnotationConfigWebApplicationContext()
+         * 		servletContext.addListener(new ContextLoaderListener(context))
+         * */
+        super.onStartup(servletContext);
+        /**
+         * 1. 创建一个IOC容器(子容器)
+         * 2. 创建 DispatcherServlet，将子容器暴露给 DispatcherServlet，并将 DispatcherServlet 注册到 web容器中
+         * */
+        registerDispatcherServlet(servletContext);
+    }
 
-	/**
-	 * Register a {@link DispatcherServlet} against the given servlet context.
-	 * <p>This method will create a {@code DispatcherServlet} with the name returned by
-	 * {@link #getServletName()}, initializing it with the application context returned
-	 * from {@link #createServletApplicationContext()}, and mapping it to the patterns
-	 * returned from {@link #getServletMappings()}.
-	 * <p>Further customization can be achieved by overriding {@link
-	 * #customizeRegistration(ServletRegistration.Dynamic)} or
-	 * {@link #createDispatcherServlet(WebApplicationContext)}.
-	 * @param servletContext the context to register the servlet against
-	 */
-	protected void registerDispatcherServlet(ServletContext servletContext) {
-		String servletName = getServletName();
-		Assert.hasLength(servletName, "getServletName() must not return null or empty");
+    /**
+     * Register a {@link DispatcherServlet} against the given servlet context.
+     * <p>This method will create a {@code DispatcherServlet} with the name returned by
+     * {@link #getServletName()}, initializing it with the application context returned
+     * from {@link #createServletApplicationContext()}, and mapping it to the patterns
+     * returned from {@link #getServletMappings()}.
+     * <p>Further customization can be achieved by overriding {@link
+     * #customizeRegistration(ServletRegistration.Dynamic)} or
+     * {@link #createDispatcherServlet(WebApplicationContext)}.
+     *
+     * @param servletContext the context to register the servlet against
+     */
+    protected void registerDispatcherServlet(ServletContext servletContext) {
+        String servletName = getServletName();
+        Assert.hasLength(servletName, "getServletName() must not return null or empty");
 
-		WebApplicationContext servletAppContext = createServletApplicationContext();
-		Assert.notNull(servletAppContext, "createServletApplicationContext() must not return null");
+        /**
+         * 1. 创建一个IOC容器 AnnotationConfigWebApplicationContext
+         * 2. 如果存在配置类，就将配置类的信息设置的容器中
+         * {@link AbstractAnnotationConfigDispatcherServletInitializer#createServletApplicationContext()}
+         * */
+        WebApplicationContext servletAppContext = createServletApplicationContext();
+        Assert.notNull(servletAppContext, "createServletApplicationContext() must not return null");
 
-		FrameworkServlet dispatcherServlet = createDispatcherServlet(servletAppContext);
-		Assert.notNull(dispatcherServlet, "createDispatcherServlet(WebApplicationContext) must not return null");
-		dispatcherServlet.setContextInitializers(getServletApplicationContextInitializers());
+        /**
+         * 实例化 DispatcherServlet
+         * {@link AbstractDispatcherServletInitializer#createDispatcherServlet(WebApplicationContext)}
+         * */
+        FrameworkServlet dispatcherServlet = createDispatcherServlet(servletAppContext);
+        Assert.notNull(dispatcherServlet, "createDispatcherServlet(WebApplicationContext) must not return null");
+        // 设置容器初始化器。是用来在refresh之前 加工IOC容器的
+        dispatcherServlet.setContextInitializers(getServletApplicationContextInitializers());
 
-		ServletRegistration.Dynamic registration = servletContext.addServlet(servletName, dispatcherServlet);
-		if (registration == null) {
-			throw new IllegalStateException("Failed to register servlet with name '" + servletName + "'. " +
-					"Check if there is another servlet registered under the same name.");
-		}
+        // 注册 dispatcherServlet 到 servletContext 中
+        ServletRegistration.Dynamic registration = servletContext.addServlet(servletName, dispatcherServlet);
+        if (registration == null) {
+            throw new IllegalStateException(
+                    "Failed to register servlet with name '" + servletName + "'. " + "Check if there is another servlet registered under the same name.");
+        }
 
-		registration.setLoadOnStartup(1);
-		registration.addMapping(getServletMappings());
-		registration.setAsyncSupported(isAsyncSupported());
+        // 设置参数。1表示项目启动的时候就初始化这个servlet
+        registration.setLoadOnStartup(1);
+        // 设置映射路径
+        registration.addMapping(getServletMappings());
+        // 是否支持异步
+        registration.setAsyncSupported(isAsyncSupported());
 
-		Filter[] filters = getServletFilters();
-		if (!ObjectUtils.isEmpty(filters)) {
-			for (Filter filter : filters) {
-				registerServletFilter(servletContext, filter);
-			}
-		}
+        Filter[] filters = getServletFilters();
+        if (!ObjectUtils.isEmpty(filters)) {
+            for (Filter filter : filters) {
+                // 注册 Filter，Filter 不是根据路径拦截的，而是根据servletName，注册的Filter子拦截当前 dispatcherServlet
+                registerServletFilter(servletContext, filter);
+            }
+        }
 
-		customizeRegistration(registration);
-	}
+        // 自定义，默认没有实现
+        customizeRegistration(registration);
+    }
 
-	/**
-	 * Return the name under which the {@link DispatcherServlet} will be registered.
-	 * Defaults to {@link #DEFAULT_SERVLET_NAME}.
-	 * @see #registerDispatcherServlet(ServletContext)
-	 */
-	protected String getServletName() {
-		return DEFAULT_SERVLET_NAME;
-	}
+    /**
+     * Return the name under which the {@link DispatcherServlet} will be registered.
+     * Defaults to {@link #DEFAULT_SERVLET_NAME}.
+     *
+     * @see #registerDispatcherServlet(ServletContext)
+     */
+    protected String getServletName() {
+        return DEFAULT_SERVLET_NAME;
+    }
 
-	/**
-	 * Create a servlet application context to be provided to the {@code DispatcherServlet}.
-	 * <p>The returned context is delegated to Spring's
-	 * {@link DispatcherServlet#DispatcherServlet(WebApplicationContext)}. As such,
-	 * it typically contains controllers, view resolvers, locale resolvers, and other
-	 * web-related beans.
-	 * @see #registerDispatcherServlet(ServletContext)
-	 */
-	protected abstract WebApplicationContext createServletApplicationContext();
+    /**
+     * Create a servlet application context to be provided to the {@code DispatcherServlet}.
+     * <p>The returned context is delegated to Spring's
+     * {@link DispatcherServlet#DispatcherServlet(WebApplicationContext)}. As such,
+     * it typically contains controllers, view resolvers, locale resolvers, and other
+     * web-related beans.
+     *
+     * @see #registerDispatcherServlet(ServletContext)
+     */
+    protected abstract WebApplicationContext createServletApplicationContext();
 
-	/**
-	 * Create a {@link DispatcherServlet} (or other kind of {@link FrameworkServlet}-derived
-	 * dispatcher) with the specified {@link WebApplicationContext}.
-	 * <p>Note: This allows for any {@link FrameworkServlet} subclass as of 4.2.3.
-	 * Previously, it insisted on returning a {@link DispatcherServlet} or subclass thereof.
-	 */
-	protected FrameworkServlet createDispatcherServlet(WebApplicationContext servletAppContext) {
-		return new DispatcherServlet(servletAppContext);
-	}
+    /**
+     * Create a {@link DispatcherServlet} (or other kind of {@link FrameworkServlet}-derived
+     * dispatcher) with the specified {@link WebApplicationContext}.
+     * <p>Note: This allows for any {@link FrameworkServlet} subclass as of 4.2.3.
+     * Previously, it insisted on returning a {@link DispatcherServlet} or subclass thereof.
+     */
+    protected FrameworkServlet createDispatcherServlet(WebApplicationContext servletAppContext) {
+        return new DispatcherServlet(servletAppContext);
+    }
 
-	/**
-	 * Specify application context initializers to be applied to the servlet-specific
-	 * application context that the {@code DispatcherServlet} is being created with.
-	 * @since 4.2
-	 * @see #createServletApplicationContext()
-	 * @see DispatcherServlet#setContextInitializers
-	 * @see #getRootApplicationContextInitializers()
-	 */
-	@Nullable
-	protected ApplicationContextInitializer<?>[] getServletApplicationContextInitializers() {
-		return null;
-	}
+    /**
+     * Specify application context initializers to be applied to the servlet-specific
+     * application context that the {@code DispatcherServlet} is being created with.
+     *
+     * @see #createServletApplicationContext()
+     * @see DispatcherServlet#setContextInitializers
+     * @see #getRootApplicationContextInitializers()
+     * @since 4.2
+     */
+    @Nullable
+    protected ApplicationContextInitializer<?>[] getServletApplicationContextInitializers() {
+        return null;
+    }
 
-	/**
-	 * Specify the servlet mapping(s) for the {@code DispatcherServlet} &mdash;
-	 * for example {@code "/"}, {@code "/app"}, etc.
-	 * @see #registerDispatcherServlet(ServletContext)
-	 */
-	protected abstract String[] getServletMappings();
+    /**
+     * Specify the servlet mapping(s) for the {@code DispatcherServlet} &mdash;
+     * for example {@code "/"}, {@code "/app"}, etc.
+     *
+     * @see #registerDispatcherServlet(ServletContext)
+     */
+    protected abstract String[] getServletMappings();
 
-	/**
-	 * Specify filters to add and map to the {@code DispatcherServlet}.
-	 * @return an array of filters or {@code null}
-	 * @see #registerServletFilter(ServletContext, Filter)
-	 */
-	@Nullable
-	protected Filter[] getServletFilters() {
-		return null;
-	}
+    /**
+     * Specify filters to add and map to the {@code DispatcherServlet}.
+     *
+     * @return an array of filters or {@code null}
+     * @see #registerServletFilter(ServletContext, Filter)
+     */
+    @Nullable
+    protected Filter[] getServletFilters() {
+        return null;
+    }
 
-	/**
-	 * Add the given filter to the ServletContext and map it to the
-	 * {@code DispatcherServlet} as follows:
-	 * <ul>
-	 * <li>a default filter name is chosen based on its concrete type
-	 * <li>the {@code asyncSupported} flag is set depending on the
-	 * return value of {@link #isAsyncSupported() asyncSupported}
-	 * <li>a filter mapping is created with dispatcher types {@code REQUEST},
-	 * {@code FORWARD}, {@code INCLUDE}, and conditionally {@code ASYNC} depending
-	 * on the return value of {@link #isAsyncSupported() asyncSupported}
-	 * </ul>
-	 * <p>If the above defaults are not suitable or insufficient, override this
-	 * method and register filters directly with the {@code ServletContext}.
-	 * @param servletContext the servlet context to register filters with
-	 * @param filter the filter to be registered
-	 * @return the filter registration
-	 */
-	protected FilterRegistration.Dynamic registerServletFilter(ServletContext servletContext, Filter filter) {
-		String filterName = Conventions.getVariableName(filter);
-		Dynamic registration = servletContext.addFilter(filterName, filter);
+    /**
+     * Add the given filter to the ServletContext and map it to the
+     * {@code DispatcherServlet} as follows:
+     * <ul>
+     * <li>a default filter name is chosen based on its concrete type
+     * <li>the {@code asyncSupported} flag is set depending on the
+     * return value of {@link #isAsyncSupported() asyncSupported}
+     * <li>a filter mapping is created with dispatcher types {@code REQUEST},
+     * {@code FORWARD}, {@code INCLUDE}, and conditionally {@code ASYNC} depending
+     * on the return value of {@link #isAsyncSupported() asyncSupported}
+     * </ul>
+     * <p>If the above defaults are not suitable or insufficient, override this
+     * method and register filters directly with the {@code ServletContext}.
+     *
+     * @param servletContext the servlet context to register filters with
+     * @param filter         the filter to be registered
+     * @return the filter registration
+     */
+    protected FilterRegistration.Dynamic registerServletFilter(ServletContext servletContext, Filter filter) {
+        String filterName = Conventions.getVariableName(filter);
+        Dynamic registration = servletContext.addFilter(filterName, filter);
 
-		if (registration == null) {
-			int counter = 0;
-			while (registration == null) {
-				if (counter == 100) {
-					throw new IllegalStateException("Failed to register filter with name '" + filterName + "'. " +
-							"Check if there is another filter registered under the same name.");
-				}
-				registration = servletContext.addFilter(filterName + "#" + counter, filter);
-				counter++;
-			}
-		}
+        if (registration == null) {
+            int counter = 0;
+            while (registration == null) {
+                if (counter == 100) {
+                    throw new IllegalStateException(
+                            "Failed to register filter with name '" + filterName + "'. " + "Check if there is another filter registered under the same name.");
+                }
+                registration = servletContext.addFilter(filterName + "#" + counter, filter);
+                counter++;
+            }
+        }
 
-		registration.setAsyncSupported(isAsyncSupported());
-		registration.addMappingForServletNames(getDispatcherTypes(), false, getServletName());
-		return registration;
-	}
+        registration.setAsyncSupported(isAsyncSupported());
+        // filter 是拦截对应名称的 servlet
+        registration.addMappingForServletNames(getDispatcherTypes(), false, getServletName());
+        return registration;
+    }
 
-	private EnumSet<DispatcherType> getDispatcherTypes() {
-		return (isAsyncSupported() ?
-				EnumSet.of(DispatcherType.REQUEST, DispatcherType.FORWARD, DispatcherType.INCLUDE, DispatcherType.ASYNC) :
-				EnumSet.of(DispatcherType.REQUEST, DispatcherType.FORWARD, DispatcherType.INCLUDE));
-	}
+    private EnumSet<DispatcherType> getDispatcherTypes() {
+        return (isAsyncSupported() ? EnumSet.of(DispatcherType.REQUEST, DispatcherType.FORWARD, DispatcherType.INCLUDE,
+                DispatcherType.ASYNC
+        ) : EnumSet.of(DispatcherType.REQUEST, DispatcherType.FORWARD, DispatcherType.INCLUDE));
+    }
 
-	/**
-	 * A single place to control the {@code asyncSupported} flag for the
-	 * {@code DispatcherServlet} and all filters added via {@link #getServletFilters()}.
-	 * <p>The default value is "true".
-	 */
-	protected boolean isAsyncSupported() {
-		return true;
-	}
+    /**
+     * A single place to control the {@code asyncSupported} flag for the
+     * {@code DispatcherServlet} and all filters added via {@link #getServletFilters()}.
+     * <p>The default value is "true".
+     */
+    protected boolean isAsyncSupported() {
+        return true;
+    }
 
-	/**
-	 * Optionally perform further registration customization once
-	 * {@link #registerDispatcherServlet(ServletContext)} has completed.
-	 * @param registration the {@code DispatcherServlet} registration to be customized
-	 * @see #registerDispatcherServlet(ServletContext)
-	 */
-	protected void customizeRegistration(ServletRegistration.Dynamic registration) {
-	}
+    /**
+     * Optionally perform further registration customization once
+     * {@link #registerDispatcherServlet(ServletContext)} has completed.
+     *
+     * @param registration the {@code DispatcherServlet} registration to be customized
+     * @see #registerDispatcherServlet(ServletContext)
+     */
+    protected void customizeRegistration(ServletRegistration.Dynamic registration) {
+    }
 
 }

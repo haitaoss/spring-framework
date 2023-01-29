@@ -1,0 +1,74 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AbstractMessageConverterMethodArgumentResolver {
+  - SUPPORTED_METHODS: Set<HttpMethod>
+  # logger: Log
+  # messageConverters: List<HttpMessageConverter<?>>
+  - advice: RequestResponseBodyAdviceChain
+  - NO_VALUE: Object
+  # isBindExceptionRequired(WebDataBinder, MethodParameter): boolean
+  # readWithMessageConverters(HttpInputMessage, MethodParameter, Type): Object?
+  ~ getAdvice(): RequestResponseBodyAdviceChain
+  # validateIfApplicable(WebDataBinder, MethodParameter): void
+  # adaptArgumentIfNecessary(Object?, MethodParameter): Object?
+  # createInputMessage(NativeWebRequest): ServletServerHttpRequest
+  # readWithMessageConverters(NativeWebRequest, MethodParameter, Type): Object?
+  # getSupportedMediaTypes(Class<?>): List<MediaType>
+}
+class AbstractMessageConverterMethodProcessor {
+  - SAFE_EXTENSIONS: Set<String>
+  - RESOURCE_REGION_LIST_TYPE: Type
+  - ALL_APPLICATION_MEDIA_TYPES: List<MediaType>
+  - safeExtensions: Set<String>
+  - SAFE_MEDIA_BASE_TYPES: Set<String>
+  - contentNegotiationManager: ContentNegotiationManager
+  # writeWithMessageConverters(T, MethodParameter, NativeWebRequest): void
+  # getProducibleMediaTypes(HttpServletRequest, Class<?>): List<MediaType>
+  - getAcceptableMediaTypes(HttpServletRequest): List<MediaType>
+  # writeWithMessageConverters(T?, MethodParameter, ServletServerHttpRequest, ServletServerHttpResponse): void
+  # isResourceType(Object?, MethodParameter): boolean
+  - getMostSpecificMediaType(MediaType, MediaType): MediaType
+  # getReturnValueType(Object?, MethodParameter): Class<?>
+  - getGenericType(MethodParameter): Type
+  - addContentDispositionHeader(ServletServerHttpRequest, ServletServerHttpResponse): void
+  # createOutputMessage(NativeWebRequest): ServletServerHttpResponse
+  - safeExtension(HttpServletRequest, String?): boolean
+  - safeMediaType(MediaType): boolean
+  # getProducibleMediaTypes(HttpServletRequest, Class<?>, Type?): List<MediaType>
+  - resolveMediaType(ServletRequest, String): MediaType?
+}
+interface HandlerMethodArgumentResolver << interface >> {
+  + resolveArgument(MethodParameter, ModelAndViewContainer?, NativeWebRequest, WebDataBinderFactory?): Object?
+  + supportsParameter(MethodParameter): boolean
+}
+interface HandlerMethodReturnValueHandler << interface >> {
+  + supportsReturnType(MethodParameter): boolean
+  + handleReturnValue(Object?, MethodParameter, ModelAndViewContainer, NativeWebRequest): void
+}
+class ModelAndViewMethodReturnValueHandler {
+  - redirectPatterns: String[]?
+  + handleReturnValue(Object?, MethodParameter, ModelAndViewContainer, NativeWebRequest): void
+  + getRedirectPatterns(): String[]?
+  + supportsReturnType(MethodParameter): boolean
+  + setRedirectPatterns(String[]?): void
+  # isRedirectViewName(String): boolean
+}
+class RequestResponseBodyMethodProcessor {
+  # checkRequired(MethodParameter): boolean
+  + resolveArgument(MethodParameter, ModelAndViewContainer?, NativeWebRequest, WebDataBinderFactory?): Object?
+  + supportsReturnType(MethodParameter): boolean
+  # readWithMessageConverters(NativeWebRequest, MethodParameter, Type): Object?
+  + supportsParameter(MethodParameter): boolean
+  + handleReturnValue(Object?, MethodParameter, ModelAndViewContainer, NativeWebRequest): void
+}
+
+AbstractMessageConverterMethodArgumentResolver  -[#008200,dashed]-^  HandlerMethodArgumentResolver
+AbstractMessageConverterMethodProcessor         -[#000082,plain]-^  AbstractMessageConverterMethodArgumentResolver
+AbstractMessageConverterMethodProcessor         -[#008200,dashed]-^  HandlerMethodReturnValueHandler
+ModelAndViewMethodReturnValueHandler            -[#008200,dashed]-^  HandlerMethodReturnValueHandler
+RequestResponseBodyMethodProcessor              -[#000082,plain]-^  AbstractMessageConverterMethodProcessor
+@enduml

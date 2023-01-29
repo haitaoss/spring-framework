@@ -19,6 +19,7 @@ package org.springframework.web.bind.support;
 import org.springframework.lang.Nullable;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.method.annotation.InitBinderDataBinderFactory;
 
 /**
  * Create a {@link WebRequestDataBinder} instance and initialize it with a
@@ -57,6 +58,10 @@ public class DefaultDataBinderFactory implements WebDataBinderFactory {
 		if (this.initializer != null) {
 			this.initializer.initBinder(dataBinder, webRequest);
 		}
+		/**
+		 * 对 WebDataBinder 进行加工
+		 * {@link InitBinderDataBinderFactory#initBinder(WebDataBinder, NativeWebRequest)}
+		 * */
 		initBinder(dataBinder, webRequest);
 		return dataBinder;
 	}

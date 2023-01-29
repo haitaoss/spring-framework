@@ -1,0 +1,225 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AbstractHandlerMapping {
+  - patternParser: PathPatternParser?
+  - interceptors: List<Object>
+  - pathMatcher: PathMatcher
+  - adaptedInterceptors: List<HandlerInterceptor>
+  # mappingsLogger: Log
+  - urlPathHelper: UrlPathHelper
+  - corsConfigurationSource: CorsConfigurationSource?
+  - order: int
+  - defaultHandler: Object?
+  - corsProcessor: CorsProcessor
+  - beanName: String?
+  # formatMappingName(): String
+  + setCorsProcessor(CorsProcessor): void
+  # getAdaptedInterceptors(): HandlerInterceptor[]?
+  # getMappedInterceptors(): MappedInterceptor[]?
+  # getHandlerExecutionChain(Object, HttpServletRequest): HandlerExecutionChain
+  + setAlwaysUseFullPath(boolean): void
+  # initLookupPath(HttpServletRequest): String
+  + setInterceptors(Object[]): void
+  + getCorsProcessor(): CorsProcessor
+  # detectMappedInterceptors(List<HandlerInterceptor>): void
+  + usesPathPatterns(): boolean
+  + getHandler(HttpServletRequest): HandlerExecutionChain?
+  + setDefaultHandler(Object?): void
+  + setUrlDecode(boolean): void
+  + getPatternParser(): PathPatternParser?
+  # extendInterceptors(List<Object>): void
+  + getUrlPathHelper(): UrlPathHelper
+  + setCorsConfigurations(Map<String, CorsConfiguration>): void
+  # hasCorsConfigurationSource(Object): boolean
+  + setOrder(int): void
+  # initInterceptors(): void
+  + setPatternParser(PathPatternParser): void
+  + setCorsConfigurationSource(CorsConfigurationSource): void
+  + setUrlPathHelper(UrlPathHelper): void
+  + setPathMatcher(PathMatcher): void
+  + getCorsConfigurationSource(): CorsConfigurationSource?
+  + getOrder(): int
+  + getDefaultHandler(): Object?
+  # adaptInterceptor(Object): HandlerInterceptor
+  # getHandlerInternal(HttpServletRequest): Object?
+  # getCorsHandlerExecutionChain(HttpServletRequest, HandlerExecutionChain, CorsConfiguration?): HandlerExecutionChain
+  + setBeanName(String): void
+  + getPathMatcher(): PathMatcher
+  + setRemoveSemicolonContent(boolean): void
+  # initApplicationContext(): void
+  # getCorsConfiguration(Object, HttpServletRequest): CorsConfiguration?
+}
+class AbstractHandlerMethodMapping<T> {
+  - PREFLIGHT_AMBIGUOUS_MATCH: HandlerMethod
+  - detectHandlerMethodsInAncestorContexts: boolean
+  - namingStrategy: HandlerMethodMappingNamingStrategy<T>?
+  - mappingRegistry: MappingRegistry
+  - SCOPED_TARGET_NAME_PREFIX: String
+  - ALLOW_CORS_CONFIG: CorsConfiguration
+  # handleMatch(T, String, HttpServletRequest): void
+  + getHandlerMethodsForMappingName(String): List<HandlerMethod>?
+  # createHandlerMethod(Object, Method): HandlerMethod
+  - addMatchingMappings(Collection<T>, List<Match>, HttpServletRequest): void
+  + registerMapping(T, Object, Method): void
+  # getDirectPaths(T): Set<String>
+  + getHandlerMethods(): Map<T, HandlerMethod>
+  + setHandlerMethodMappingNamingStrategy(HandlerMethodMappingNamingStrategy<T>): void
+  + getNamingStrategy(): HandlerMethodMappingNamingStrategy<T>?
+  # getMappingComparator(HttpServletRequest): Comparator<T>
+  ~ getMappingRegistry(): MappingRegistry
+  # getHandlerInternal(HttpServletRequest): HandlerMethod?
+  # getMappingForMethod(Method, Class<?>): T?
+  # getCorsConfiguration(Object, HttpServletRequest): CorsConfiguration?
+  + setPatternParser(PathPatternParser): void
+  # registerHandlerMethod(Object, Method, T): void
+  # lookupHandlerMethod(String, HttpServletRequest): HandlerMethod?
+  # hasCorsConfigurationSource(Object): boolean
+  # processCandidateBean(String): void
+  # handlerMethodsInitialized(Map<T, HandlerMethod>): void
+  # isHandler(Class<?>): boolean
+  + afterPropertiesSet(): void
+  # getMappingPathPatterns(T): Set<String>
+  # getMatchingMapping(T, HttpServletRequest): T?
+  + setDetectHandlerMethodsInAncestorContexts(boolean): void
+  # detectHandlerMethods(Object): void
+  - formatMappings(Class<?>, Map<Method, T>): String
+  # initCorsConfiguration(Object, Method, T): CorsConfiguration?
+  + unregisterMapping(T): void
+  # handleNoMatch(Set<T>, String, HttpServletRequest): HandlerMethod?
+  # initHandlerMethods(): void
+  # getCandidateBeanNames(): String[]
+}
+interface ApplicationContextAware << interface >> {
+  + setApplicationContext(ApplicationContext): void
+}
+class ApplicationObjectSupport {
+  # logger: Log
+  - applicationContext: ApplicationContext?
+  - messageSourceAccessor: MessageSourceAccessor?
+  # initApplicationContext(): void
+  + getApplicationContext(): ApplicationContext?
+  # obtainApplicationContext(): ApplicationContext
+  # getMessageSourceAccessor(): MessageSourceAccessor?
+  # initApplicationContext(ApplicationContext): void
+  + setApplicationContext(ApplicationContext?): void
+  # requiredContextClass(): Class<?>
+  # isContextRequired(): boolean
+}
+interface Aware << interface >>
+interface BeanNameAware << interface >> {
+  + setBeanName(String): void
+}
+interface EmbeddedValueResolverAware << interface >> {
+  + setEmbeddedValueResolver(StringValueResolver): void
+}
+interface HandlerMapping << interface >> {
+  + MATRIX_VARIABLES_ATTRIBUTE: String
+  + BEST_MATCHING_HANDLER_ATTRIBUTE: String
+  + PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE: String
+  + LOOKUP_PATH: String
+  + INTROSPECT_TYPE_LEVEL_MAPPING: String
+  + BEST_MATCHING_PATTERN_ATTRIBUTE: String
+  + URI_TEMPLATE_VARIABLES_ATTRIBUTE: String
+  + PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE: String
+  + usesPathPatterns(): boolean
+  + getHandler(HttpServletRequest): HandlerExecutionChain?
+}
+interface InitializingBean << interface >> {
+  + afterPropertiesSet(): void
+}
+interface MatchableHandlerMapping << interface >> {
+  + getPatternParser(): PathPatternParser?
+  + match(HttpServletRequest, String): RequestMatchResult?
+}
+interface Ordered << interface >> {
+  + HIGHEST_PRECEDENCE: int
+  + LOWEST_PRECEDENCE: int
+  + getOrder(): int
+}
+class RequestMappingHandlerMapping {
+  - useTrailingSlashMatch: boolean
+  - embeddedValueResolver: StringValueResolver?
+  - config: BuilderConfiguration
+  - contentNegotiationManager: ContentNegotiationManager
+  - useRegisteredSuffixPatternMatch: boolean
+  - pathPrefixes: Map<String, Predicate<Class<?>>>
+  - useSuffixPatternMatch: boolean
+  + useRegisteredSuffixPatternMatch(): boolean
+  + getPathPrefixes(): Map<String, Predicate<Class<?>>>
+  + setUseRegisteredSuffixPatternMatch(boolean): void
+  + setUseTrailingSlashMatch(boolean): void
+  + registerMapping(RequestMappingInfo, Object, Method): void
+  + match(HttpServletRequest, String): RequestMatchResult?
+  + afterPropertiesSet(): void
+  # getCustomMethodCondition(Method): RequestCondition<?>?
+  - updateConsumesCondition(RequestMappingInfo, Method): void
+  # registerHandlerMethod(Object, Method, RequestMappingInfo): void
+  # resolveEmbeddedValuesInPatterns(String[]): String[]
+  # isHandler(Class<?>): boolean
+  # createRequestMappingInfo(RequestMapping, RequestCondition<?>?): RequestMappingInfo
+  # initCorsConfiguration(Object, Method, RequestMappingInfo): CorsConfiguration?
+  + setUseSuffixPatternMatch(boolean): void
+  ~ getPathPrefix(Class<?>): String?
+  + setEmbeddedValueResolver(StringValueResolver): void
+  + setPathPrefixes(Map<String, Predicate<Class<?>>>): void
+  + useTrailingSlashMatch(): boolean
+  # getMappingForMethod(Method, Class<?>): RequestMappingInfo?
+  + getFileExtensions(): List<String>?
+  + getContentNegotiationManager(): ContentNegotiationManager
+  + useSuffixPatternMatch(): boolean
+  - createRequestMappingInfo(AnnotatedElement): RequestMappingInfo?
+  # getCustomTypeCondition(Class<?>): RequestCondition<?>?
+  - resolveCorsAnnotationValue(String): String
+  - updateCorsConfig(CorsConfiguration, CrossOrigin?): void
+  + setContentNegotiationManager(ContentNegotiationManager): void
+}
+class RequestMappingInfoHandlerMapping {
+  - HTTP_OPTIONS_HANDLE_METHOD: Method
+  # getMappingPathPatterns(RequestMappingInfo): Set<String>
+  # getHandlerInternal(HttpServletRequest): HandlerMethod?
+  # getMappingComparator(HttpServletRequest): Comparator<RequestMappingInfo>
+  # handleMatch(RequestMappingInfo, String, HttpServletRequest): void
+  - extractMatchDetails(PathPatternsRequestCondition, String, HttpServletRequest): void
+  - extractMatrixVariables(HttpServletRequest, Map<String, String>): Map<String, MultiValueMap<String, String>>
+  # getMatchingMapping(RequestMappingInfo, HttpServletRequest): RequestMappingInfo?
+  # getDirectPaths(RequestMappingInfo): Set<String>
+  - extractMatchDetails(PatternsRequestCondition, String, HttpServletRequest): void
+  # handleNoMatch(Set<RequestMappingInfo>, String, HttpServletRequest): HandlerMethod?
+}
+interface ServletContextAware << interface >> {
+  + setServletContext(ServletContext): void
+}
+class WebApplicationObjectSupport {
+  - servletContext: ServletContext?
+  # initApplicationContext(ApplicationContext): void
+  # initServletContext(ServletContext): void
+  # getTempDir(): File
+  # getServletContext(): ServletContext?
+  + setServletContext(ServletContext): void
+  # getWebApplicationContext(): WebApplicationContext?
+  # isContextRequired(): boolean
+}
+
+AbstractHandlerMapping            -[#008200,dashed]-^  BeanNameAware
+AbstractHandlerMapping            -[#008200,dashed]-^  HandlerMapping
+AbstractHandlerMapping            -[#008200,dashed]-^  Ordered
+AbstractHandlerMapping            -[#000082,plain]-^  WebApplicationObjectSupport
+AbstractHandlerMethodMapping      -[#000082,plain]-^  AbstractHandlerMapping
+AbstractHandlerMethodMapping      -[#008200,dashed]-^  InitializingBean
+ApplicationContextAware           -[#008200,plain]-^  Aware
+ApplicationObjectSupport          -[#008200,dashed]-^  ApplicationContextAware
+BeanNameAware                     -[#008200,plain]-^  Aware
+EmbeddedValueResolverAware        -[#008200,plain]-^  Aware
+MatchableHandlerMapping           -[#008200,plain]-^  HandlerMapping
+RequestMappingHandlerMapping      -[#008200,dashed]-^  EmbeddedValueResolverAware
+RequestMappingHandlerMapping      -[#008200,dashed]-^  MatchableHandlerMapping
+RequestMappingHandlerMapping      -[#000082,plain]-^  RequestMappingInfoHandlerMapping
+RequestMappingInfoHandlerMapping  -[#000082,plain]-^  AbstractHandlerMethodMapping
+ServletContextAware               -[#008200,plain]-^  Aware
+WebApplicationObjectSupport       -[#000082,plain]-^  ApplicationObjectSupport
+WebApplicationObjectSupport       -[#008200,dashed]-^  ServletContextAware
+@enduml

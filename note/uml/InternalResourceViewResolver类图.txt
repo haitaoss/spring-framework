@@ -1,0 +1,145 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AbstractCachingViewResolver {
+  - viewAccessCache: Map<Object, View>
+  - viewCreationCache: Map<Object, View>
+  - DEFAULT_CACHE_FILTER: CacheFilter
+  - cacheLimit: int
+  + DEFAULT_CACHE_LIMIT: int
+  - cacheFilter: CacheFilter
+  - UNRESOLVED_VIEW: View
+  - cacheUnresolved: boolean
+  + setCache(boolean): void
+  + clearCache(): void
+  + getCacheFilter(): CacheFilter
+  + setCacheLimit(int): void
+  + getCacheLimit(): int
+  # createView(String, Locale): View?
+  - formatKey(Object): String
+  + setCacheUnresolved(boolean): void
+  # getCacheKey(String, Locale): Object
+  + isCacheUnresolved(): boolean
+  + isCache(): boolean
+  + resolveViewName(String, Locale): View?
+  # loadView(String, Locale): View?
+  + setCacheFilter(CacheFilter): void
+  + removeFromCache(String, Locale): void
+}
+interface ApplicationContextAware << interface >> {
+  + setApplicationContext(ApplicationContext): void
+}
+class ApplicationObjectSupport {
+  # logger: Log
+  - messageSourceAccessor: MessageSourceAccessor?
+  - applicationContext: ApplicationContext?
+  # obtainApplicationContext(): ApplicationContext
+  # requiredContextClass(): Class<?>
+  # initApplicationContext(ApplicationContext): void
+  + setApplicationContext(ApplicationContext?): void
+  + getApplicationContext(): ApplicationContext?
+  # isContextRequired(): boolean
+  # getMessageSourceAccessor(): MessageSourceAccessor?
+  # initApplicationContext(): void
+}
+interface Aware << interface >>
+class InternalResourceViewResolver {
+  - jstlPresent: boolean
+  - alwaysInclude: Boolean?
+  # buildView(String): AbstractUrlBasedView
+  + setAlwaysInclude(boolean): void
+  # requiredViewClass(): Class<?>
+  # instantiateView(): AbstractUrlBasedView
+}
+interface Ordered << interface >> {
+  + LOWEST_PRECEDENCE: int
+  + HIGHEST_PRECEDENCE: int
+  + getOrder(): int
+}
+interface ServletContextAware << interface >> {
+  + setServletContext(ServletContext): void
+}
+class UrlBasedViewResolver {
+  - redirectHttp10Compatible: boolean
+  - prefix: String
+  - contentType: String?
+  + REDIRECT_URL_PREFIX: String
+  + FORWARD_URL_PREFIX: String
+  - requestContextAttribute: String?
+  - exposePathVariables: Boolean?
+  - exposeContextBeansAsAttributes: Boolean?
+  - staticAttributes: Map<String, Object>
+  - redirectContextRelative: boolean
+  - redirectHosts: String[]?
+  - viewClass: Class<?>?
+  - exposedContextBeanNames: String[]?
+  - viewNames: String[]?
+  - order: int
+  - suffix: String
+  # getCacheKey(String, Locale): Object
+  + getOrder(): int
+  # isRedirectContextRelative(): boolean
+  + setViewNames(String[]?): void
+  # getViewNames(): String[]?
+  # buildView(String): AbstractUrlBasedView
+  # getExposePathVariables(): Boolean?
+  + setExposedContextBeanNames(String[]?): void
+  # initApplicationContext(): void
+  # loadView(String, Locale): View?
+  + setRequestContextAttribute(String?): void
+  # getContentType(): String?
+  # isRedirectHttp10Compatible(): boolean
+  + setExposePathVariables(Boolean?): void
+  # getSuffix(): String
+  + setViewClass(Class<?>?): void
+  + setOrder(int): void
+  # canHandle(String, Locale): boolean
+  + setAttributesMap(Map<String, ?>?): void
+  + setAttributes(Properties): void
+  + setExposeContextBeansAsAttributes(boolean): void
+  # createView(String, Locale): View?
+  # requiredViewClass(): Class<?>
+  # getExposeContextBeansAsAttributes(): Boolean?
+  + setSuffix(String?): void
+  + getRedirectHosts(): String[]?
+  # instantiateView(): AbstractUrlBasedView
+  + getAttributesMap(): Map<String, Object>
+  + setRedirectContextRelative(boolean): void
+  + setRedirectHttp10Compatible(boolean): void
+  + setRedirectHosts(String[]?): void
+  # getExposedContextBeanNames(): String[]?
+  + setContentType(String?): void
+  # getPrefix(): String
+  # applyLifecycleMethods(String, AbstractUrlBasedView): View
+  + setPrefix(String?): void
+  # getRequestContextAttribute(): String?
+  # getViewClass(): Class<?>?
+}
+interface ViewResolver << interface >> {
+  + resolveViewName(String, Locale): View?
+}
+class WebApplicationObjectSupport {
+  - servletContext: ServletContext?
+  # initApplicationContext(ApplicationContext): void
+  # getWebApplicationContext(): WebApplicationContext?
+  # initServletContext(ServletContext): void
+  + setServletContext(ServletContext): void
+  # getTempDir(): File
+  # isContextRequired(): boolean
+  # getServletContext(): ServletContext?
+}
+
+AbstractCachingViewResolver   -[#008200,dashed]-^  ViewResolver
+AbstractCachingViewResolver   -[#000082,plain]-^  WebApplicationObjectSupport
+ApplicationContextAware       -[#008200,plain]-^  Aware
+ApplicationObjectSupport      -[#008200,dashed]-^  ApplicationContextAware
+InternalResourceViewResolver  -[#000082,plain]-^  UrlBasedViewResolver
+ServletContextAware           -[#008200,plain]-^  Aware
+UrlBasedViewResolver          -[#000082,plain]-^  AbstractCachingViewResolver
+UrlBasedViewResolver          -[#008200,dashed]-^  Ordered
+WebApplicationObjectSupport   -[#000082,plain]-^  ApplicationObjectSupport
+WebApplicationObjectSupport   -[#008200,dashed]-^  ServletContextAware
+@enduml

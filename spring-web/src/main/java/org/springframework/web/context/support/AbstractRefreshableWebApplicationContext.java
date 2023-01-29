@@ -16,9 +16,6 @@
 
 package org.springframework.web.context.support;
 
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletContext;
-
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.context.support.AbstractRefreshableConfigApplicationContext;
 import org.springframework.core.env.ConfigurableEnvironment;
@@ -33,6 +30,9 @@ import org.springframework.web.context.ConfigurableWebApplicationContext;
 import org.springframework.web.context.ConfigurableWebEnvironment;
 import org.springframework.web.context.ServletConfigAware;
 import org.springframework.web.context.ServletContextAware;
+
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletContext;
 
 /**
  * {@link org.springframework.context.support.AbstractRefreshableApplicationContext}
@@ -78,146 +78,155 @@ import org.springframework.web.context.ServletContextAware;
  * @see org.springframework.ui.context.ThemeSource
  * @see XmlWebApplicationContext
  */
-public abstract class AbstractRefreshableWebApplicationContext extends AbstractRefreshableConfigApplicationContext
-		implements ConfigurableWebApplicationContext, ThemeSource {
+public abstract class AbstractRefreshableWebApplicationContext extends AbstractRefreshableConfigApplicationContext implements ConfigurableWebApplicationContext, ThemeSource {
 
-	/** Servlet context that this context runs in. */
-	@Nullable
-	private ServletContext servletContext;
+    /** Servlet context that this context runs in. */
+    @Nullable
+    private ServletContext servletContext;
 
-	/** Servlet config that this context runs in, if any. */
-	@Nullable
-	private ServletConfig servletConfig;
+    /** Servlet config that this context runs in, if any. */
+    @Nullable
+    private ServletConfig servletConfig;
 
-	/** Namespace of this context, or {@code null} if root. */
-	@Nullable
-	private String namespace;
+    /** Namespace of this context, or {@code null} if root. */
+    @Nullable
+    private String namespace;
 
-	/** the ThemeSource for this ApplicationContext. */
-	@Nullable
-	private ThemeSource themeSource;
-
-
-	public AbstractRefreshableWebApplicationContext() {
-		setDisplayName("Root WebApplicationContext");
-	}
+    /** the ThemeSource for this ApplicationContext. */
+    @Nullable
+    private ThemeSource themeSource;
 
 
-	@Override
-	public void setServletContext(@Nullable ServletContext servletContext) {
-		this.servletContext = servletContext;
-	}
+    public AbstractRefreshableWebApplicationContext() {
+        setDisplayName("Root WebApplicationContext");
+    }
 
-	@Override
-	@Nullable
-	public ServletContext getServletContext() {
-		return this.servletContext;
-	}
 
-	@Override
-	public void setServletConfig(@Nullable ServletConfig servletConfig) {
-		this.servletConfig = servletConfig;
-		if (servletConfig != null && this.servletContext == null) {
-			setServletContext(servletConfig.getServletContext());
-		}
-	}
+    @Override
+    public void setServletContext(@Nullable ServletContext servletContext) {
+        this.servletContext = servletContext;
+    }
 
-	@Override
-	@Nullable
-	public ServletConfig getServletConfig() {
-		return this.servletConfig;
-	}
+    @Override
+    @Nullable
+    public ServletContext getServletContext() {
+        return this.servletContext;
+    }
 
-	@Override
-	public void setNamespace(@Nullable String namespace) {
-		this.namespace = namespace;
-		if (namespace != null) {
-			setDisplayName("WebApplicationContext for namespace '" + namespace + "'");
-		}
-	}
+    @Override
+    public void setServletConfig(@Nullable ServletConfig servletConfig) {
+        this.servletConfig = servletConfig;
+        if (servletConfig != null && this.servletContext == null) {
+            setServletContext(servletConfig.getServletContext());
+        }
+    }
 
-	@Override
-	@Nullable
-	public String getNamespace() {
-		return this.namespace;
-	}
+    @Override
+    @Nullable
+    public ServletConfig getServletConfig() {
+        return this.servletConfig;
+    }
 
-	@Override
-	public String[] getConfigLocations() {
-		return super.getConfigLocations();
-	}
+    @Override
+    public void setNamespace(@Nullable String namespace) {
+        this.namespace = namespace;
+        if (namespace != null) {
+            setDisplayName("WebApplicationContext for namespace '" + namespace + "'");
+        }
+    }
 
-	@Override
-	public String getApplicationName() {
-		return (this.servletContext != null ? this.servletContext.getContextPath() : "");
-	}
+    @Override
+    @Nullable
+    public String getNamespace() {
+        return this.namespace;
+    }
 
-	/**
-	 * Create and return a new {@link StandardServletEnvironment}. Subclasses may override
-	 * in order to configure the environment or specialize the environment type returned.
-	 */
-	@Override
-	protected ConfigurableEnvironment createEnvironment() {
-		return new StandardServletEnvironment();
-	}
+    @Override
+    public String[] getConfigLocations() {
+        return super.getConfigLocations();
+    }
 
-	/**
-	 * Register request/session scopes, a {@link ServletContextAwareProcessor}, etc.
-	 */
-	@Override
-	protected void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) {
-		beanFactory.addBeanPostProcessor(new ServletContextAwareProcessor(this.servletContext, this.servletConfig));
-		beanFactory.ignoreDependencyInterface(ServletContextAware.class);
-		beanFactory.ignoreDependencyInterface(ServletConfigAware.class);
+    @Override
+    public String getApplicationName() {
+        return (this.servletContext != null ? this.servletContext.getContextPath() : "");
+    }
 
-		WebApplicationContextUtils.registerWebApplicationScopes(beanFactory, this.servletContext);
-		WebApplicationContextUtils.registerEnvironmentBeans(beanFactory, this.servletContext, this.servletConfig);
-	}
+    /**
+     * Create and return a new {@link StandardServletEnvironment}. Subclasses may override
+     * in order to configure the environment or specialize the environment type returned.
+     */
+    @Override
+    protected ConfigurableEnvironment createEnvironment() {
+        return new StandardServletEnvironment();
+    }
 
-	/**
-	 * This implementation supports file paths beneath the root of the ServletContext.
-	 * @see ServletContextResource
-	 */
-	@Override
-	protected Resource getResourceByPath(String path) {
-		Assert.state(this.servletContext != null, "No ServletContext available");
-		return new ServletContextResource(this.servletContext, path);
-	}
+    /**
+     * Register request/session scopes, a {@link ServletContextAwareProcessor}, etc.
+     */
+    @Override
+    protected void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) {
+        // 注册BeanPostProcessor，处理 ServletContext 和 ServletConfig 的 Aware 注入
+        beanFactory.addBeanPostProcessor(new ServletContextAwareProcessor(this.servletContext, this.servletConfig));
+        beanFactory.ignoreDependencyInterface(ServletContextAware.class);
+        beanFactory.ignoreDependencyInterface(ServletConfigAware.class);
 
-	/**
-	 * This implementation supports pattern matching in unexpanded WARs too.
-	 * @see ServletContextResourcePatternResolver
-	 */
-	@Override
-	protected ResourcePatternResolver getResourcePatternResolver() {
-		return new ServletContextResourcePatternResolver(this);
-	}
+        /**
+         * 1. 注册 request、session、application 三个Scope
+         * 2. 注册 ServletRequest、ServletResponse、HttpSession、WebRequest 四个依赖注入对象
+         * */
+        WebApplicationContextUtils.registerWebApplicationScopes(beanFactory, this.servletContext);
+        /**
+         * 1. 注册单例bean，用于 ServletContext 和 ServletConfig 的依赖注入
+         * 2. 补充，注入 contextParameters 这个单例bean，用于访问 web容器+DispatcherServlet 的初始化属性（类型是Map）
+         * 3. 补充，注入 contextAttributes 这个单例bean，用于访问 DispatcherServlet 的初始化属性（类型是Map）
+         * */
+        WebApplicationContextUtils.registerEnvironmentBeans(beanFactory, this.servletContext, this.servletConfig);
+    }
 
-	/**
-	 * Initialize the theme capability.
-	 */
-	@Override
-	protected void onRefresh() {
-		this.themeSource = UiApplicationContextUtils.initThemeSource(this);
-	}
+    /**
+     * This implementation supports file paths beneath the root of the ServletContext.
+     * @see ServletContextResource
+     */
+    @Override
+    protected Resource getResourceByPath(String path) {
+        Assert.state(this.servletContext != null, "No ServletContext available");
+        return new ServletContextResource(this.servletContext, path);
+    }
 
-	/**
-	 * {@inheritDoc}
-	 * <p>Replace {@code Servlet}-related property sources.
-	 */
-	@Override
-	protected void initPropertySources() {
-		ConfigurableEnvironment env = getEnvironment();
-		if (env instanceof ConfigurableWebEnvironment) {
-			((ConfigurableWebEnvironment) env).initPropertySources(this.servletContext, this.servletConfig);
-		}
-	}
+    /**
+     * This implementation supports pattern matching in unexpanded WARs too.
+     * @see ServletContextResourcePatternResolver
+     */
+    @Override
+    protected ResourcePatternResolver getResourcePatternResolver() {
+        return new ServletContextResourcePatternResolver(this);
+    }
 
-	@Override
-	@Nullable
-	public Theme getTheme(String themeName) {
-		Assert.state(this.themeSource != null, "No ThemeSource available");
-		return this.themeSource.getTheme(themeName);
-	}
+    /**
+     * Initialize the theme capability.
+     */
+    @Override
+    protected void onRefresh() {
+        this.themeSource = UiApplicationContextUtils.initThemeSource(this);
+    }
+
+    /**
+     * {@inheritDoc}
+     * <p>Replace {@code Servlet}-related property sources.
+     */
+    @Override
+    protected void initPropertySources() {
+        ConfigurableEnvironment env = getEnvironment();
+        if (env instanceof ConfigurableWebEnvironment) {
+            ((ConfigurableWebEnvironment) env).initPropertySources(this.servletContext, this.servletConfig);
+        }
+    }
+
+    @Override
+    @Nullable
+    public Theme getTheme(String themeName) {
+        Assert.state(this.themeSource != null, "No ThemeSource available");
+        return this.themeSource.getTheme(themeName);
+    }
 
 }

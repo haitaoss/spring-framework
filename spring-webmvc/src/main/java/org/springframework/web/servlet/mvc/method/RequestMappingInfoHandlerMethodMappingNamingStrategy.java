@@ -32,27 +32,32 @@ import org.springframework.web.servlet.handler.HandlerMethodMappingNamingStrateg
  * @author Rossen Stoyanchev
  * @since 4.1
  */
-public class RequestMappingInfoHandlerMethodMappingNamingStrategy
-		implements HandlerMethodMappingNamingStrategy<RequestMappingInfo> {
+public class RequestMappingInfoHandlerMethodMappingNamingStrategy implements HandlerMethodMappingNamingStrategy<RequestMappingInfo> {
 
-	/** Separator between the type and method-level parts of a HandlerMethod mapping name. */
-	public static final String SEPARATOR = "#";
+    /**
+     * Separator between the type and method-level parts of a HandlerMethod mapping name.
+     */
+    public static final String SEPARATOR = "#";
 
 
-	@Override
-	public String getName(HandlerMethod handlerMethod, RequestMappingInfo mapping) {
-		if (mapping.getName() != null) {
-			return mapping.getName();
-		}
-		StringBuilder sb = new StringBuilder();
-		String simpleTypeName = handlerMethod.getBeanType().getSimpleName();
-		for (int i = 0; i < simpleTypeName.length(); i++) {
-			if (Character.isUpperCase(simpleTypeName.charAt(i))) {
-				sb.append(simpleTypeName.charAt(i));
-			}
-		}
-		sb.append(SEPARATOR).append(handlerMethod.getMethod().getName());
-		return sb.toString();
-	}
+    @Override
+    public String getName(HandlerMethod handlerMethod, RequestMappingInfo mapping) {
+        if (mapping.getName() != null) {
+            return mapping.getName();
+        }
+        StringBuilder sb = new StringBuilder();
+        String simpleTypeName = handlerMethod.getBeanType()
+                .getSimpleName();
+        for (int i = 0; i < simpleTypeName.length(); i++) {
+            // 是大写的
+            if (Character.isUpperCase(simpleTypeName.charAt(i))) {
+                sb.append(simpleTypeName.charAt(i));
+            }
+        }
+        sb.append(SEPARATOR)
+                .append(handlerMethod.getMethod()
+                        .getName());
+        return sb.toString();
+    }
 
 }

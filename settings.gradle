@@ -57,5 +57,6 @@ settings.gradle.projectsLoaded {
 		}
 	}
 }
-include 'spring-mytest'
+include 'source-note-spring'
+include 'source-note-springmvc'
 

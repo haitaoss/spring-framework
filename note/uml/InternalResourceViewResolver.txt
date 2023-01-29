@@ -1,0 +1,231 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AbstractCachingViewResolver {
+  - cacheFilter: CacheFilter
+  - viewCreationCache: Map<Object, View>
+  - cacheLimit: int
+  - UNRESOLVED_VIEW: View
+  - cacheUnresolved: boolean
+  + DEFAULT_CACHE_LIMIT: int
+  - viewAccessCache: Map<Object, View>
+  - DEFAULT_CACHE_FILTER: CacheFilter
+  + getCacheLimit(): int
+  + setCacheUnresolved(boolean): void
+  + setCacheFilter(CacheFilter): void
+  + removeFromCache(String, Locale): void
+  # createView(String, Locale): View?
+  # loadView(String, Locale): View?
+  - formatKey(Object): String
+  + isCache(): boolean
+  + getCacheFilter(): CacheFilter
+  + resolveViewName(String, Locale): View?
+  # getCacheKey(String, Locale): Object
+  + isCacheUnresolved(): boolean
+  + clearCache(): void
+  + setCacheLimit(int): void
+  + setCache(boolean): void
+}
+class AbstractUrlBasedView {
+  - url: String?
+  + setUrl(String?): void
+  + afterPropertiesSet(): void
+  + getUrl(): String?
+  + checkResourceExists(Locale): boolean
+  + toString(): String
+}
+class AbstractView {
+  + REQUEST_DATA_VALUE_PROCESSOR_BEAN_NAME: String
+  - beanName: String?
+  - adapterRegistry: ReactiveAdapterRegistry
+  - requestContextAttribute: String?
+  # logger: Log
+  - applicationContext: ApplicationContext?
+  - mediaTypes: List<MediaType>
+  - defaultCharset: Charset
+  + setSupportedMediaTypes(List<MediaType>): void
+  # resolveAsyncAttributes(Map<String, Object>, ServerWebExchange): Mono<Void>
+  # obtainApplicationContext(): ApplicationContext
+  # resolveAsyncAttributes(Map<String, Object>): Mono<Void>
+  + getSupportedMediaTypes(): List<MediaType>
+  + setBeanName(String?): void
+  # createRequestContext(ServerWebExchange, Map<String, Object>): RequestContext
+  + setDefaultCharset(Charset): void
+  + getBeanName(): String?
+  + getDefaultCharset(): Charset
+  + setRequestContextAttribute(String?): void
+  + getRequestContextAttribute(): String?
+  # renderInternal(Map<String, Object>, MediaType?, ServerWebExchange): Mono<Void>
+  + render(Map<String, ?>?, MediaType?, ServerWebExchange): Mono<Void>
+  + toString(): String
+  + setApplicationContext(ApplicationContext?): void
+  - addBindingResult(String, Object, Map<String, Object>, ServerWebExchange): void
+  # formatViewName(): String
+  + getApplicationContext(): ApplicationContext?
+  # getModelAttributes(Map<String, ?>?, ServerWebExchange): Mono<Map<String, Object>>
+  # getRequestDataValueProcessor(): RequestDataValueProcessor?
+}
+interface ApplicationContextAware << interface >> {
+  + setApplicationContext(ApplicationContext): void
+}
+class ApplicationObjectSupport {
+  - messageSourceAccessor: MessageSourceAccessor?
+  - applicationContext: ApplicationContext?
+  # logger: Log
+  # obtainApplicationContext(): ApplicationContext
+  # isContextRequired(): boolean
+  + getApplicationContext(): ApplicationContext?
+  # requiredContextClass(): Class<?>
+  # initApplicationContext(): void
+  + setApplicationContext(ApplicationContext?): void
+  # initApplicationContext(ApplicationContext): void
+  # getMessageSourceAccessor(): MessageSourceAccessor?
+}
+interface Aware << interface >>
+interface BeanNameAware << interface >> {
+  + setBeanName(String): void
+}
+interface InitializingBean << interface >> {
+  + afterPropertiesSet(): void
+}
+class InternalResourceView {
+  - preventDispatchLoop: boolean
+  - alwaysInclude: boolean
+  + setAlwaysInclude(boolean): void
+  # prepareForRendering(HttpServletRequest, HttpServletResponse): String
+  # isContextRequired(): boolean
+  # useInclude(HttpServletRequest, HttpServletResponse): boolean
+  + setPreventDispatchLoop(boolean): void
+  # getRequestDispatcher(HttpServletRequest, String): RequestDispatcher?
+  # renderMergedOutputModel(Map<String, Object>, HttpServletRequest, HttpServletResponse): void
+  # exposeHelpers(HttpServletRequest): void
+}
+class InternalResourceViewResolver {
+  - jstlPresent: boolean
+  - alwaysInclude: Boolean?
+  # instantiateView(): AbstractUrlBasedView
+  # requiredViewClass(): Class<?>
+  # buildView(String): AbstractUrlBasedView
+  + setAlwaysInclude(boolean): void
+}
+interface Ordered << interface >> {
+  + HIGHEST_PRECEDENCE: int
+  + LOWEST_PRECEDENCE: int
+  + getOrder(): int
+}
+class RedirectView {
+  - URI_TEMPLATE_VARIABLE_PATTERN: Pattern
+  - propagateQuery: boolean
+  - statusCode: HttpStatus
+  - contextRelative: boolean
+  - hosts: String[]?
+  # renderInternal(Map<String, Object>, MediaType?, ServerWebExchange): Mono<Void>
+  # sendRedirect(String, ServerWebExchange): Mono<Void>
+  + isRedirectView(): boolean
+  + setPropagateQuery(boolean): void
+  + setHosts(String[]?): void
+  + isPropagateQuery(): boolean
+  - encodeUriVariable(String): String
+  + checkResourceExists(Locale): boolean
+  + setStatusCode(HttpStatus): void
+  + getHosts(): String[]?
+  - getCurrentUriVariables(ServerWebExchange): Map<String, String>
+  # createTargetUrl(Map<String, Object>, ServerWebExchange): String
+  + getStatusCode(): HttpStatus
+  + setContextRelative(boolean): void
+  + afterPropertiesSet(): void
+  # expandTargetUrlTemplate(String, Map<String, Object>, Map<String, String>): StringBuilder
+  # isRemoteHost(String): boolean
+  + isContextRelative(): boolean
+  # appendCurrentRequestQuery(String, ServerHttpRequest): StringBuilder
+}
+interface ServletContextAware << interface >> {
+  + setServletContext(ServletContext): void
+}
+class UrlBasedViewResolver {
+  - contentType: String?
+  - redirectContextRelative: boolean
+  - viewClass: Class<?>?
+  - exposeContextBeansAsAttributes: Boolean?
+  - viewNames: String[]?
+  - order: int
+  - staticAttributes: Map<String, Object>
+  - exposedContextBeanNames: String[]?
+  - prefix: String
+  - suffix: String
+  - requestContextAttribute: String?
+  - exposePathVariables: Boolean?
+  + FORWARD_URL_PREFIX: String
+  - redirectHosts: String[]?
+  + REDIRECT_URL_PREFIX: String
+  - redirectHttp10Compatible: boolean
+  # instantiateView(): AbstractUrlBasedView
+  + setRedirectHttp10Compatible(boolean): void
+  # getRequestContextAttribute(): String?
+  # isRedirectHttp10Compatible(): boolean
+  + setExposeContextBeansAsAttributes(boolean): void
+  + setSuffix(String?): void
+  # getExposedContextBeanNames(): String[]?
+  # requiredViewClass(): Class<?>
+  + getRedirectHosts(): String[]?
+  # getPrefix(): String
+  + setRedirectHosts(String[]?): void
+  # getSuffix(): String
+  # getContentType(): String?
+  # initApplicationContext(): void
+  + setViewNames(String[]?): void
+  + setRedirectContextRelative(boolean): void
+  # canHandle(String, Locale): boolean
+  # loadView(String, Locale): View?
+  # applyLifecycleMethods(String, AbstractUrlBasedView): View
+  # isRedirectContextRelative(): boolean
+  + setAttributes(Properties): void
+  + setContentType(String?): void
+  # buildView(String): AbstractUrlBasedView
+  + getAttributesMap(): Map<String, Object>
+  + setRequestContextAttribute(String?): void
+  # getExposePathVariables(): Boolean?
+  + setPrefix(String?): void
+  + setAttributesMap(Map<String, ?>?): void
+  # getCacheKey(String, Locale): Object
+  # getViewClass(): Class<?>?
+  + setExposePathVariables(Boolean?): void
+  # getViewNames(): String[]?
+  + setOrder(int): void
+  # getExposeContextBeansAsAttributes(): Boolean?
+  + setExposedContextBeanNames(String[]?): void
+  + getOrder(): int
+  + setViewClass(Class<?>?): void
+  # createView(String, Locale): View?
+}
+interface View << interface >> {
+  + BINDING_CONTEXT_ATTRIBUTE: String
+  + render(Map<String, ?>?, MediaType?, ServerWebExchange): Mono<Void>
+  + isRedirectView(): boolean
+  + getSupportedMediaTypes(): List<MediaType>
+}
+interface ViewResolver << interface >> {
+  + resolveViewName(String, Locale): View?
+}
+
+AbstractCachingViewResolver   -[#008200,dashed]-^  ViewResolver
+AbstractUrlBasedView          -[#000082,plain]-^  AbstractView
+AbstractUrlBasedView          -[#008200,dashed]-^  InitializingBean
+AbstractView                  -[#008200,dashed]-^  ApplicationContextAware
+AbstractView                  -[#008200,dashed]-^  BeanNameAware
+AbstractView                  -[#008200,dashed]-^  View
+ApplicationContextAware       -[#008200,plain]-^  Aware
+ApplicationObjectSupport      -[#008200,dashed]-^  ApplicationContextAware
+BeanNameAware                 -[#008200,plain]-^  Aware
+InternalResourceView          -[#008200,dashed]-^  BeanNameAware
+InternalResourceView          -[#008200,dashed]-^  InitializingBean
+InternalResourceViewResolver  -[#000082,plain]-^  UrlBasedViewResolver
+RedirectView                  -[#000082,plain]-^  AbstractUrlBasedView
+ServletContextAware           -[#008200,plain]-^  Aware
+UrlBasedViewResolver          -[#000082,plain]-^  AbstractCachingViewResolver
+UrlBasedViewResolver          -[#008200,dashed]-^  Ordered
+ViewResolver *-- View
+@enduml

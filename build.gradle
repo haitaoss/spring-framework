@@ -15,7 +15,7 @@ plugins {
 }
 
 ext {
-	moduleProjects = subprojects.findAll { it.name.startsWith("spring-") }
+	moduleProjects = subprojects.findAll { it.name.startsWith("spring-") || it.name.startsWith("source-note-")  }
 	javaProjects = subprojects - project(":framework-bom")
 	withoutJclOverSlf4j = {
 		exclude group: "org.slf4j", name: "jcl-over-slf4j"

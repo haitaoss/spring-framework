@@ -1,0 +1,61 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+interface ApplicationContextInitializer<C> << interface >> {
+  + initialize(C): void
+}
+class ContextLoader {
+  - contextInitializers: List<ApplicationContextInitializer<ConfigurableApplicationContext>>
+  + CONTEXT_INITIALIZER_CLASSES_PARAM: String
+  - currentContextPerThread: Map<ClassLoader, WebApplicationContext>
+  + CONTEXT_ID_PARAM: String
+  + GLOBAL_INITIALIZER_CLASSES_PARAM: String
+  - context: WebApplicationContext?
+  - currentContext: WebApplicationContext?
+  + CONFIG_LOCATION_PARAM: String
+  - INIT_PARAM_DELIMITERS: String
+  - DEFAULT_STRATEGIES_PATH: String
+  + CONTEXT_CLASS_PARAM: String
+  - defaultStrategies: Properties
+  + closeWebApplicationContext(ServletContext): void
+  + setContextInitializers(ApplicationContextInitializer<?>[]?): void
+  # createWebApplicationContext(ServletContext): WebApplicationContext
+  + getCurrentWebApplicationContext(): WebApplicationContext?
+  + initWebApplicationContext(ServletContext): WebApplicationContext
+  - loadInitializerClass(String): Class<ApplicationContextInitializer<ConfigurableApplicationContext>>
+  # configureAndRefreshWebApplicationContext(ConfigurableWebApplicationContext, ServletContext): void
+  # customizeContext(ServletContext, ConfigurableWebApplicationContext): void
+  # loadParentContext(ServletContext): ApplicationContext?
+  # determineContextClass(ServletContext): Class<?>
+  # determineContextInitializerClasses(ServletContext): List<Class<ApplicationContextInitializer<ConfigurableApplicationContext>>>
+}
+class ContextLoaderListener {
+  + contextInitialized(ServletContextEvent): void
+  + contextDestroyed(ServletContextEvent): void
+}
+interface EventListener << interface >>
+interface ServletContextListener << interface >> {
+  + contextInitialized(ServletContextEvent): void
+  + contextDestroyed(ServletContextEvent): void
+}
+interface WebApplicationContext << interface >> {
+  + SERVLET_CONTEXT_BEAN_NAME: String
+  + CONTEXT_ATTRIBUTES_BEAN_NAME: String
+  + SCOPE_SESSION: String
+  + CONTEXT_PARAMETERS_BEAN_NAME: String
+  + SCOPE_REQUEST: String
+  + SCOPE_APPLICATION: String
+  + ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE: String
+  + getServletContext(): ServletContext?
+}
+
+ContextLoaderListener          -[#000082,plain]-^  ContextLoader
+ContextLoaderListener          -[#008200,dashed]-^  ServletContextListener
+ServletContextListener         -[#008200,plain]-^  EventListener
+ContextLoader *-- WebApplicationContext
+ContextLoader *-- ApplicationContextInitializer
+@enduml
+
