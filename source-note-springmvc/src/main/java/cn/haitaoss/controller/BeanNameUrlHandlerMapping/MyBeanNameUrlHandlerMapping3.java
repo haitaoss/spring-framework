@@ -28,7 +28,7 @@ public class MyBeanNameUrlHandlerMapping3 implements Controller, BeanFactoryAwar
     public ModelAndView handleRequest(HttpServletRequest request, HttpServletResponse response) throws Exception {
         System.out.println("MyBeanNameUrlHandlerMapping3..." + request.getAttribute(UrlPathHelper.PATH_ATTRIBUTE));
         ModelAndView index = new ModelAndView("index");
-        index.setViewName("redirect:http://www.baidu.com");
+        // index.setViewName("redirect:http://www.baidu.com");
         return index;
     }
 
@@ -42,6 +42,7 @@ public class MyBeanNameUrlHandlerMapping3 implements Controller, BeanFactoryAwar
     public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
         this.beanFactory = beanFactory;
         DefaultListableBeanFactory.class.cast(beanFactory)
-                .registerAlias("/static/**", beanName);
+                // .registerAlias("/static/**", beanName); // 原来是这么写，写反了，所以导致后面判断错误
+                .registerAlias(beanName, "/static/**"); // 这样才对
     }
 }

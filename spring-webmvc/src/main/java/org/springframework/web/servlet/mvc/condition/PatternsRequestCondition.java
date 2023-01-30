@@ -295,6 +295,7 @@ public class PatternsRequestCondition extends AbstractRequestCondition<PatternsR
     public List<String> getMatchingPatterns(String lookupPath) {
         List<String> matches = null;
         for (String pattern : this.patterns) {
+            // 匹配
             String match = getMatchingPattern(pattern, lookupPath);
             if (match != null) {
                 matches = (matches != null ? matches : new ArrayList<>());
@@ -305,6 +306,7 @@ public class PatternsRequestCondition extends AbstractRequestCondition<PatternsR
             return Collections.emptyList();
         }
         if (matches.size() > 1) {
+            // 对结果排序
             matches.sort(this.pathMatcher.getPatternComparator(lookupPath));
         }
         return matches;

@@ -212,6 +212,9 @@ public abstract class AbstractMessageConverterMethodProcessor extends AbstractMe
             HttpServletRequest request = inputMessage.getServletRequest();
             List<MediaType> acceptableTypes;
             try {
+                /**
+                 * 拿到 Accept 的值
+                 * */
                 acceptableTypes = getAcceptableMediaTypes(request);
             } catch (HttpMediaTypeNotAcceptableException ex) {
                 int series = outputMessage.getServletResponse()

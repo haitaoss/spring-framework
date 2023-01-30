@@ -2,6 +2,8 @@ package cn.haitaoss.controller.RequestMappingHandlerMapping;
 
 import cn.haitaoss.entity.Person;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.annotation.Validated;
@@ -76,6 +78,36 @@ public class HelloController2 {
     public String index3(@RequestParam(value = "name",
             required = false) Object obj, Integer age) {
         System.out.println("index3");
+        return "ok";
+    }
+
+
+    /**
+     * 已知, consumes 匹配的是 请求头中的 Content-Type 的值,produces 匹配的是 请求头中的 Accept 的值
+     *
+     * 问题：都是从请求头中获取的，为啥一个叫 consume(消费) 一个叫produce(生产)？
+     *
+     * 请求体映解析成JavaBean , JavaBean输出到响应体 这两种转换是使用 HttpMessageConverter 接口来处理的
+     * {@link HttpMessageConverter#canRead(Class, MediaType)}   ---> 用来判断是否支持这个 MediaType
+     * {@link HttpMessageConverter#canWrite(Class, MediaType)}  ---> 用来判断是否支持这个 MediaType
+     *
+     * 站在程序的角度，来看 read 就是读取请求体，write 就是将内容输出到响应体。
+     *
+     * canRead 方法的MediaType参数，是读取请求头的 Content-Type 得到的
+     * canWrite 方法的MediaType参数，是读取响应体的 Content-Type 得到的，或者是请求头的 Accept 得到
+     * 所以才命名为 consumes 和 produces！！！
+     *
+     * 比如发送的请求的请求头是：
+     *      Content-Type: text/plain
+     *      Accept: application/json
+     *
+     * 那么解析@RequestBody 用的 HttpMessageConverter 应当是直接将请求体内容转换成String即可
+     * 解析@ResponseBody 用的 HttpMessageConverter 应当是直接将返回值转成JSON字符串，然后将字符串写入到响应体即可
+     * */
+    @RequestMapping(value = "index4", consumes = MediaType.TEXT_PLAIN_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public String index4() {
+        System.out.println("index4");
         return "ok";
     }
 }

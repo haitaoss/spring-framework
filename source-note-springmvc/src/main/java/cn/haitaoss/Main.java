@@ -10,7 +10,6 @@ import org.apache.catalina.webresources.StandardRoot;
 import org.apache.coyote.http11.Http11NioProtocol;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.util.AntPathMatcher;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.FrameworkServlet;
 
@@ -98,15 +97,6 @@ public class Main {
                 "Parent-Context: " + servletContext.getAttribute(WebApplicationContext.class.getName() + ".ROOT"));
         System.out.println(
                 "Son-Context: " + servletContext.getAttribute(FrameworkServlet.SERVLET_CONTEXT_PREFIX + "dispatcher"));
-
-        System.out.println("API的使用");
-        AntPathMatcher antPathMatcher = new AntPathMatcher();
-        System.out.println("校验路径匹配");
-        System.out.println(antPathMatcher.isPattern("/index"));
-        System.out.println(antPathMatcher.isPattern("/*"));
-        System.out.println("校验注解");
-        System.out.println("提取占位符");
-        System.out.println(antPathMatcher.extractUriTemplateVariables("/user/9{id}", "/user/9527"));
 
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         // 执行bean的初始化操作(XxxAware、初始化前后置处理器、初始化方法、初始化后后置处理器)

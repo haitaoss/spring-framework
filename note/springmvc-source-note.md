@@ -687,8 +687,12 @@ protected void initStrategies(ApplicationContext context) {
  *      - HandlerFunctionAdapter {@link HandlerFunctionAdapter#supports(Object)}
  *          handler instanceof HandlerFunction
  *
- *
- * 其中只有 RequestMappingHandlerAdapter 比较特殊，存在初始化方法。
+ **/
+```
+#### RequestMappingHandlerAdapter
+```java
+/**
+ * RequestMappingHandlerAdapter 比较特殊，存在初始化方法。
  * {@link RequestMappingHandlerAdapter#afterPropertiesSet()}
  *  1. 根据 @ControllerAdvice 注解标注的bean，初始化一些属性
  *      1.1 遍历容器中所有的bean，收集存在 @ControllerAdvice 的并构造成 ControllerAdviceBean 返回
@@ -1732,13 +1736,17 @@ protected void initStrategies(ApplicationContext context) {
  **/
 ```
 
-# @SessionAttributes、@ModelAttribute和@InitBinder的理解
+# 常用功能原理分析
 
-@ModelAttribute：表示属性需要用到，会从方法的执行上下文对象中查找属性，找不到就回调标注的方法
+## @SessionAttributes、@ModelAttribute和@InitBinder的理解
 
-@SessionAttributes：会从session域中读取属性值，存到方法的执行上下文对象中，供方法使用
+- @ModelAttribute：表示属性需要用到，会从方法的执行上下文对象中查找属性，找不到就回调标注的方法
+- @SessionAttributes：会从session域中读取属性值，存到方法的执行上下文对象中，供方法使用。再handler执行完之后会从方法执行上下文中拿到这些属性，存到session域中
+- @InitBinder：回调@ModelAttribute的方法时和调用@RequestMapping标注的方法时的**参数解析**阶段会回调该方法
 
-@InitBinder：回调@ModelAttribute的方法时的参数解析阶段和调用@RequestMapping标注的方法，解析参数列表时会回调该方法
+[方法回调的原理，得看RequestMappingHandlerMapping执行Handler的流程](#AbstractHandlerMethodAdapter#handle)
+
+[全局的 @ModelAttribute 和 @InitBinder 是如何注册的，得看@ControllerAdvice的解析过程](#RequestMappingHandlerAdapter)
 
 ```java
 @Controller
@@ -1790,24 +1798,161 @@ public class HelloController2 {
 }
 ```
 
-# 待整理
+## @EnableWebMvc
 
-@EnableWebMvc
+[WebMvcConfigurationSupport的说明](#WebMvcConfigurationSupport)
 
-@ResponseBody
+```java
+/**
+ * @EnableWebMvc
+ *
+ * 会 @Import(DelegatingWebMvcConfiguration.class)，也就是会把 DelegatingWebMvcConfiguration 注册到BeanFactory中
+ * 而 DelegatingWebMvcConfiguration 继承了 WebMvcConfigurationSupport，重写了很多方法，然后我们可以使用 WebMvcConfigurer 
+ * 处理重写方法的回调。
+ *
+ * 所以要想知道 @EnableWebMvc 有啥用，其实就是得看 WebMvcConfigurationSupport 有啥用 
+ * */
+```
+## WebMvcConfigurationSupport
 
-@RequestBody
+[DispatcherServlet的初始化主要做了这些事情](#DispatcherServlet#initStrategies)
 
-@Valid
+```java
+/**
+ * WebMvcConfigurationSupport 是啥？
+ *
+ * 使用 AbstractAnnotationConfigDispatcherServletInitializer 只是实现了将DispatcherServlet注册到Web容器中，不支持对DispatcherServlet的配置。
+ * 所以 SpringMVC提供了 WebMvcConfigurationSupport ，WebMvcConfigurationSupport 其实就是将 DispatcherServlet.properties 文件中定义的默认值改成使用@Bean的方式
+ * 将bean注册到IOC容器中，然后预留了很多 protected 方法，让子类重写，方便给这些bean进行配置。比如配置 HandlerInterceptor、ConversionService、Validator等等
+ *
+ *
+ * WebMvcConfigurationSupport 会使用 @Bean注册这些东西
+ *  HandlerMapping:
+ *      - RequestMappingHandlerMapping
+ *      - BeanNameUrlHandlerMapping
+ *      - RouterFunctionMapping
+ *
+ *  HandlerAdapter:
+ *      - RequestMappingHandlerAdapter
+ *      - HandlerFunctionAdapter
+ *      - HttpRequestHandlerAdapter
+ *      - SimpleControllerHandlerAdapter
+ *
+ *  HandlerExceptionResolver:
+ *      - ExceptionHandlerExceptionResolver
+ *      - ResponseStatusExceptionResolver
+ *      - DefaultHandlerExceptionResolver
+ *
+ *  ViewResolver:
+ *      - InternalResourceViewResolver
+ *
+ *  LocaleResolver:
+ *      - AcceptHeaderLocaleResolver
+ *
+ *  ThemeResolver:
+ *      - FixedThemeResolver
+ *
+ *  FlashMapManager:
+ *      - SessionFlashMapManager
+ *
+ *  RequestToViewNameTranslator:
+ *      - DefaultRequestToViewNameTranslator
+ *
+ * 还额外配置了这些，这些是前面那几个bean依赖的东西
+ *
+ *  FormattingConversionService、Validator
+ *      给 RequestMappingHandlerAdapter 用的，在解析方法参数列表时，对参数的值进行 类型转换和JSR303校验。
+ *
+ *  ContentNegotiationManager
+ *      给 RequestMappingHandlerAdapter 和 ExceptionHandlerExceptionResolver 用的
+ *      ContentNegotiationManager 是用于确定Request的MediaType类型 的管理器
+ *
+ *  PathMatchConfigurer
+ *      给 RequestMappingHandlerMapping 用的，用来配置请求路径与@RequestMapping('path')的路径匹配时，
+ *      用什么 PathMatcher 进行匹配，是否使用后缀匹配(拼接文件扩展名，拼接'.*')， 尾部拼接上 / 进行匹配
+ *
+ * 还有两个，目前不知道有啥应用场景，用到在看吧:
+ *      - ResourceUrlProvider
+ *      - CompositeUriComponentsContributor
+ *
+ * */
+```
 
-@RequestMapping
+## @RequestMapping
 
-@CookieValue
+[看 RequestMappingHandlerMapping 的实例化就知道如何解析@RequestMapping了](#RequestMappingHandlerMapping)
 
-@RequestHeader
+[看获取Hanlder的流程就知道@RequestMapping的注解值有啥用了](#RequestMappingInfoHandlerMapping#getHandlerInternal)
 
-@ControllerAdvice
+```java
+@Controller
+public class HelloController {
+    /**
+     * 已知, consumes 匹配的是 请求头中的 Content-Type 的值,produces 匹配的是 请求头中的 Accept 的值
+     *
+     * 问题：都是从请求头中获取的，为啥一个叫 consume(消费) 一个叫produce(生产)？
+     *
+     * 请求体映解析成JavaBean , JavaBean输出到响应体 这两种转换是使用 HttpMessageConverter 接口来处理的
+     * {@link HttpMessageConverter#canRead(Class, MediaType)}   ---> 用来判断是否支持这个 MediaType
+     * {@link HttpMessageConverter#canWrite(Class, MediaType)}  ---> 用来判断是否支持这个 MediaType
+     *
+     * 站在程序的角度，来看 read 就是读取请求体，write 就是将内容输出到响应体。
+     *
+     * canRead 方法的MediaType参数，是读取请求头的 Content-Type 得到的
+     * canWrite 方法的MediaType参数，是读取响应体的 Content-Type 得到的，或者是请求头的 Accept 得到
+     * 所以才命名为 consumes 和 produces！！！
+     *
+     * 比如发送的请求的请求头是：
+     *      Content-Type: text/plain
+     *      Accept: application/json
+     *
+     * 那么解析@RequestBody 用的 HttpMessageConverter 应当是直接将请求体内容转换成String即可
+     * 解析@ResponseBody 用的 HttpMessageConverter 应当是直接将返回值转成JSON字符串，然后将字符串写入到响应体即可
+     * */
+    @RequestMapping(value = "index4", consumes = MediaType.TEXT_PLAIN_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public String index4() {
+        System.out.println("index4");
+        return "ok";
+    }
+}
+```
 
-@ExceptionHandler
+## @ControllerAdvice
 
-RedirectAttributes
+[RequestMappingHandlerAdapter的实例化会解析@ControllerAdvice](#RequestMappingHandlerAdapter)
+
+[ExceptionHandlerExceptionResolver的实例化会解析@ControllerAdvice](#ExceptionHandlerExceptionResolver)
+
+## @ExceptionHandler
+
+[ExceptionHandlerExceptionResolver的实例化会解析@ControllerAdvice，然后记录下标注了@ExceptionHanler的方法](#ExceptionHandlerExceptionResolver)
+
+[异常处理流程](#DispatcherServlet#processHandlerException)
+
+## @RequestBody、@CookieValue、@RequestHeader、RedirectAttributes、@ResponseBody、@Valid、@Validated
+
+[@RequestBody、@CookieValue、@RequestHeader、RedirectAttributes看参数解析流程就知道了，都是类似的](#HandlerMethodArgumentResolver#resolveArgument)
+
+[@ResponseBody看返回值处理的流程就知道了](#HandlerMethodReturnValueHandler#handleReturnValue)
+
+@Valid 和 @Validated 并没有对应的参数解析器，而是在其他参数解析器解析参数时判断方法参数上有这两个注解，就会额外进行参数值的JSR303校验，但是我看了大部分参数解析器是不处理的，只有[解析@RequestBody的参数处理器](#RequestResponseBodyMethodProcessor)才额外校验了这两个注解 
+
+# 好用的工具类
+
+## AntPathMatcher
+
+```java
+public class AntPathMatcherTest {
+    public static void main(String[] args) {
+        AntPathMatcher antPathMatcher = new AntPathMatcher();
+
+        System.out.println("校验路径匹配");
+        System.out.println(antPathMatcher.isPattern("/index"));
+        System.out.println(antPathMatcher.isPattern("/*"));
+        
+        System.out.println("提取占位符");
+        System.out.println(antPathMatcher.extractUriTemplateVariables("/user/9{id}", "/user/9527"));
+    }
+}
+```
