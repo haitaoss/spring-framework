@@ -455,7 +455,12 @@ public abstract class AbstractHandlerMethodMapping<T> extends AbstractHandlerMap
                 // 是浏览器发出的预检请求
                 if (CorsUtils.isPreFlightRequest(request)) {
                     for (Match match : matches) {
-                        // 匹配的方法或者其类上 写了 @CrossOrigin
+                        /**
+                         * 匹配的方法或者其类上 写了 @CrossOrigin
+                         *
+                         * 看解析的地方就知道了
+                         * {@link AbstractHandlerMethodMapping.MappingRegistry#register(Object, Object, Method)}
+                         * */
                         if (match.hasCorsConfig()) {
                             // 快速返回
                             return PREFLIGHT_AMBIGUOUS_MATCH;
@@ -719,25 +724,25 @@ public abstract class AbstractHandlerMethodMapping<T> extends AbstractHandlerMap
                 // 生成 HandlerMethod(Method+beanName+IOC容器)
                 HandlerMethod handlerMethod = createHandlerMethod(handler, method);
                 /**
-                 * 已经注册过 就报错。
-                 * 所以说不允许同一个 @RequestMapping 标注的多个方法上
+                 * 验证 mapping 是否会重复注册了,就是不能写相同的 @RequestMapping
                  * */
                 validateMethodMapping(handlerMethod, mapping);
 
                 /**
-                 * 拿到直接的路径
-                 * 比如 @RequestMapping(value = {"index", "/","/**"}) 返回的就是
-                 * {"index", "/"}
+                 * 获取直接路径。比如 @RequestMapping("/index","/**") 直接路径就是 /index
                  * */
                 Set<String> directPaths = AbstractHandlerMethodMapping.this.getDirectPaths(mapping);
                 for (String path : directPaths) {
                     /**
                      * 一个路径可以对应多个mapping。
-                     *
                      * 比如：
                      *  @RequestMapping(value = {"index", "/","/**"},method='post')
                      *  @RequestMapping(value = {"index", "/","/**"},method='get')
+                     *
+                     * 缓存起来，在根据Request获取Handler的时候尝试通过直接路径，进行匹配，没有匹配的，在进行通配符的路径匹配
+                     * {@link org.springframework.web.servlet.handler.AbstractHandlerMethodMapping#lookupHandlerMethod(String, HttpServletRequest)}
                      * */
+
                     this.pathLookup.add(path, mapping);
                 }
 
@@ -754,13 +759,22 @@ public abstract class AbstractHandlerMethodMapping<T> extends AbstractHandlerMap
                      * */
                     addMappingName(name, handlerMethod);
                 }
-
-                // 拿到 类或者方法上 @CrossOrigin 注解的信息 构造出 CorsConfiguration
+                /**
+                 * 获取方法或者类上的 @CrossOrigin 映射成 CorsConfiguration 实例
+                 * 1. 方法上的@CrossOrigin的注解值 会覆盖 类上的@CrossOrigin的注解值
+                 * 2. 如果没有设置注解值，会设置默认值
+                 * */
                 CorsConfiguration corsConfig = initCorsConfiguration(handler, method, mapping);
                 if (corsConfig != null) {
                     // 校验参数
                     corsConfig.validateAllowCredentials();
-                    // 记录起来
+                    /**
+                     * 缓存起来
+                     * 在 request 匹配 Handler 时，会判断是否有 这个配置信息，用来处理预检请求的。
+                     *
+                     * {@link org.springframework.web.servlet.handler.AbstractHandlerMapping#getHandler(HttpServletRequest)}
+                     * {@link org.springframework.web.servlet.handler.AbstractHandlerMethodMapping#lookupHandlerMethod(String, HttpServletRequest)}
+                     * */
                     this.corsLookup.put(handlerMethod, corsConfig);
                 }
 

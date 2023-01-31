@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity4">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<h1>展示的信息是：${data}</h1>
+<button onclick="getData('localhost')">发送ajax--->localhost</button>
+<button onclick="getData('127.0.0.1')">发送ajax--->127.0.0.1</button>
+</body>
+</html>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script>
+    function getData(host) {
+        // let url = `http://${host}:8080/mvc/cross/has_CrossOrigin`
+        let url = `http://${host}:8080/mvc/cross/no_CrossOrigin`
+        axios.post(url, {})
+            .then(function (response) {
+                console.log(response);
+            })
+            .catch(function (error) {
+                console.log(error);
+            });
+    }
+</script>

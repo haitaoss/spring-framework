@@ -3,6 +3,7 @@ package cn.haitaoss.servlet;
 import cn.haitaoss.config.RootConfig;
 import cn.haitaoss.config.WebServletConfig;
 import cn.haitaoss.filter.Filter1;
+import cn.haitaoss.filter.MyCorsFilter;
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.web.servlet.support.AbstractAnnotationConfigDispatcherServletInitializer;
 
@@ -16,11 +17,11 @@ import javax.servlet.Filter;
 public class DispatcherServletInitializer extends AbstractAnnotationConfigDispatcherServletInitializer {
     /**
      * RequestToViewNameTranslator（request变成viewName的翻译器。比如返回了ModelAndView但是没有指定viewName，就是使用这个解析request拿到默认的viewName）:
-     *  DefaultRequestToViewNameTranslator
+     * DefaultRequestToViewNameTranslator
      *
      * FlashMapManager（处理RedirectAttributes中的flash参数的，负责设置、读取session中的值）:
-     *  SessionFlashMapManager
-     * */
+     * SessionFlashMapManager
+     */
     @Override
     protected Class<?>[] getRootConfigClasses() {
         // 作为父容器的配置类
@@ -43,7 +44,7 @@ public class DispatcherServletInitializer extends AbstractAnnotationConfigDispat
     @Override
     protected Filter[] getServletFilters() {
         // 是否需要给 DispatcherServlet 注册过滤器
-        return new Filter[]{new Filter1()};
+        return new Filter[]{new Filter1(), new MyCorsFilter()};
     }
 
     @Override

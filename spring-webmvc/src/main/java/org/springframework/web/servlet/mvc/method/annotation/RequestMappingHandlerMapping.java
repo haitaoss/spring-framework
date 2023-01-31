@@ -496,15 +496,18 @@ public class RequestMappingHandlerMapping extends RequestMappingInfoHandlerMappi
         }
 
         CorsConfiguration config = new CorsConfiguration();
+        // 先设置类上的，在设置方法上的，从而实现方法上的会覆盖类的值
         updateCorsConfig(config, typeAnnotation);
         updateCorsConfig(config, methodAnnotation);
 
         if (CollectionUtils.isEmpty(config.getAllowedMethods())) {
             for (RequestMethod allowedMethod : mappingInfo.getMethodsCondition()
                     .getMethods()) {
+                // 将 @RequestMapping 中的方法 信息设置给 config
                 config.addAllowedMethod(allowedMethod.name());
             }
         }
+        // 设置默认值
         return config.applyPermitDefaultValues();
     }
 

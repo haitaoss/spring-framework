@@ -1,0 +1,125 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class CorsConfiguration {
+  - maxAge: Long?
+  - DEFAULT_PERMIT_ALL: List<String>
+  - ALL_PATTERN: OriginPattern
+  - allowedHeaders: List<String>?
+  + ALL: String
+  - allowedOriginPatterns: List<OriginPattern>?
+  - DEFAULT_PERMIT_METHODS: List<String>
+  - ALL_PATTERN_LIST: List<OriginPattern>
+  - allowedMethods: List<String>?
+  - DEFAULT_METHODS: List<HttpMethod>
+  - allowedOrigins: List<String>?
+  - resolvedMethods: List<HttpMethod>?
+  - exposedHeaders: List<String>?
+  - ALL_LIST: List<String>
+  - allowCredentials: Boolean?
+  + addExposedHeader(String): void
+  + addAllowedMethod(String): void
+  + applyPermitDefaultValues(): CorsConfiguration
+  - combine(List<String>?, List<String>?): List<String>
+  + setAllowCredentials(Boolean?): void
+  + setAllowedMethods(List<String>?): void
+  + getAllowCredentials(): Boolean?
+  + checkHttpMethod(HttpMethod?): List<HttpMethod>?
+  + getAllowedHeaders(): List<String>?
+  + validateAllowCredentials(): void
+  + addAllowedOriginPattern(String?): void
+  + setAllowedOrigins(List<String>?): void
+  + getAllowedOrigins(): List<String>?
+  + setAllowedOriginPatterns(List<String>?): CorsConfiguration
+  + setExposedHeaders(List<String>?): void
+  + checkHeaders(List<String>?): List<String>?
+  + setMaxAge(Duration): void
+  + getMaxAge(): Long?
+  + setMaxAge(Long?): void
+  + addAllowedOrigin(String?): void
+  + getAllowedOriginPatterns(): List<String>?
+  + getExposedHeaders(): List<String>?
+  + combine(CorsConfiguration?): CorsConfiguration
+  + setAllowedHeaders(List<String>?): void
+  - trimTrailingSlash(String): String
+  + addAllowedMethod(HttpMethod): void
+  - combinePatterns(List<OriginPattern>?, List<OriginPattern>?): List<OriginPattern>
+  + getAllowedMethods(): List<String>?
+  + addAllowedHeader(String): void
+  + checkOrigin(String?): String?
+}
+interface CorsConfigurationSource << interface >> {
+  + getCorsConfiguration(HttpServletRequest): CorsConfiguration?
+}
+class CorsFilter {
+  - configSource: CorsConfigurationSource
+  - processor: CorsProcessor
+  + setCorsProcessor(CorsProcessor): void
+  # doFilterInternal(HttpServletRequest, HttpServletResponse, FilterChain): void
+}
+interface CorsProcessor << interface >> {
+  + processRequest(CorsConfiguration?, HttpServletRequest, HttpServletResponse): boolean
+}
+class DefaultCorsProcessor {
+  - logger: Log
+  + processRequest(CorsConfiguration?, HttpServletRequest, HttpServletResponse): boolean
+  - getHeadersToUse(ServerHttpRequest, boolean): List<String>
+  # handleInternal(ServerHttpRequest, ServerHttpResponse, CorsConfiguration, boolean): boolean
+  # checkHeaders(CorsConfiguration, List<String>): List<String>?
+  # checkOrigin(CorsConfiguration, String?): String?
+  - getMethodToUse(ServerHttpRequest, boolean): HttpMethod?
+  # checkMethods(CorsConfiguration, HttpMethod?): List<HttpMethod>?
+  # rejectRequest(ServerHttpResponse): void
+}
+interface Filter << interface >> {
+  + init(FilterConfig): void
+  + doFilter(ServletRequest, ServletResponse, FilterChain): void
+  + destroy(): void
+}
+class GenericFilterBean {
+  - beanName: String?
+  # logger: Log
+  - servletContext: ServletContext?
+  - requiredProperties: Set<String>
+  - filterConfig: FilterConfig?
+  - environment: Environment?
+  # getServletContext(): ServletContext
+  + setBeanName(String): void
+  + afterPropertiesSet(): void
+  # getFilterName(): String?
+  # initFilterBean(): void
+  + getEnvironment(): Environment
+  + setServletContext(ServletContext): void
+  + setEnvironment(Environment): void
+  # addRequiredProperty(String): void
+  + destroy(): void
+  # initBeanWrapper(BeanWrapper): void
+  + getFilterConfig(): FilterConfig?
+  + init(FilterConfig): void
+  # createEnvironment(): Environment
+}
+class OncePerRequestFilter {
+  + ALREADY_FILTERED_SUFFIX: String
+  # getAlreadyFilteredAttributeName(): String
+  # isAsyncDispatch(HttpServletRequest): boolean
+  + doFilter(ServletRequest, ServletResponse, FilterChain): void
+  # shouldNotFilterAsyncDispatch(): boolean
+  # shouldNotFilterErrorDispatch(): boolean
+  # doFilterInternal(HttpServletRequest, HttpServletResponse, FilterChain): void
+  # doFilterNestedErrorDispatch(HttpServletRequest, HttpServletResponse, FilterChain): void
+  - skipDispatch(HttpServletRequest): boolean
+  # isAsyncStarted(HttpServletRequest): boolean
+  # shouldNotFilter(HttpServletRequest): boolean
+}
+
+CorsFilter               -[#000082,plain]-^  OncePerRequestFilter
+DefaultCorsProcessor     -[#008200,dashed]-^ CorsProcessor
+GenericFilterBean        -[#008200,dashed]-^  Filter
+OncePerRequestFilter     -[#000082,plain]-^  GenericFilterBean
+CorsFilter *-- CorsProcessor
+CorsFilter *-- CorsConfigurationSource
+CorsConfigurationSource *-- CorsConfiguration
+@enduml

@@ -20,7 +20,6 @@ import org.springframework.validation.beanvalidation.MethodValidationPostProcess
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.servlet.View;
 import org.springframework.web.servlet.ViewResolver;
-import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.view.InternalResourceViewResolver;
 import org.springframework.web.servlet.view.UrlBasedViewResolver;
 
@@ -34,7 +33,6 @@ import java.util.Locale;
  * date 2023-01-15 21:10
  */
 @Configuration
-@EnableWebMvc
 @ComponentScan(value = "cn.haitaoss")
 @Import(MethodValidationPostProcessor.class)
 public class WebServletConfig implements ApplicationContextAware {

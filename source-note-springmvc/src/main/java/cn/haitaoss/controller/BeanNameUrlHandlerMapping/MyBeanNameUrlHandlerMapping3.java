@@ -27,7 +27,7 @@ public class MyBeanNameUrlHandlerMapping3 implements Controller, BeanFactoryAwar
     @Override
     public ModelAndView handleRequest(HttpServletRequest request, HttpServletResponse response) throws Exception {
         System.out.println("MyBeanNameUrlHandlerMapping3..." + request.getAttribute(UrlPathHelper.PATH_ATTRIBUTE));
-        ModelAndView index = new ModelAndView("index");
+        ModelAndView index = new ModelAndView("HTML:test_cross");
         // index.setViewName("redirect:http://www.baidu.com");
         return index;
     }

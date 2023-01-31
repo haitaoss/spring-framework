@@ -16,14 +16,6 @@
 
 package org.springframework.web.reactive.result.method.annotation;
 
-import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.function.Predicate;
-
 import org.springframework.context.EmbeddedValueResolverAware;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.annotation.MergedAnnotation;
@@ -46,6 +38,14 @@ import org.springframework.web.reactive.result.condition.ConsumesRequestConditio
 import org.springframework.web.reactive.result.condition.RequestCondition;
 import org.springframework.web.reactive.result.method.RequestMappingInfo;
 import org.springframework.web.reactive.result.method.RequestMappingInfoHandlerMapping;
+
+import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.function.Predicate;
 
 /**
  * An extension of {@link RequestMappingInfoHandlerMapping} that creates
@@ -290,7 +290,9 @@ public class RequestMappingHandlerMapping extends RequestMappingInfoHandlerMappi
 	protected CorsConfiguration initCorsConfiguration(Object handler, Method method, RequestMappingInfo mappingInfo) {
 		HandlerMethod handlerMethod = createHandlerMethod(handler, method);
 		Class<?> beanType = handlerMethod.getBeanType();
+		// 类上的
 		CrossOrigin typeAnnotation = AnnotatedElementUtils.findMergedAnnotation(beanType, CrossOrigin.class);
+		// 方法上的
 		CrossOrigin methodAnnotation = AnnotatedElementUtils.findMergedAnnotation(method, CrossOrigin.class);
 
 		if (typeAnnotation == null && methodAnnotation == null) {
@@ -298,14 +300,17 @@ public class RequestMappingHandlerMapping extends RequestMappingInfoHandlerMappi
 		}
 
 		CorsConfiguration config = new CorsConfiguration();
+		// 方法上的会覆盖类上的
 		updateCorsConfig(config, typeAnnotation);
 		updateCorsConfig(config, methodAnnotation);
 
 		if (CollectionUtils.isEmpty(config.getAllowedMethods())) {
 			for (RequestMethod allowedMethod : mappingInfo.getMethodsCondition().getMethods()) {
+				// 将 @RequestMapping 中的方法 信息设置给 config
 				config.addAllowedMethod(allowedMethod.name());
 			}
 		}
+		// 设置默认值
 		return config.applyPermitDefaultValues();
 	}
 

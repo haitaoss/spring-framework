@@ -1938,6 +1938,214 @@ public class HelloController {
 
 @Valid 和 @Validated 并没有对应的参数解析器，而是在其他参数解析器解析参数时判断方法参数上有这两个注解，就会额外进行参数值的JSR303校验，但是我看了大部分参数解析器是不处理的，只有[解析@RequestBody的参数处理器](#RequestResponseBodyMethodProcessor)才额外校验了这两个注解 
 
+## @CrossOrigin
+
+1. @CrossOrigin 必须的标注在 @Controller 中才会生效，或者是@RequestMapping的bean也行
+2. @CrossOrigin 标注在 @RequestMapping的方法上，这个方法就支持跨域请求
+3. @CrossOrigin 标注在类上，类中所有 @RequestMapping的方法都支持跨域请求
+
+### 使用示例
+
+> @CrossOrigin 基本使用
+
+```java
+// @CrossOrigin
+@RestController
+@RequestMapping("cross")
+public class HelloController3 {
+    @CrossOrigin
+    @RequestMapping("has_CrossOrigin")
+    public String has_CrossOrigin() {
+        return "ok";
+    }
+
+    @RequestMapping("no_CrossOrigin")
+    public String no_CrossOrigin() {
+        return "ok";
+    }
+}
+```
+
+> 通过Filter实现全局的跨域请求处理
+
+```java
+public class MyCorsFilter implements Filter {
+    private final CorsFilter corsFilter;
+
+    public MyCorsFilter() {
+        CorsConfiguration corsConfiguration = new CorsConfiguration();
+        corsConfiguration.applyPermitDefaultValues();
+
+        UrlBasedCorsConfigurationSource configSource = new UrlBasedCorsConfigurationSource();
+        configSource.registerCorsConfiguration("/**", corsConfiguration);
+        corsFilter = new CorsFilter(configSource);
+    }
+
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response,
+                         FilterChain chain) throws IOException, ServletException {
+        System.out.println("MyCorsFilter...处理跨域");
+        corsFilter.doFilter(request, response, chain);
+    }
+}
+```
+
+### 解析@CrossOrigin
+
+```java
+/**
+ * 解析 @CrossOrigin 是在 RequestMappingHandlerMapping 的实例化时，会解析 @Controller 的bean，然后解析beanClass中的 @CrossOrigin、@RequestMapping 注解，
+ * 将注解映射成对象，然后记录在 RequestMappingHandlerMapping 的成员属性中
+ *
+ * {@link AbstractHandlerMethodMapping#afterPropertiesSet()}
+ * {@link AbstractHandlerMethodMapping#initHandlerMethods()}
+ * {@link AbstractHandlerMethodMapping#processCandidateBean(String)}
+ * {@link AbstractHandlerMethodMapping#detectHandlerMethods(Object)}
+ * {@link RequestMappingHandlerMapping#registerHandlerMethod(Object, Method, RequestMappingInfo)}
+ * {@link AbstractHandlerMethodMapping.MappingRegistry#register(Object, Object, Method)}
+ *
+ * 1. 获取方法或者类上的 @CrossOrigin 映射成 CorsConfiguration 实例
+ *      CorsConfiguration corsConfig = initCorsConfiguration(handler, method, mapping);
+ *
+ *      方法上的@CrossOrigin的注解值 会覆盖 类上的@CrossOrigin的注解值
+ *      如果没有设置注解值，会给 CorsConfiguration 设置默认值
+ *
+ * 2. 记录起来
+ *      this.corsLookup.put(handlerMethod, corsConfig);
+ *      {@link AbstractHandlerMethodMapping.MappingRegistry#corsLookup}
+ *
+ **/
+```
+
+### 用到 @CrossOrigin 进行匹配的地方
+
+```java
+/**
+ * 用到 @CrossOrigin 进行匹配的地方
+ *
+ * 根据Request获取对应的 HandlerExecutionChain
+ * {@link AbstractHandlerMapping#getHandler(HttpServletRequest)}
+ *      1. 根据Request获取对应的 HandlerMethod
+ *      Object handler = getHandlerInternal(request);
+ *          如果Request是预检请求 且 匹配的Handler有 CorsConfiguration，那么就快速 return EmptyHandler
+ *          {@link org.springframework.web.servlet.handler.AbstractHandlerMethodMapping#lookupHandlerMethod(String, HttpServletRequest)}
+ *
+ *      2. 构造出 HandlerExecutionChain
+ *          org.springframework.web.servlet.HandlerExecutionChain executionChain = getHandlerExecutionChain(handler, request);
+ *
+ *      3. handler有CorsConfiguration 或者 Request是预检请求
+ *          executionChain = getCorsHandlerExecutionChain(request, executionChain, config)
+ *
+ *          3.1 是预检请求，就使用 PreFlightHandler 处理，而不是映射到具体的方法
+ *              return new HandlerExecutionChain(new PreFlightHandler(config), chain.getInterceptors());
+ *
+ *          3.2 else，增加 CorsInterceptor 作为 handler 的第一个拦截器
+ *              chain.addInterceptor(0, new CorsInterceptor(config));
+ *              return chain
+ *
+ *      4. 返回
+ *          return executionChain
+ *          
+ *  Tips：具体的逻辑看 PreFlightHandler、CorsInterceptor    
+ **/
+```
+
+### PreFlightHandler 的作用
+
+```java
+/**
+ * PreFlightHandler 的作用
+ *  PreFlightHandler 实现 HttpRequestHandler，会由 HttpRequestHandlerAdapter 来处理，具体的业务逻辑是
+ *      {@link AbstractHandlerMapping.PreFlightHandler#handleRequest(HttpServletRequest, HttpServletResponse)}
+ *          corsProcessor.processRequest(this.config, request, response);
+ *
+ *          1. 委托给 CorsProcessor 进行处理。
+ *          2. config 就是 Request匹配的@RequestMapping标注的方法上的@CrossOrigin和其类上的@CrossOrigin 解析而成的 CorsConfiguration 对象
+ *          3. corsProcessor 默认是 DefaultCorsProcessor
+ *
+ **/
+```
+
+### CorsInterceptor 的作用
+
+```java
+/**
+* CorsInterceptor 的作用
+*   CorsInterceptor 实现 HandlerInterceptor 只重写了 preHandle 方法，具体的业务逻辑是
+*   {@link AbstractHandlerMapping.CorsInterceptor#preHandle(HttpServletRequest, HttpServletResponse, Object)}
+*      return corsProcessor.processRequest(this.config, request, response);
+*      1. 委托给 CorsProcessor 进行处理。
+*      2. config 就是 Request匹配的@RequestMapping标注的方法上的@CrossOrigin和其类上的@CrossOrigin 解析而成的 CorsConfiguration 对象
+*      3. corsProcessor 默认是 DefaultCorsProcessor
+**/
+```
+
+### DefaultCorsProcessor 的作用
+
+```java
+/**
+ * 看看 DefaultCorsProcessor#processRequest 具体是如何匹配的
+ * {@link DefaultCorsProcessor#processRequest(CorsConfiguration, HttpServletRequest, HttpServletResponse)}
+ *  1. Request 不是预检请求，直接return true
+ *
+ *  2. 响应头有 Access-Control-Allow-Origin 直接 return true
+ *
+ *  3. CorsConfiguration == null 且 Request是预检请求。往响应体设置错误信息
+ *      response.setStatusCode(403);
+ *      response.getBody().write("Invalid CORS request");
+ *      response.flush();
+ *      return false;
+ *
+ *  4. CorsConfiguration == null 且 Request不是预检请求 直接 return true
+ *
+ *  5. CorsConfiguration != null 且 Request是预检请求，那就需要匹配是否允许这个Request进行跨域访问了
+ *      return handleInternal(new ServletServerHttpRequest(request), new ServletServerHttpResponse(response), config,
+ *                 preFlightRequest
+ *         );
+ *      {@link DefaultCorsProcessor#handleInternal(ServerHttpRequest, ServerHttpResponse, CorsConfiguration, boolean)}
+ *
+ *      5.1 使用 CorsConfiguration 校验 请求头Origin
+ *          String allowOrigin = checkOrigin(config, requestOrigin);
+ *          if allowOrigin == null
+ *              往响应体设置错误信息
+ *              return false
+ *
+ *      5.2 使用 CorsConfiguration 校验 请求方法
+ *          List<HttpMethod> allowMethods = checkMethods(config, requestMethod);
+ *          if allowMethods == null
+ *              往响应体设置错误信息
+ *              return false
+ *      5.3 使用 CorsConfiguration 校验 请求头
+ *          List<String> allowHeaders = checkHeaders(config, requestHeaders);
+ *              if allowHeaders == null
+ *                  往响应体设置错误信息
+ *                  return false
+ *
+ *      5.4 将 allowOrigin、allowMethods、allowHeaders 设置到响应头中，然后 return true
+ *
+ * */
+```
+
+### CorsFilter
+
+```java
+/**
+ *
+ * CorsFilter 继承 OncePerRequestFilter
+ * OncePerRequestFilter 实现 Filter
+ *
+ * 继承 OncePerRequestFilter 的目的是，这种 OncePerRequestFilter 类型的Filter 如果重复执行，只会执行第一个的逻辑，第二个直接放行，避免重复执行。
+ * 原理：Filter每次执行前，需要判断request域中是否存在当前FilterName的属性，存在就直接放行(doFilter)，不执行抽象方法 doFilterInternal 。而执行 doFilterInternal 之前
+ *      会将当前FilterName存到request域中，从而保证同一个Filter只能执行一次。
+ *
+ * CorsFilter 依赖了 CorsProcessor，其作为Filter的逻辑是 使用 CorsProcessor 处理预检请求
+ * CorsFilter 还依赖了 CorsConfigurationSource ，CorsConfigurationSource 是用来存储 CorsConfiguration 的，可以根据Request获取匹配的
+ * CorsConfiguration
+ * */	
+```
+
+![CorsFilter](.springmvc-source-note_imgs/CorsFilter.svg)
+
 # 好用的工具类
 
 ## AntPathMatcher
