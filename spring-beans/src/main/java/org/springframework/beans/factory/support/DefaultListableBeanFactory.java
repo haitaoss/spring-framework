@@ -1447,7 +1447,9 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
                      * 解析占位符的。
                      *
                      * 是在完成这里设置的，用来解析 "${name:default}" 占位符字符串的
-                     * {@link org.springframework.context.support.AbstractApplicationContext#finishBeanFactoryInitialization(ConfigurableListableBeanFactory)}
+                     * 有两个地方会给BeanFactory设置嵌入值解析器：
+                     *  - {@link org.springframework.context.support.AbstractApplicationContext#finishBeanFactoryInitialization(ConfigurableListableBeanFactory)}
+                     *  - {@link org.springframework.context.support.PropertySourcesPlaceholderConfigurer#postProcessBeanFactory(ConfigurableListableBeanFactory)}
                      * */
                     String strVal = resolveEmbeddedValue((String) value);
                     BeanDefinition bd = (

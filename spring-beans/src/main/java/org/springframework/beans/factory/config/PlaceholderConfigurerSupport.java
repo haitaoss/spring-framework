@@ -215,15 +215,26 @@ public abstract class PlaceholderConfigurerSupport extends PropertyResourceConfi
 	protected void doProcessProperties(ConfigurableListableBeanFactory beanFactoryToProcess,
 			StringValueResolver valueResolver) {
 
+		// 将 valueResolver 装饰成 BeanDefinitionVisitor
 		BeanDefinitionVisitor visitor = new BeanDefinitionVisitor(valueResolver);
 
 		String[] beanNames = beanFactoryToProcess.getBeanDefinitionNames();
+		// 遍历 BeanFactory 中所有的beanName
 		for (String curName : beanNames) {
+			// 不是当前bean，才需要解析占位符，进行替换
 			// Check that we're not parsing our own bean definition,
 			// to avoid failing on unresolvable placeholders in properties file locations.
 			if (!(curName.equals(this.beanName) && beanFactoryToProcess.equals(this.beanFactory))) {
 				BeanDefinition bd = beanFactoryToProcess.getBeanDefinition(curName);
 				try {
+					/**
+					 * 其实就是使用 valueResolver 解析 BeanDefinition 中一些属性的占位符
+					 * 比如：ParentName、BeanClassName、FactoryBeanName、FactoryMethodName、Scope、PropertyValues、ConstructorArgumentValues
+					 * 所以我们才可以在xml这么写
+					 * <bean id="id" class="A">
+					 *     <property name="name" value="${name}"></property>
+					 * </bean>
+					 * */
 					visitor.visitBeanDefinition(bd);
 				}
 				catch (Exception ex) {
@@ -232,9 +243,11 @@ public abstract class PlaceholderConfigurerSupport extends PropertyResourceConfi
 			}
 		}
 
+		// 解析别名中的占位符
 		// New in Spring 2.5: resolve placeholders in alias target names and aliases as well.
 		beanFactoryToProcess.resolveAliases(valueResolver);
 
+		// 设置给BeanFactory，在依赖注入时，解析@Value会使用这个东西解析占位符
 		// New in Spring 3.0: resolve placeholders in embedded values such as annotation attributes.
 		beanFactoryToProcess.addEmbeddedValueResolver(valueResolver);
 	}

@@ -125,12 +125,24 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
         // then ultimately reset this.delegate back to its original (parent) reference.
         // this behavior emulates a stack of delegates without actually necessitating one.
         BeanDefinitionParserDelegate parent = this.delegate;
+        // 创建
         this.delegate = createDelegate(getReaderContext(), root, parent);
-
+        /**
+         * root 是默认的命名空间
+         *
+         * <?xml version="1.0" encoding="UTF-8"?>
+         * <beans profile="env" xmlns="http://www.springframework.org/schema/beans">
+         *     ...
+         * </beans>
+         *
+         * 取得是 xmlns
+         * */
         if (this.delegate.isDefaultNamespace(root)) {
+            // 拿到 profile 的值
             String profileSpec = root.getAttribute(PROFILE_ATTRIBUTE);
             if (StringUtils.hasText(profileSpec)) {
                 String[] specifiedProfiles = StringUtils.tokenizeToStringArray(profileSpec, BeanDefinitionParserDelegate.MULTI_VALUE_ATTRIBUTE_DELIMITERS);
+                // profile 不满足，那就直接return，这个xml就不要解析了
                 // We cannot use Profiles.of(...) since profile expressions are not supported
                 // in XML config. See SPR-12458 for details.
                 if (!getReaderContext().getEnvironment()
@@ -145,7 +157,8 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
         }
 
         preProcessXml(root);
-        parseBeanDefinitions(root, this.delegate); // 解析 Bean 定义
+        // 解析里面的标签，注册BeanDefinition
+        parseBeanDefinitions(root, this.delegate);
         postProcessXml(root);
 
         this.delegate = parent;
@@ -165,20 +178,38 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
      * @param root the DOM root element of the document
      */
     protected void parseBeanDefinitions(Element root, BeanDefinitionParserDelegate delegate) {
+        // 是默认命名空间
         if (delegate.isDefaultNamespace(root)) {
             NodeList nl = root.getChildNodes();
+            // 遍历所有的子节点
             for (int i = 0; i < nl.getLength(); i++) {
                 Node node = nl.item(i);
+                // 子节点是 Element
                 if (node instanceof Element) {
                     Element ele = (Element) node;
-                    if (delegate.isDefaultNamespace(ele)) { // 命名空间是 http://www.springframework.org/schema/beans
-                        parseDefaultElement(ele, delegate); // 注册 spring.xml 里面的bean标签
+                    /**
+                     * 是默认命名空间的标签，比如
+                     * <bean id="a" class="A"/>
+                     *
+                     * 默认命名空间是 http://www.springframework.org/schema/beans
+                     *
+                     * Tips：解析的结果其实是 一个标签对应一个BeanDefinition，并将BeanDefinition注册到BeanFactory中
+                     * */
+                    if (delegate.isDefaultNamespace(ele)) {
+                        parseDefaultElement(ele, delegate);
                     } else {
+                        /**
+                         * 其他情况，比如
+                         * <context:property-placeholder location="classpath:data.properties" local-override="false"/>
+                         *
+                         * Tips：解析的结果其实是 一个标签对应一个BeanDefinition，并将BeanDefinition注册到BeanFactory中
+                         * */
                         delegate.parseCustomElement(ele); // 解析 component-scan 进行包扫描
                     }
                 }
             }
         } else {
+            // 其他情况
             delegate.parseCustomElement(root);
         }
     }

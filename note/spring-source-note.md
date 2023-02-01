@@ -6432,6 +6432,134 @@ public class Test {
 }
 ```
 
+## 使用`<context:property-placeholder/>`会发生什么
+
+[IOC容器的生命周期，看 refresh 的生命周期，就知道BeanFactoryPostProcessor是啥时候被回调的](#整体生命周期)
+
+```java
+/**
+ * 使用 <context:property-placeholder/> 会发生什么
+ *
+ * 这个标签是被 PropertyPlaceholderBeanDefinitionParser 所解析，解析的结果是往BeanFactory中注册 PropertySourcesPlaceholderConfigurer 类型的bean
+ * 所以得看 PropertySourcesPlaceholderConfigurer 有啥特点
+ **/
+```
+
+### PropertySourcesPlaceholderConfigurer 
+
+[StandardEnvironment有啥用和原理](#StandardEnvironment的实例化)
+
+[PropertyResolver的基本使用](#PropertyPlaceholderHelper)
+
+```java
+/**
+ * PropertySourcesPlaceholderConfigurer 有啥特点
+ * {@link PropertySourcesPlaceholderConfigurer}
+ *  1. 实现 EnvironmentAware 接口，会将 Environment 设置为成员属性
+ *  2. 实现 BeanFactoryPostProcessor 其实现方法，会在refresh中准备BeanFactory阶段，被执行。重点就是看这个方法
+ *  {@link PropertySourcesPlaceholderConfigurer#postProcessBeanFactory(ConfigurableListableBeanFactory)}
+ *
+ * 细说 PropertySourcesPlaceholderConfigurer#postProcessBeanFactory
+ * {@link PropertySourcesPlaceholderConfigurer#postProcessBeanFactory(ConfigurableListableBeanFactory)}
+ *
+ *  1. 初始化内部属性 propertySources
+ *      this.propertySources = new MutablePropertySources();
+ *
+ *  2. 将 Environment 装饰成 PropertySource，然后添加到 propertySources 中 用于访问 Environment中的属性
+ *      this.propertySources.addLast(Environment)
+ *
+ *  3. 读取 <context:property-placeholder location="classpath:data.properties"/> 属性文件的内容 成 Properties对象，将Properties对象构造成 PropertiesPropertySource
+ *      PropertySource<?> localPropertySource =
+ *                         new PropertiesPropertySource(LOCAL_PROPERTIES_PROPERTY_SOURCE_NAME, mergeProperties());
+ *
+ *  4. localOverride == true，那就设置 localPropertySource 到 第一个位置
+ *      this.propertySources.addFirst(localPropertySource);
+ *
+ *  5. localOverride == false，那就设置 localPropertySource 到 最后的位置
+ *
+ *  6. 将 propertySources 构造成 PropertySourcesPropertyResolver，设置到BeanFactory中
+ *
+ *      PropertySourcesPropertyResolver propertyResolver = new PropertySourcesPropertyResolver(this.propertySources);
+ *      processProperties(beanFactory, propertyResolver);
+ *
+ *      6.1 为 propertyResolver 设置占位符的前缀、后缀、默认值分隔符
+ *          propertyResolver.setPlaceholderPrefix("${");
+ *          propertyResolver.setPlaceholderSuffix("}");
+ *          propertyResolver.setValueSeparator(":");
+ *
+ *      6.2 将 propertyResolver 构造成值解析器
+ *          StringValueResolver valueResolver = strVal -> propertyResolver.resolvePlaceholders(strVal)
+ *
+ *      6.3 遍历容器中所有的BeanDefinition(出了当前这个bean本身)，尝试替换某些值的占位符
+ *          其实就是使用 valueResolver 解析 BeanDefinition 中一些属性的占位符
+ *          比如：ParentName、BeanClassName、FactoryBeanName、FactoryMethodName、Scope、PropertyValues、ConstructorArgumentValues
+ *          所以我们才可以在xml这么写
+ *          <bean id="id" class="A">
+ *              <property name="name" value="${name}"></property>
+ *          </bean>
+ *
+ *      6.4 解析别名中的占位符
+ *          beanFactoryToProcess.resolveAliases(valueResolver);
+ *
+ *      6.5 将 valueResolver 设置到 BeanFactory 中
+ *          beanFactoryToProcess.addEmbeddedValueResolver(valueResolver);
+ *          注：在依赖注入时，解析@Value会使用这个东西解析占位符
+ *
+ *  Tips：
+ *      放到前面，也就是说 访问属性的顺序是： <context:property-placeholder/> -> Environment
+ *      而 Environment 也是一个 MutablePropertySources 其获取属性的顺序是：getSystemProperties -> getSystemEnvironment -> @PropertySource，
+ *      所以如果 localOverride 为 true，最终的属性访问顺序其实是： <context:property-placeholder/> -> getSystemProperties -> getSystemEnvironment -> @PropertySource
+ * */
+```
+
+### 示例代码
+
+> spring6.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation=
+               "http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+    <context:property-placeholder location="classpath:data.properties" local-override="false"/>
+   <!-- <bean id="test2" class="cn.haitaoss.javaconfig.PropertyPlaceholder.Test">
+        <property name="name" value="${name}"></property>
+    </bean>-->
+</beans>
+```
+
+```java
+// @PropertySource("classpath:properties/My.properties")
+@Component
+@ImportResource("classpath:spring6.xml")
+@Data
+public class Test {
+    @Value("${name}") // 使用的是 BeanFactory#resolveEmbeddedValue 来解析的
+    private String name;
+    @Autowired
+    private Environment environment;
+    @Autowired
+    private DefaultListableBeanFactory beanFactory;
+
+    public static void main(String[] args) {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(Test.class);
+        Test bean = context.getBean(Test.class);
+        System.out.println("bean = " + bean.getName());
+
+        // 不能获取使用  <context:property-placeholder/> 加载的属性文件的内容
+        System.out.println(bean.getEnvironment().getProperty("name"));
+        // 可以获取到 <context:property-placeholder/> + Environment 中的信息
+        System.out.println(bean.getBeanFactory().resolveEmbeddedValue("${name}"));
+
+    }
+}
+```
+
+## ClassPathXmlApplicationContext
+
 # Spring好用的工具类
 
 ## ProxyFactoryBean

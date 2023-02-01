@@ -69,6 +69,7 @@ public abstract class NamespaceHandlerSupport implements NamespaceHandler {
 	@Override
 	@Nullable
 	public BeanDefinition parse(Element element, ParserContext parserContext) {
+		// 根据 element 找到 BeanDefinitionParser
 		BeanDefinitionParser parser = findParserForElement(element, parserContext);
 		return (parser != null ? parser.parse(element, parserContext) : null); // org.springframework.context.annotation.ComponentScanBeanDefinitionParser.parse
 	}

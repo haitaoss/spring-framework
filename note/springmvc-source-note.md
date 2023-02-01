@@ -2082,6 +2082,13 @@ public class MyCorsFilter implements Filter {
 
 ### DefaultCorsProcessor 的作用
 
+```tex
+浏览器发送的预检请求 Request Headers 示例:
+    Access-Control-Request-Headers: content-type
+    Access-Control-Request-Method: POST
+    Origin: http://localhost:8080
+```
+
 ```java
 /**
  * 看看 DefaultCorsProcessor#processRequest 具体是如何匹配的

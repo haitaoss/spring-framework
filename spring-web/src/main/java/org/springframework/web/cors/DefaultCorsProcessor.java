@@ -124,11 +124,16 @@ public class DefaultCorsProcessor implements CorsProcessor {
      */
     protected boolean handleInternal(ServerHttpRequest request, ServerHttpResponse response, CorsConfiguration config,
                                      boolean preFlightRequest) throws IOException {
+        /*
+        浏览器发送的预检请求 Request Headers 示例:
+            Access-Control-Request-Headers: content-type
+            Access-Control-Request-Method: POST
+            Origin: http://localhost:8080
 
-        // 拿到请求头的信息
+         */
         String requestOrigin = request.getHeaders()
                 .getOrigin();
-        // 使用 config 校验 请求头的origin
+        // 使用 CorsConfiguration 校验 Origin 的值
         String allowOrigin = checkOrigin(config, requestOrigin);
         HttpHeaders responseHeaders = response.getHeaders();
 
@@ -139,7 +144,7 @@ public class DefaultCorsProcessor implements CorsProcessor {
             return false;
         }
 
-        // 根据 config 校验 请求方法
+        // 使用 CorsConfiguration 校验 Access-Control-Request-Method 的值
         HttpMethod requestMethod = getMethodToUse(request, preFlightRequest);
         List<HttpMethod> allowMethods = checkMethods(config, requestMethod);
         if (allowMethods == null) {
@@ -147,7 +152,7 @@ public class DefaultCorsProcessor implements CorsProcessor {
             rejectRequest(response);
             return false;
         }
-        // 根据 config 校验 请求头
+        // 使用 CorsConfiguration 校验 Access-Control-Request-Headers 的值
         List<String> requestHeaders = getHeadersToUse(request, preFlightRequest);
         // 允许的请求头
         List<String> allowHeaders = checkHeaders(config, requestHeaders);

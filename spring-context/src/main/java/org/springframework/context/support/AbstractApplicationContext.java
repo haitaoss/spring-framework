@@ -1113,6 +1113,12 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader i
             beanFactory.setConversionService(beanFactory.getBean(CONVERSION_SERVICE_BEAN_NAME, ConversionService.class));
         }
 
+        /**
+         * BeanFactory 没有设置嵌入值解析器，那就设置一个默认的，特点是可以访问 Environment 中加载的所有属性
+         *
+         * 比如 当我们使用  <context:property-placeholder/> 时，会设置 嵌入值解析器，看这里就知道了
+         *   {@link PropertySourcesPlaceholderConfigurer#postProcessBeanFactory(ConfigurableListableBeanFactory)}
+         * */
         // Register a default embedded value resolver if no BeanFactoryPostProcessor
         // (such as a PropertySourcesPlaceholderConfigurer bean) registered any before:
         // at this point, primarily for resolution in annotation attribute values.

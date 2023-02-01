@@ -16,19 +16,18 @@
 
 package org.springframework.core.io.support;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.core.io.Resource;
+import org.springframework.lang.Nullable;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.PropertiesPersister;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Properties;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import org.springframework.core.io.Resource;
-import org.springframework.lang.Nullable;
-import org.springframework.util.CollectionUtils;
-import org.springframework.util.PropertiesPersister;
 
 /**
  * Base class for JavaBean-style components that need to load properties
@@ -147,17 +146,20 @@ public abstract class PropertiesLoaderSupport {
 		Properties result = new Properties();
 
 		if (this.localOverride) {
+			// 就是 读取属性文件，将属性文件的内容添加到 result 若存在相同的key就覆盖
 			// Load properties from file upfront, to let local properties override.
 			loadProperties(result);
 		}
 
 		if (this.localProperties != null) {
 			for (Properties localProp : this.localProperties) {
+				// 将 localProp 复制到 result 中，若存在相同的key就覆盖
 				CollectionUtils.mergePropertiesIntoMap(localProp, result);
 			}
 		}
 
 		if (!this.localOverride) {
+			// 后加载属性文件的内容，从而能实现覆盖 localProperties 的值
 			// Load properties from file afterwards, to let those properties override.
 			loadProperties(result);
 		}

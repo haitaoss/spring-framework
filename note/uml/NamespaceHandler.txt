@@ -1,0 +1,87 @@
+@startuml
+
+!theme plain
+top to bottom direction
+skinparam linetype ortho
+
+class AopNamespaceHandler {
+  + init(): void
+}
+class CacheNamespaceHandler {
+  ~ extractCacheManager(Element): String
+  ~ parseKeyGenerator(Element, BeanDefinition): BeanDefinition
+  + init(): void
+}
+class ComponentNamespaceHandler {
+  + init(): void
+}
+class ContextNamespaceHandler {
+  + init(): void
+}
+class JdbcNamespaceHandler {
+  + init(): void
+}
+class JeeNamespaceHandler {
+  + init(): void
+}
+class JmsNamespaceHandler {
+  + init(): void
+}
+class LangNamespaceHandler {
+  + init(): void
+  - registerScriptBeanDefinitionParser(String, String): void
+}
+class MvcNamespaceHandler {
+  + init(): void
+}
+interface NamespaceHandler << interface >> {
+  + init(): void
+  + decorate(Node, BeanDefinitionHolder, ParserContext): BeanDefinitionHolder?
+  + parse(Element, ParserContext): BeanDefinition?
+}
+class NamespaceHandlerSupport {
+  + parse(Element, ParserContext): BeanDefinition?
+  # registerBeanDefinitionDecoratorForAttribute(String, BeanDefinitionDecorator): void
+  - findParserForElement(Element, ParserContext): BeanDefinitionParser?
+  + decorate(Node, BeanDefinitionHolder, ParserContext): BeanDefinitionHolder?
+  # registerBeanDefinitionParser(String, BeanDefinitionParser): void
+  - findDecoratorForNode(Node, ParserContext): BeanDefinitionDecorator?
+  # registerBeanDefinitionDecorator(String, BeanDefinitionDecorator): void
+}
+class OxmNamespaceHandler {
+  + init(): void
+}
+class TaskNamespaceHandler {
+  + init(): void
+}
+class TestNamespaceHandler {
+  + init(): void
+}
+class TxNamespaceHandler {
+  + init(): void
+  ~ getTransactionManagerName(Element): String
+}
+class UtilNamespaceHandler {
+  + init(): void
+}
+class WebSocketNamespaceHandler {
+  + init(): void
+}
+
+AopNamespaceHandler        -[#000082,plain]-^  NamespaceHandlerSupport
+CacheNamespaceHandler      -[#000082,plain]-^  NamespaceHandlerSupport
+ComponentNamespaceHandler  -[#000082,plain]-^  NamespaceHandlerSupport
+ContextNamespaceHandler    -[#000082,plain]-^  NamespaceHandlerSupport
+JdbcNamespaceHandler       -[#000082,plain]-^  NamespaceHandlerSupport
+JeeNamespaceHandler        -[#000082,plain]-^  NamespaceHandlerSupport
+JmsNamespaceHandler        -[#000082,plain]-^  NamespaceHandlerSupport
+LangNamespaceHandler       -[#000082,plain]-^  NamespaceHandlerSupport
+MvcNamespaceHandler        -[#000082,plain]-^  NamespaceHandlerSupport
+NamespaceHandlerSupport    -[#008200,dashed]-^  NamespaceHandler
+OxmNamespaceHandler        -[#000082,plain]-^  NamespaceHandlerSupport
+TaskNamespaceHandler       -[#000082,plain]-^  NamespaceHandlerSupport
+TestNamespaceHandler       -[#000082,plain]-^  NamespaceHandlerSupport
+TxNamespaceHandler         -[#000082,plain]-^  NamespaceHandlerSupport
+UtilNamespaceHandler       -[#000082,plain]-^  NamespaceHandlerSupport
+WebSocketNamespaceHandler  -[#000082,plain]-^  NamespaceHandlerSupport
+@enduml
