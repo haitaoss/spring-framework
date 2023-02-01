@@ -8,6 +8,8 @@ class AopNamespaceHandler {
   + init(): void
 }
 class CacheNamespaceHandler {
+  ~ DEFAULT_CACHE_MANAGER_BEAN_NAME: String
+  ~ CACHE_MANAGER_ATTRIBUTE: String
   ~ extractCacheManager(Element): String
   ~ parseKeyGenerator(Element, BeanDefinition): BeanDefinition
   + init(): void
@@ -40,6 +42,9 @@ interface NamespaceHandler << interface >> {
   + parse(Element, ParserContext): BeanDefinition?
 }
 class NamespaceHandlerSupport {
+  - parsers: Map<String, BeanDefinitionParser>
+  - decorators: Map<String, BeanDefinitionDecorator>
+  - attributeDecorators: Map<String, BeanDefinitionDecorator>
   + parse(Element, ParserContext): BeanDefinition?
   # registerBeanDefinitionDecoratorForAttribute(String, BeanDefinitionDecorator): void
   - findParserForElement(Element, ParserContext): BeanDefinitionParser?
@@ -58,13 +63,17 @@ class TestNamespaceHandler {
   + init(): void
 }
 class TxNamespaceHandler {
+  ~ DEFAULT_TRANSACTION_MANAGER_BEAN_NAME: String
+  ~ TRANSACTION_MANAGER_ATTRIBUTE: String
   + init(): void
   ~ getTransactionManagerName(Element): String
 }
 class UtilNamespaceHandler {
+  - SCOPE_ATTRIBUTE: String
   + init(): void
 }
 class WebSocketNamespaceHandler {
+  - isSpringMessagingPresent: boolean
   + init(): void
 }
 

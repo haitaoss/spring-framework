@@ -6560,6 +6560,114 @@ public class Test {
 
 ## ClassPathXmlApplicationContext
 
+```java
+/**
+ * 简单讲讲 Spring.xml 是如何解析并注册BeanDefinition的流程
+ *
+ * 在 IOC 容器的 refresh 时，会获取BeanFactory，获取的逻辑中会刷新BeanFactory，会在刷新的逻辑中遍历配置的 xml 文件依次解析，解析逻辑看 doRegisterBeanDefinitions
+ * {@link AbstractApplicationContext#refresh()}
+ * {@link AbstractApplicationContext#obtainFreshBeanFactory()}
+ * {@link AbstractRefreshableApplicationContext#refreshBeanFactory()}
+ * {@link AbstractXmlApplicationContext#loadBeanDefinitions(DefaultListableBeanFactory)}
+ *
+ *
+ * 解析 spring.xml
+ * {@link DefaultBeanDefinitionDocumentReader#doRegisterBeanDefinitions(Element)}
+ *
+ * 1. 创建一个 BeanDefinitionParserDelegate
+ *  BeanDefinitionParserDelegate = createDelegate(getReaderContext(), root, parent);
+ *  注:root 就是xml文件的根标签
+ *
+ * 2. 根标签是默认的命名空间，那就获取标签的属性值 profile。根据环境变量的值校验profile是否满足，不满足直接return，不要解析了
+ *  if this.delegate.isDefaultNamespace(root)
+ *      String profileSpec = root.getAttribute("profile"); // 获取标签属性的值
+ *      String[] specifiedProfiles = StringUtils.tokenizeToStringArray(profileSpec, ",; "); // 按照拆分字符串成数组
+ *      getReaderContext().getEnvironment().acceptsProfiles(specifiedProfiles) // 对于多个值，只要一个满足，那就只是true
+ *
+ * 3. 遍历root的子标签，一个个的解析
+ *      NodeList nl = root.getChildNodes();
+ *      for (int i = 0; i < nl.getLength(); i++)
+ *          Node node = nl.item(i);
+ *
+ * 4. 子节点是 Element 才解析
+ *      if node instanceof Element
+ *      Element ele = (Element) node;
+ *
+ * 5. 标签是默认命名空间
+ *      if delegate.isDefaultNamespace(ele)
+ *          parseDefaultElement(ele, delegate); // 默认是处理 import 、bean、alias、beans 这四个标签
+ *          {@link DefaultBeanDefinitionDocumentReader#parseDefaultElement(Element, BeanDefinitionParserDelegate)}
+ *
+ * 6. 其他情况
+ *      delegate.parseCustomElement(ele);
+ *      {@link BeanDefinitionParserDelegate#parseCustomElement(Element)}
+ *
+ *      比如这些标签：
+ *          <context:load-time-weaver/>
+ *          <context:component-scan/>
+ *          <context:property-placeholder/>
+ *
+ *      parseCustomElement 的大致流程：
+ *          1. 根据标签的命名空间映找到对应的 NamespaceHandler
+ *              NamespaceHandler handler = this.readerContext.getNamespaceHandlerResolver()
+ *                 .resolve(getNamespaceURI(ele));
+ *              注：有哪些NamespaceHandler看 META-INF/spring.handlers
+ *
+ *          2. 使用 NamespaceHandler 解析 标签。
+ *              handler.parse(ele, new ParserContext(this.readerContext, this, containingBd))
+ *              {@link NamespaceHandlerSupport#parse(Element, ParserContext)}
+ *
+ *              注：NamespaceHandlerSupport 有一个 Map<标签名,BeanDefinitionParser>，解析逻辑一般是根据标签名
+ *                  拿到对应的 BeanDefinitionParser ，使用 BeanDefinitionParser 解析标签。解析的逻辑是将 标签解析成一个 BeanDefinition，
+ *                  只要看 BeanDefinition 的 beanClass 的值，看这个BeanClass的特点，就能知道这个标签的实际效果是啥了
+ *
+ * Tips：解析的大致流程，对于简单的标签(<bean/>、<context:property-placeholder/>等等)一般是一个标签对应一个BeanDefinition，并将BeanDefinition注册到BeanFactory中。
+ *      像 <import resource="classpath:spring5.xml"/> 其实就是读取文件，按照整个spring.xml文件的方式进行解析，
+ *      像 <beans/> 就是递归解析
+ *
+ * */
+```
+
+[比如`<context:property-placeholder/>`的解析流程](#使用`<context:property-placeholder/>`会发生什么)
+
+### NamespaceHandler
+
+![NamespaceHandler](.spring-source-note_imgs/NamespaceHandler.svg)
+
+### 示例代码
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans profile="env" xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation=
+               "http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+    <context:property-placeholder location="classpath:data.properties" local-override="false"/>
+    <!-- <bean id="test2" class="cn.haitaoss.javaconfig.PropertyPlaceholder.Test">
+         <property name="name" value="${name}"></property>
+     </bean>-->
+    <import resource="classpath:spring5.xml"/>
+    <beans>
+        <bean id="1" class="cn.haitaoss.Test"></bean>
+    </beans>
+</beans>
+```
+
+```java
+public class Test {
+
+    public static void main(String[] args) {
+        ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("classpath:spring6.xml");
+    }
+}
+```
+
+
+
+
+
 # Spring好用的工具类
 
 ## ProxyFactoryBean

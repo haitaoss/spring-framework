@@ -6,7 +6,11 @@
                "http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
                 http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
     <context:property-placeholder location="classpath:data.properties" local-override="false"/>
-   <!-- <bean id="test2" class="cn.haitaoss.javaconfig.PropertyPlaceholder.Test">
-        <property name="name" value="${name}"></property>
-    </bean>-->
+    <!-- <bean id="test2" class="cn.haitaoss.javaconfig.PropertyPlaceholder.Test">
+         <property name="name" value="${name}"></property>
+     </bean>-->
+    <import resource="classpath:spring5.xml"/>
+    <beans>
+        <bean id="1" class="cn.haitaoss.Test"></bean>
+    </beans>
 </beans>

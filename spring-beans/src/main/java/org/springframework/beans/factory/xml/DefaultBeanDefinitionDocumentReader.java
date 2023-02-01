@@ -141,8 +141,11 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
             // 拿到 profile 的值
             String profileSpec = root.getAttribute(PROFILE_ATTRIBUTE);
             if (StringUtils.hasText(profileSpec)) {
+                // 按照拆分字符串成数组
                 String[] specifiedProfiles = StringUtils.tokenizeToStringArray(profileSpec, BeanDefinitionParserDelegate.MULTI_VALUE_ATTRIBUTE_DELIMITERS);
-                // profile 不满足，那就直接return，这个xml就不要解析了
+                /**
+                 * 对于多个值，只要一个满足，那就只是true
+                 * */
                 // We cannot use Profiles.of(...) since profile expressions are not supported
                 // in XML config. See SPR-12458 for details.
                 if (!getReaderContext().getEnvironment()
@@ -151,13 +154,14 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
                         logger.debug("Skipped XML bean definition file due to specified profiles [" + profileSpec
                                      + "] not matching: " + getReaderContext().getResource());
                     }
+                    // 不满足，那就直接return，这个xml就不要解析了
                     return;
                 }
             }
         }
 
         preProcessXml(root);
-        // 解析里面的标签，注册BeanDefinition
+        // 解析root的子标签，注册BeanDefinition
         parseBeanDefinitions(root, this.delegate);
         postProcessXml(root);
 
@@ -192,20 +196,23 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
                      * <bean id="a" class="A"/>
                      *
                      * 默认命名空间是 http://www.springframework.org/schema/beans
-                     *
-                     * Tips：解析的结果其实是 一个标签对应一个BeanDefinition，并将BeanDefinition注册到BeanFactory中
                      * */
                     if (delegate.isDefaultNamespace(ele)) {
                         parseDefaultElement(ele, delegate);
                     } else {
                         /**
                          * 其他情况，比如
-                         * <context:property-placeholder location="classpath:data.properties" local-override="false"/>
-                         *
-                         * Tips：解析的结果其实是 一个标签对应一个BeanDefinition，并将BeanDefinition注册到BeanFactory中
+                         * <context:load-time-weaver/>
+                         * <context:component-scan/>
+                         * <context:property-placeholder/>
                          * */
-                        delegate.parseCustomElement(ele); // 解析 component-scan 进行包扫描
+                        delegate.parseCustomElement(ele);
                     }
+                    /**
+                     * Tips：简单的标签(<bean/>、<context:property-placeholder/>等等)一般是一个标签对应一个BeanDefinition，并将BeanDefinition注册到BeanFactory中。
+                     *      像 <import/> 其实就是解析整个spring.xml文件，
+                     *      像 <beans/> 就是套娃解析
+                     * */
                 }
             }
         } else {
@@ -222,6 +229,7 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
         } else if (delegate.nodeNameEquals(ele, BEAN_ELEMENT)) {
             processBeanDefinition(ele, delegate);
         } else if (delegate.nodeNameEquals(ele, NESTED_BEANS_ELEMENT)) {
+            // 递归
             // recurse
             doRegisterBeanDefinitions(ele);
         }
