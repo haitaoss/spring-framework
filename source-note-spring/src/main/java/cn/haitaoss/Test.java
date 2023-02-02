@@ -1,8 +1,11 @@
 package cn.haitaoss;
 
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.support.AbstractBeanFactory;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.stereotype.Component;
 
 /**
@@ -12,18 +15,30 @@ import org.springframework.stereotype.Component;
  */
 
 @Component
+@EnableAsync
 public class Test {
+
+
+    @Autowired
+    private Test test;
+
+    @Async
+    public void x() {
+
+    }
+
     public static void main(String[] args) throws Exception {
         // ClassPathXmlApplicationContext classPathXmlApplicationContext = new ClassPathXmlApplicationContext("spring.xml");
         // AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(cn.haitaoss.javaconfig.ClassPathBeanDefinitionScanner.Test.class);
         //        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+        new AnnotationConfigApplicationContext(Test.class);
         /*ConfigurableEnvironment environment = context.getEnvironment();
         environment.addActiveProfile("uat");
         System.out.println(environment.acceptsProfiles(Profiles.of("!prod")));
         System.out.println(environment.acceptsProfiles(Profiles.of("prod")));
         System.out.println("==============");*/
 
-        test_parent_son_context();
+        // test_parent_son_context();
         /**
          * BeanPostProcessor执行过程：
          * 实例化前后置->推断构造器后置->实例化bean->合并BeanDefinition后置->实例化后后置->属性注入后置->初始化前后置->初始化后后置->销毁前后置(hit)

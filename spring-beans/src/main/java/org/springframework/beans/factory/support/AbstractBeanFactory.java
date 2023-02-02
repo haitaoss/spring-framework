@@ -195,7 +195,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 
     @Override
     public Object getBean(String name) throws BeansException {
-        // // TODOHAITAO 真正的获取bean的逻辑
+        // TODOHAITAO 真正的获取bean的逻辑
         return doGetBean(name, null, null, false);
     }
 
@@ -269,7 +269,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
             beanInstance = getObjectForBeanInstance(sharedInstance, name, beanName, null);
         } else {
             /**
-             * spring只能解决单例对象的循环依赖，不能解决多例bean的循环依赖
+             * spring只能解决单例对象的循环依赖，不能解决多例bean和scope bean的循环依赖
              * @see cn.haitaoss.javaconfig.circular.A
              */
             // Fail if we're already creating this bean instance:
@@ -313,6 +313,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
              *      this.alreadyCreated.add(beanName);
              * */
             if (!typeCheckOnly) {
+                // 标记这个bean已经创建了，在后面会有用
                 markBeanAsCreated(beanName);
             }
 
@@ -400,10 +401,14 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
                     // It's a prototype -> create a new instance.
                     Object prototypeInstance = null;
                     try {
-                        // 记录创建的多例bean，用于检查多例bean的循环依赖问题
+                        /**
+                         * 记录创建的多例bean，用于检查多例bean的循环依赖问题。存到这里面，说明这个bean不支持循环依赖。因为上面
+                         * 有校验代码
+                         * */
                         beforePrototypeCreation(beanName);
                         prototypeInstance = createBean(beanName, mbd, args);
                     } finally {
+                        // 移除记录
                         afterPrototypeCreation(beanName);
                     }
                     beanInstance = getObjectForBeanInstance(prototypeInstance, name, beanName, mbd);
@@ -418,6 +423,9 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
                     }
                     try {
                         Object scopedInstance = scope.get(beanName, () -> {
+                            /**
+                             * 同上
+                             * */
                             beforePrototypeCreation(beanName);
                             try {
                                 return createBean(beanName, mbd, args);

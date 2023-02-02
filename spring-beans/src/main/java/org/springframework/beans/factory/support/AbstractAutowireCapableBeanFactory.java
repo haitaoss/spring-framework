@@ -661,7 +661,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
         // Initialize the bean instance.
         Object exposedObject = bean;
         try {
-            // TODOHAITAO 属性赋值给我们的属性进行赋值（调用set方法进行赋值）
+            // TODOHAITAO 填充bean，就是依赖注入或者给属性设置值
             populateBean(beanName, mbd, instanceWrapper); // getBean()
             // TODOHAITAO 进行对象初始化操作（在这里可能生成代理对象）
             exposedObject = initializeBean(beanName, exposedObject, mbd);
@@ -673,31 +673,61 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
                         mbd.getResourceDescription(), beanName, "Initialization of bean failed", ex);
             }
         }
-        // 允许早期对象的引用
+        /**
+         * 这里是为了处理二级缓存中的bean 和 执行了初始化操作的 bean 不一致的校验，不一致说明可能存在
+         * 依赖注入的bean 和 实际存入单例池中的bean 不一致的问题。对于不一致，下面的处理是报错
+         *
+         *
+         * 比如 A 注入了 B，B 注入了 A
+         * 先是 getBean(A),然后其 populateBean 环节要注入B, 所以会 getBean(B)，然后其 populateBean 环节要注入A,所以要 getBean(A)
+         * 此时发现A正在创建，所以会读取三级缓存的value，然后执行提前AOP得到一个 proxyBeanA ，并将 proxyBeanA 存入二级缓存，然后将 proxyBeanA 注入到 B中，
+         * 然后B就创建完了，然后B就会被注入到A中，所以A的 populateBean 结束了，然后会执行 initializeBean。假设在 initializeBean 生成了 proxyBeanA2 。
+         * 这就出现了 注入到B中的A，和实际最终生成的A不一致的问题，对于这中情况，只能直接报错了，下面的逻辑就是为了应付这种情况的，
+         *
+         * 注：当然 提前AOP 也不一定会创建代理对象，我这里只是举例了 提前AOP和初始化都创建了代理对象的场景，方便说明
+         *
+         * */
         if (earlySingletonExposure) {
             /**
-             * 去缓存中获取到我们的对象由于传递的 allowEarlyReference 是false要求只能在一级二级缓存中去获取
-             * 正常普通的bean(不存在循环依赖的bean)创建的过程中，压根不会把三级缓存提升到二级缓存中
+             * 去缓存中获取到我们的对，象由于传递的 allowEarlyReference 是false要求只能在一级二级缓存中去获取。
+             * 说白了，就尝试从二级缓存中获取bean。
+             *
+             * 注：正常普通的bean(不存在循环依赖的bean)创建的过程中，压根不会把三级缓存提升到二级缓存中。
              * */
             Object earlySingletonReference = getSingleton(beanName, false);
-            // 能够获取到
+            /**
+             * 能够获取到，说明是在二级缓存拿到的。也就是这个 beanName 产生了循环依赖的问题，
+             * */
             if (earlySingletonReference != null) {
                 /**
-                 * TODOHAITAO 经过后置处理的bean和早期的bean引用还相等的话（表示当前的bean没有被 再次 代理过)
-                 *  如果在初始化后被 再次 代理，会进行二次校验，有问题就报错
+                 *  相等，说明初始化操作并没有对bean进行代理，那就没事。二级缓存的值作为最后要存入单例池中的值
+                 *  不相等，说明对bean进行了代理。这就会导致循环依赖了bean的那些东西，注入的bean是不对的，我们需要判断一下
+                 *      那些东西是否已经创建完了，创建完，那就没得搞了，只能报错了。
                  */
                 if (exposedObject == bean) {
                     exposedObject = earlySingletonReference;
                 }
-                // 处理依赖的bean
+                /**
+                 * hasDependentBean(beanName) 说明，这个bean已经注入到其他的bean对象中
+                 * */
                 else if (!this.allowRawInjectionDespiteWrapping && hasDependentBean(beanName)) {
+                    // 获取依赖了  beanName 的bean。其实就是获取那些 bean注入了 beanName这个bean
                     String[] dependentBeans = getDependentBeans(beanName);
                     Set<String> actualDependentBeans = new LinkedHashSet<>(dependentBeans.length);
                     for (String dependentBean : dependentBeans) {
+                        /**
+                         * 尝试挽救一下，如果 dependentBean 还没有创建完成，那就没问题了
+                         *
+                         * 创建完成的标记，是在这个地方设置的，也就是在 doGetBean 的一开始就设置了
+                         * {@link AbstractBeanFactory#doGetBean(String, Class, Object[], boolean)}
+                         * {@link AbstractBeanFactory#markBeanAsCreated(String)}
+                         * */
                         if (!removeSingletonIfCreatedForTypeCheckOnly(dependentBean)) {
+                            // 已经创建完了，就记录一下。
                             actualDependentBeans.add(dependentBean);
                         }
                     }
+                    // 报错
                     if (!actualDependentBeans.isEmpty()) {
                         throw new BeanCurrentlyInCreationException(beanName,
                                 "Bean with name '" + beanName + "' has been injected into other beans [" + StringUtils.collectionToCommaDelimitedString(
