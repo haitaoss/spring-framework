@@ -689,10 +689,30 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
          * */
         if (earlySingletonExposure) {
             /**
-             * 去缓存中获取到我们的对，象由于传递的 allowEarlyReference 是false要求只能在一级二级缓存中去获取。
+             * 去缓存中获取到我们的对象,由于传递的 allowEarlyReference 是false要求只能在一级二级缓存中去获取。
              * 说白了，就尝试从二级缓存中获取bean。
              *
-             * 注：正常普通的bean(不存在循环依赖的bean)创建的过程中，压根不会把三级缓存提升到二级缓存中。
+             * 注：在这里就能体会到三级缓存的好处了。因为这里是只会从一级缓存和二级缓存中获取内容(其实只可能从二级缓存中拿到，一级缓存是拿不到的，因为此时还未将单例bean存入一级缓存)
+             *     如果二级缓存拿到的值不为null，就校验一下 exposedObject(执行了初始化后置处理器返回的值) 和 bean(简单实例化出来的) 是否一致，
+             *     若不一致，就需要判断一下，这个bean是否注入给了其他bean对象，若注入给了其他bean对象，那么就只能报错了，因为已经注入给了其他bean的值 和 exposedObject 不一致。
+             *
+             *     假设我们采用二级缓存来解决循环依赖的问题。思路如下：
+             *          一级缓存用来缓存最终完全的bean，二级缓存一开始存入的是 ObjectFactory ，当出现了循环依赖时，读取二级缓存的值,然后回调方法 ObjectFactory#getObject 得到 提前AOP的bean。
+             *          将 提前AOP的bean 存入进二级缓存，也就是进行值覆盖。
+             *
+             *          一级缓存：< beanName,最终的bean >
+             *          二级缓存：< beanName, ObjectFactory 或者 提前AOP得到的bean >
+             *
+             *          这就会出现一个问题，很难确定二级缓存存储得值 是 ObjectFactory 还是 提前AOP得到的bean，
+             *          你可能会这么想 `earlySingletonReference instanceof ObjectFactory` 来检验，但这是不靠谱的，因为有可能bean的类型就是 ObjectFactory 的
+             *          所以呢，只能使用东西标记二级缓存的值  是 ObjectFactory 还是 提前AOP得到的bean，
+             *          比如 这么设计： ThreadLocal< beanName, boolean > earlyLocal ： false 表示二级缓存的值是 ObjectFactory，true 表示二级缓存的值是 提前AOP得到的bean
+             *
+             *          那么下面的 判断逻辑应当改成 ` if ( earlySingletonReference != null && earlyLocal.get().get(beanName) )
+             *
+             *          所以呢肯定是需要使用东西来标记一下，是否执行了 ObjectFactory 得到 提前AOP得到的bean，Spring是采用的三级缓存来标记，
+             *          这就是为啥使用三级缓存
+             *
              * */
             Object earlySingletonReference = getSingleton(beanName, false);
             /**
@@ -711,7 +731,11 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
                  * hasDependentBean(beanName) 说明，这个bean已经注入到其他的bean对象中
                  * */
                 else if (!this.allowRawInjectionDespiteWrapping && hasDependentBean(beanName)) {
-                    // 获取依赖了  beanName 的bean。其实就是获取那些 bean注入了 beanName这个bean
+                    /**
+                     * 获取依赖了 beanName 的bean。其实就是获取哪些bean注入了 beanName这个bean
+                     *
+                     * 在依赖注入时会记录，比如@Resource的注入逻辑 {@link org.springframework.context.annotation.CommonAnnotationBeanPostProcessor#autowireResource(BeanFactory, org.springframework.context.annotation.CommonAnnotationBeanPostProcessor.LookupElement, String)}
+                     * */
                     String[] dependentBeans = getDependentBeans(beanName);
                     Set<String> actualDependentBeans = new LinkedHashSet<>(dependentBeans.length);
                     for (String dependentBean : dependentBeans) {
@@ -723,7 +747,9 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
                          * {@link AbstractBeanFactory#markBeanAsCreated(String)}
                          * */
                         if (!removeSingletonIfCreatedForTypeCheckOnly(dependentBean)) {
-                            // 已经创建完了，就记录一下。
+                            /**
+                             * 已经创建完了，就记录一下。
+                             * */
                             actualDependentBeans.add(dependentBean);
                         }
                     }

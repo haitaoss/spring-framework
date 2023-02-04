@@ -27,6 +27,7 @@ import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.beans.factory.annotation.InitDestroyAnnotationBeanPostProcessor;
 import org.springframework.beans.factory.annotation.InjectionMetadata;
 import org.springframework.beans.factory.config.*;
+import org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.core.BridgeMethodResolver;
 import org.springframework.core.MethodParameter;
@@ -550,7 +551,9 @@ public class CommonAnnotationBeanPostProcessor extends InitDestroyAnnotationBean
             for (String autowiredBeanName : autowiredBeanNames) {
                 if (requestingBeanName != null && beanFactory.containsBean(autowiredBeanName)) {
                     /**
-                     * 记录依赖关系
+                     * 记录依赖关系。在bean执行完初始化后，会利用这个属性值，校验bean是否不一致
+                     *
+                     * {@link AbstractAutowireCapableBeanFactory#doCreateBean(String, RootBeanDefinition, Object[])}
                      * */
                     beanFactory.registerDependentBean(autowiredBeanName, requestingBeanName);
                 }

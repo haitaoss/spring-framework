@@ -720,6 +720,8 @@ public class FullConfigClassTest {
 ```
 ## bean 创建的生命周期
 
+[为什么使用三级缓存？](#为什么使用三级缓存？)
+
 ### 整体流程
 
 ```java
@@ -872,7 +874,7 @@ public class FullConfigClassTest {
  *          @see org.springframework.beans.factory.config.DestructionAwareBeanPostProcessor.requiresDestruction
  * */
 ```
-### 如何实现bean创建的优先级
+### 实现bean创建的优先级
 
 ```java
 /**
@@ -935,51 +937,50 @@ public class MyApplicationListener implements ApplicationListener<MyApplicationE
 }
 
 ```
-```
 ## 依赖注入原理
-> ### @Resource、@Autowired、@Value
->
-> @Resource、@Autowired、@Value 标注字段、方法，则表示需要依赖注入(就是反射给字段设置值、反射执行方法)
->
-> 在依赖注入的前提上：
->
-> - 使用@Lazy则表示注入的是代理对象，执行代理对象时才会真正进行依赖的解析
-> - 使用@Qualifier("beanName")，匹配了多个注入的值时，遍历每个候选者，找到限定beanName一致的候选者
-> - 使用@Primary，匹配了多个注入的值时，有@Primary的候选者作为最终的注入值
-> - 使用@Priority，匹配了多个注入的值时，然后没有@Primary的候选者，才会根据@Priority的排序值，找到至最小的作为最终的注入值
->
-> 注：匹配了多个注入的值时，没有@Qualifier、@Primary、@Primary限定，那就根据字段的名字、或者方法的参数名作为限定名匹配候选者
->
-> ### 怎么实现的？
->
-> 都是通过BeanPostProcessor实现的。
->
-> - `CommonAnnotationBeanPostProcessor` 处理 `@Resource`
-> - `AutowiredAnnotationBeanPostProcessor`处理`@Autowired 、@Value`
->
-> - 在实例化`AnnotationConfigApplicationContext`时
->   - 注册`CommonAnnotationBeanPostProcessor、AutowiredAnnotationBeanPostProcessor`到BeanFactory中的
->   - 给BeanFactory设置自动注入候选者解析器`ContextAnnotationAutowireCandidateResolver`。对注入的依赖进行排序，获取依赖类的@Priority的值。
->   
-> - 在`prepareBeanFactory`时
->   - 给BeanFactory添加`ResourceEditorRegistrar`。登记员用来加工`PropertyEditorRegistry`
->   - 给BeanFactory添加忽略的依赖接口`ignoredDependencyInterfaces`。是这些接口的方法不应该进行自动注入
->   - 给BeanFactory添加可解析的依赖 `resolvableDependencies`。也叫伪装bean不在BeanDefinitionMap中但支持注入这些类型
->   - 给BeanFactory添加 `manualSingletonNames`。自制的bean，即不使用BeanFactory初始化bean，直接注册到单例池，不在BeanDefinitionMap，但是在单例池中，支持注入这些类型
->
-> - 在`finishBeanFactoryInitialization`时：
->   - 给BeanFactory设置`ConversionService`。在依赖注入时，默认会使用`SimpleTypeConverter`要对注入值进行类型转换会使用这个东西，这个其实是`PropertyEditorRegistry`的子类，然后 `ConversionService` 就是其属性，真正进行类型转换是使用`ConversionService`
->   
->   ```txt
->   // SimpleTypeConverter 其实就是 PropertyEditorRegistry的子类
->   SimpleTypeConverter typeConverter = new SimpleTypeConverter();
->   // 设置 conversionService
->   typeConverter.setConversionService(getConversionService()); 
->   // ResourceEditorRegistrar 对 typeConverter 进行加工，其实就是给 typeConverter 注册PropertyEditor
->   registrar.registerCustomEditors(typeConverter);
->   ```
+ ### @Resource、@Autowired、@Value
+
+ @Resource、@Autowired、@Value 标注字段、方法，则表示需要依赖注入(就是反射给字段设置值、反射执行方法)
+
+ 在依赖注入的前提上：
+
+ - 使用@Lazy则表示注入的是代理对象，执行代理对象时才会真正进行依赖的解析
+ - 使用@Qualifier("beanName")，匹配了多个注入的值时，遍历每个候选者，找到限定beanName一致的候选者
+ - 使用@Primary，匹配了多个注入的值时，有@Primary的候选者作为最终的注入值
+ - 使用@Priority，匹配了多个注入的值时，然后没有@Primary的候选者，才会根据@Priority的排序值，找到至最小的作为最终的注入值
+
+ 注：匹配了多个注入的值时，没有@Qualifier、@Primary、@Primary限定，那就根据字段的名字、或者方法的参数名作为限定名匹配候选者
+
+ ### 怎么实现的？
+
+ 都是通过BeanPostProcessor实现的。
+
+ - `CommonAnnotationBeanPostProcessor` 处理 `@Resource`
+ - `AutowiredAnnotationBeanPostProcessor`处理`@Autowired 、@Value`
+
+ - 在实例化`AnnotationConfigApplicationContext`时
+   - 注册`CommonAnnotationBeanPostProcessor、AutowiredAnnotationBeanPostProcessor`到BeanFactory中的
+   - 给BeanFactory设置自动注入候选者解析器`ContextAnnotationAutowireCandidateResolver`。对注入的依赖进行排序，获取依赖类的@Priority的值。
+   
+ - 在`prepareBeanFactory`时
+   - 给BeanFactory添加`ResourceEditorRegistrar`。登记员用来加工`PropertyEditorRegistry`
+   - 给BeanFactory添加忽略的依赖接口`ignoredDependencyInterfaces`。是这些接口的方法不应该进行自动注入
+   - 给BeanFactory添加可解析的依赖 `resolvableDependencies`。也叫伪装bean不在BeanDefinitionMap中但支持注入这些类型
+   - 给BeanFactory添加 `manualSingletonNames`。自制的bean，即不使用BeanFactory初始化bean，直接注册到单例池，不在BeanDefinitionMap，但是在单例池中，支持注入这些类型
+
+ - 在`finishBeanFactoryInitialization`时：
+   - 给BeanFactory设置`ConversionService`。在依赖注入时，默认会使用`SimpleTypeConverter`要对注入值进行类型转换会使用这个东西，这个其实是`PropertyEditorRegistry`的子类，然后 `ConversionService` 就是其属性，真正进行类型转换是使用`ConversionService`
+   
+   ```java
+   // SimpleTypeConverter 其实就是 PropertyEditorRegistry的子类
+   SimpleTypeConverter typeConverter = new SimpleTypeConverter();
+   // 设置 conversionService
+   typeConverter.setConversionService(getConversionService()); 
+   // ResourceEditorRegistrar 对 typeConverter 进行加工，其实就是给 typeConverter 注册PropertyEditor
+   registrar.registerCustomEditors(typeConverter);
 
 ### 循环依赖知识
+
 ```java
 /**
  * 只有单例bean支持循环依赖，原型和Scope是不支持循环依赖的
@@ -1004,7 +1005,127 @@ public class MyApplicationListener implements ApplicationListener<MyApplicationE
  * 注：当然 提前AOP 也不一定会创建代理对象，我这里只是举例了 提前AOP和初始化都创建了代理对象的场景，方便说明
  * */
 ```
+### 为什么使用三级缓存？
+
+```java
+protected Object doCreateBean(String beanName, RootBeanDefinition mbd,
+                                  @Nullable Object[] args) throws BeanCreationException {
+
+        // 实例化bean
+        bean = createBeanInstance(beanName, mbd, args);
+
+        if (earlySingletonExposure) {
+            /**
+             * TODOHAITAO 循环依赖-添加到三级缓存中
+             * 把我们的早期对象包装成一个 singletonFactory 对象，该对象提供了一个 getObject方法，该方法内部调用 getEarlyBeanReference(beanName, mbd, bean)
+             * 实现提前AOP
+             * */
+            addSingletonFactory(beanName, () -> getEarlyBeanReference(beanName, mbd, bean));
+        }
+
+        // Initialize the bean instance.
+        Object exposedObject = bean;
+        // TODOHAITAO 填充bean，就是依赖注入或者给属性设置值
+        populateBean(beanName, mbd, instanceWrapper); // getBean()
+        // TODOHAITAO 进行对象初始化操作（在这里可能生成代理对象）
+        exposedObject = initializeBean(beanName, exposedObject, mbd);
+
+        /**
+         * 这里是为了处理二级缓存中的bean 和 执行了初始化操作的 bean 不一致的校验，不一致说明可能存在
+         * 依赖注入的bean 和 实际存入单例池中的bean 不一致的问题。对于不一致，下面的处理是报错
+         *
+         *
+         * 比如 A 注入了 B，B 注入了 A
+         * 先是 getBean(A),然后其 populateBean 环节要注入B, 所以会 getBean(B)，然后其 populateBean 环节要注入A,所以要 getBean(A)
+         * 此时发现A正在创建，所以会读取三级缓存的value，然后执行提前AOP得到一个 proxyBeanA ，并将 proxyBeanA 存入二级缓存，然后将 proxyBeanA 注入到 B中，
+         * 然后B就创建完了，然后B就会被注入到A中，所以A的 populateBean 结束了，然后会执行 initializeBean。假设在 initializeBean 生成了 proxyBeanA2 。
+         * 这就出现了 注入到B中的A，和实际最终生成的A不一致的问题，对于这中情况，只能直接报错了，下面的逻辑就是为了应付这种情况的，
+         *
+         * 注：当然 提前AOP 也不一定会创建代理对象，我这里只是举例了 提前AOP和初始化都创建了代理对象的场景，方便说明
+         *
+         * */
+        if (earlySingletonExposure) {
+            /**
+             * 去缓存中获取到我们的对象,由于传递的 allowEarlyReference 是false要求只能在一级二级缓存中去获取。
+             * 说白了，就尝试从二级缓存中获取bean。
+             *
+             * 注：在这里就能体会到三级缓存的好处了。因为这里是只会从一级缓存和二级缓存中获取内容(其实只可能从二级缓存中拿到，一级缓存是拿不到的，因为此时还未将单例bean存入一级缓存)
+             *     如果二级缓存拿到的值不为null，就校验一下 exposedObject(执行了初始化后置处理器返回的值) 和 bean(简单实例化出来的) 是否一致，
+             *     若不一致，就需要判断一下，这个bean是否注入给了其他bean对象，若注入给了其他bean对象，那么就只能报错了，因为已经注入给了其他bean的值 和 exposedObject 不一致。
+             *
+             *     假设我们采用二级缓存来解决循环依赖的问题。思路如下：
+             *          一级缓存用来缓存最终完全的bean，二级缓存一开始存入的是 ObjectFactory ，当出现了循环依赖时，读取二级缓存的值,然后回调方法 ObjectFactory#getObject 得到 提前AOP的bean。
+             *          将 提前AOP的bean 存入进二级缓存，也就是进行值覆盖。
+             *
+             *          一级缓存：< beanName,最终的bean >
+             *          二级缓存：< beanName, ObjectFactory 或者 提前AOP得到的bean >
+             *
+             *          这就会出现一个问题，很难确定二级缓存存储得值 是 ObjectFactory 还是 提前AOP得到的bean，
+             *          你可能会这么想 `earlySingletonReference instanceof ObjectFactory` 来检验，但这是不靠谱的，因为有可能bean的类型就是 ObjectFactory 的
+             *          所以呢，只能使用东西标记二级缓存的值  是 ObjectFactory 还是 提前AOP得到的bean，
+             *          比如 这么设计： ThreadLocal< beanName, boolean > earlyLocal ： false 表示二级缓存的值是 ObjectFactory，true 表示二级缓存的值是 提前AOP得到的bean
+             *
+             *          那么下面的 判断逻辑应当改成 ` if ( earlySingletonReference != null && earlyLocal.get().get(beanName) )
+             *
+             *          所以呢肯定是需要使用东西来标记一下，是否执行了 ObjectFactory 得到 提前AOP得到的bean，Spring是采用的三级缓存来标记，
+             *          这就是为啥使用三级缓存
+             *
+             * */
+            Object earlySingletonReference = getSingleton(beanName, false);
+            /**
+             * 能够获取到，说明是在二级缓存拿到的。也就是这个 beanName 产生了循环依赖的问题，
+             * */
+            /**
+             *  相等，说明初始化操作并没有对bean进行代理，那就没事。二级缓存的值作为最后要存入单例池中的值
+             *  不相等，说明对bean进行了代理。这就会导致循环依赖了bean的那些东西，注入的bean是不对的，我们需要判断一下
+             *      那些东西是否已经创建完了，创建完，那就没得搞了，只能报错了。
+             */
+            if (exposedObject == bean) {
+                exposedObject = earlySingletonReference;
+            }
+            /**
+             * hasDependentBean(beanName) 说明，这个bean已经注入到其他的bean对象中
+             * */
+            else if (!this.allowRawInjectionDespiteWrapping && hasDependentBean(beanName)) {
+                /**
+                 * 获取依赖了 beanName 的bean。其实就是获取哪些bean注入了 beanName这个bean
+                 *
+                 * 在依赖注入时会记录，比如@Resource的注入逻辑 {@link org.springframework.context.annotation.CommonAnnotationBeanPostProcessor#autowireResource(BeanFactory, org.springframework.context.annotation.CommonAnnotationBeanPostProcessor.LookupElement, String)}
+                 * */
+                String[] dependentBeans = getDependentBeans(beanName);
+                Set<String> actualDependentBeans = new LinkedHashSet<>(dependentBeans.length);
+                for (String dependentBean : dependentBeans) {
+                    /**
+                     * 尝试挽救一下，如果 dependentBean 还没有创建完成，那就没问题了
+                     *
+                     * 创建完成的标记，是在这个地方设置的，也就是在 doGetBean 的一开始就设置了
+                     * {@link AbstractBeanFactory#doGetBean(String, Class, Object[], boolean)}
+                     * {@link AbstractBeanFactory#markBeanAsCreated(String)}
+                     * */
+                    if (!removeSingletonIfCreatedForTypeCheckOnly(dependentBean)) {
+                        /**
+                         * 已经创建完了，就记录一下。
+                         * */
+                        actualDependentBeans.add(dependentBean);
+                    }
+                }
+                // 报错
+                if (!actualDependentBeans.isEmpty()) {
+                    throw new BeanCurrentlyInCreationException();
+                }
+            }
+        }
+        return exposedObject;
+
+    }
+```
+
+
+
+
+
 ### 示例代码
+
 ```java
 @Component
 public class Test {
