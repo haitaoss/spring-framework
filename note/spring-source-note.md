@@ -888,6 +888,8 @@ public class FullConfigClassTest {
  */
 ```
 
+#### 早期事件实现
+
 通过重写 `onRefresh` 发布早期事件，实现bean的提前创建 示例
 
 ```java
@@ -937,7 +939,78 @@ public class MyApplicationListener implements ApplicationListener<MyApplicationE
 }
 
 ```
+#### 后置处理器实现
+
+```java
+/**
+ * @author haitao.chen
+ * email haitaoss@aliyun.com
+ * date 2023-02-12 09:53
+ * 指定的bean会是最先创建的bean (在 BeanFactoryPostProcesso 、BeanPostProcessor、MessageSource、ApplicationEventMulticaster 之后创建)
+ */
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Import(EarlyCreate.EarlyCreateDeferredImportSelector.class)
+public @interface EarlyCreate {
+    String[] value() default {};
+
+    class EarlyCreateDeferredImportSelector implements DeferredImportSelector {
+        @Override
+        public Class<? extends Group> getImportGroup() {
+            //            return EarlyCreateGroup.class;
+            return DeferredImportSelector.super.getImportGroup();
+        }
+
+        @Override
+        public String[] selectImports(AnnotationMetadata importingClassMetadata) {
+            return new String[]{EarlyCreateBeanPostProcessor.class.getName()};
+        }
+
+        @Override
+        public Predicate<String> getExclusionFilter() {
+            return DeferredImportSelector.super.getExclusionFilter();
+        }
+    }
+
+    class EarlyCreateBeanPostProcessor implements BeanPostProcessor, BeanFactoryAware, ImportAware {
+        private BeanFactory beanFactory;
+
+        @Override
+        public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
+            this.beanFactory = beanFactory;
+        }
+
+        @Override
+        public void setImportMetadata(AnnotationMetadata importMetadata) {
+            Optional.ofNullable(importMetadata.getAnnotationAttributes(EarlyCreate.class.getName()))
+                    .map(map -> map.get("value"))
+                    .map(item -> (String[]) item)
+                    .ifPresent(beanNames -> Stream.of(beanNames)
+                            .forEach(beanFactory::getBean));
+        }
+    }
+
+
+    // 会有默认的，没有特殊需求可以不设置
+    class EarlyCreateGroup implements DeferredImportSelector.Group {
+        @Override
+        public void process(AnnotationMetadata metadata, DeferredImportSelector selector) {
+
+        }
+
+        @Override
+        public Iterable<Entry> selectImports() {
+            return null;
+        }
+    }
+
+}
+```
+
+
+
 ## 依赖注入原理
+
  ### @Resource、@Autowired、@Value
 
  @Resource、@Autowired、@Value 标注字段、方法，则表示需要依赖注入(就是反射给字段设置值、反射执行方法)
@@ -3763,15 +3836,20 @@ public class TestJDKSchedulerAPI {
 ```java
 public class TestSpringCronAPI {
 
-    public static void main(String[] args) {
-        String expression = "*/1 5 12 * * ?";
+    public static void main(String[] args) throws Exception {
+        // String expression = "*/1 5 12 * * ?";
+        // String expression = "* * 10 2 * ?";
+        String expression = "0 0 10 2 * ?";
         CronExpression parse = CronExpression.parse(expression);
 
-        ZonedDateTime dateTime = ZonedDateTime.ofInstant(new Date().toInstant(), ZoneId.systemDefault());
-        ZonedDateTime next = parse.next(dateTime);
-        // 下一次执行时间        
-        System.out.println(next.format(DateTimeFormatter.ISO_DATE_TIME));
-
+        Instant instant1 = new Date().toInstant();
+        Function<Instant, ZonedDateTime> fun = instant -> ZonedDateTime.ofInstant(instant, ZoneId.systemDefault());
+        // 下一次执行时间
+        for (int i = 0; i < 10; i++) {
+            ZonedDateTime next = parse.next(fun.apply(instant1));
+            System.out.println(next.format(DateTimeFormatter.ISO_DATE_TIME));
+            instant1 = next.toInstant();
+        }
     }
 }
 ```
