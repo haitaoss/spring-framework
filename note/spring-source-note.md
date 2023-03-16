@@ -5617,6 +5617,20 @@ public class AopTest4 {
 > 有啥用：
 >
 > - 可能通过自定义Scope使用配置bean的热部署。
+> 
+> 补充知识点
+> ```
+> /**
+>  * 使用 @Scope(proxyMode = ScopedProxyMode.TARGET_CLASS)
+>  * 其实会映射成两个 BeanDefinition：
+>  *  第一个的beanClass 是 当前类本身，而其beanName是 "scopedTarget. + beanName"
+>  *  第二个的beanClass 是 ScopedProxyFactoryBean，而其beanName 是 beanName
+>  *
+>  * 举例的处理逻辑：
+>  *  {@link ClassPathBeanDefinitionScanner#doScan(String...)}
+>  *  {@link ConfigurationClassBeanDefinitionReader#registerBeanDefinitionForImportedConfigurationClass(ConfigurationClass)}
+>  * */
+>```
 
 ```java
 @Component

@@ -314,6 +314,7 @@ public abstract class AnnotationConfigUtils {
             ScopeMetadata metadata, BeanDefinitionHolder definition, BeanDefinitionRegistry registry) {
 
         ScopedProxyMode scopedProxyMode = metadata.getScopedProxyMode();
+        // 是 no  就不做处理
         if (scopedProxyMode.equals(ScopedProxyMode.NO)) {
             return definition;
         }

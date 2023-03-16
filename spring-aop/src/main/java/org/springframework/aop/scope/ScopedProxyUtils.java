@@ -58,6 +58,7 @@ public abstract class ScopedProxyUtils {
 
 		String originalBeanName = definition.getBeanName();
 		BeanDefinition targetDefinition = definition.getBeanDefinition();
+		// 拼接上 scopedTarget. 前缀
 		String targetBeanName = getTargetBeanName(originalBeanName);
 
 		// Create a scoped proxy definition for the original bean name,
@@ -88,9 +89,13 @@ public abstract class ScopedProxyUtils {
 		targetDefinition.setAutowireCandidate(false);
 		targetDefinition.setPrimary(false);
 
+		// 额外注册一个 BeanDefinition，这个记录的就是原始的 bean信息
 		// Register the target bean as separate bean in the factory.
 		registry.registerBeanDefinition(targetBeanName, targetDefinition);
 
+		/**
+		 * proxyDefinition 其 beanClass 是 ScopedProxyFactoryBean，他能关联到 targetDefinition
+		 * */
 		// Return the scoped proxy definition as primary bean definition
 		// (potentially an inner bean).
 		return new BeanDefinitionHolder(proxyDefinition, originalBeanName, definition.getAliases());

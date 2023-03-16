@@ -5,8 +5,10 @@ import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.config.Scope;
+import org.springframework.context.annotation.*;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -18,6 +20,23 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Component
 public class ScopeTest {
+    public static void main(String[] args) {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(ScopeTest.class);
+        System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
+        /**
+         * 使用 @Scope(proxyMode = ScopedProxyMode.TARGET_CLASS)
+         * 其实会映射成两个 BeanDefinition：
+         *  第一个的beanClass 是 当前类本身，而其beanName是 "scopedTarget. + beanName"
+         *  第二个的beanClass 是 ScopedProxyFactoryBean，而其beanName 是 beanName
+         *
+         * 举例的处理逻辑：
+         *  {@link ClassPathBeanDefinitionScanner#doScan(String...)}
+         *  {@link ConfigurationClassBeanDefinitionReader#registerBeanDefinitionForImportedConfigurationClass(ConfigurationClass)}
+         * */
+        System.out.println(context.getBean("scopedTarget.cn.haitaoss.javaconfig.Scope.ScopeTest$Demo"));
+        System.out.println(context.getBean("cn.haitaoss.javaconfig.Scope.ScopeTest$Demo"));
+    }
+
     @Component
     public static class MyBeanFactoryPostProcessor implements BeanFactoryPostProcessor {
 
@@ -27,7 +46,7 @@ public class ScopeTest {
         }
     }
 
-    @org.springframework.context.annotation.Scope("haitao")
+    @org.springframework.context.annotation.Scope(value = "haitao", proxyMode = ScopedProxyMode.TARGET_CLASS)
     @Component
     public static class Demo {
     }

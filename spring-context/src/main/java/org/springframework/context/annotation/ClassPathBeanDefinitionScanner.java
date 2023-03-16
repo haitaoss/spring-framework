@@ -16,6 +16,7 @@
 
 package org.springframework.context.annotation;
 
+import org.springframework.aop.scope.ScopedProxyUtils;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinitionHolder;
@@ -282,6 +283,7 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
             // 查找符合条件的 bean
             Set<BeanDefinition> candidates = findCandidateComponents(basePackage);
             for (BeanDefinition candidate : candidates) {
+                // 获取 @Scope 的信息
                 ScopeMetadata scopeMetadata = this.scopeMetadataResolver.resolveScopeMetadata(candidate);
                 candidate.setScope(scopeMetadata.getScopeName());
                 // 设置beanName
@@ -299,6 +301,13 @@ public class ClassPathBeanDefinitionScanner extends ClassPathScanningCandidateCo
                 // 检查 Spring 容器中是否已经存在该 beanName
                 if (checkCandidate(beanName, candidate)) {
                     BeanDefinitionHolder definitionHolder = new BeanDefinitionHolder(candidate, beanName);
+                    /**
+                     * 针对 @Scope 进行处理，只要不是 @Scope(proxyMode = ScopedProxyMode.NO | DEFAULT) 就做额外处理。
+                     * 具体的处理逻辑是 额外注册一个 BeanDefinition 记录的是原始BeanDefinition，其beanName是 `scopedTarget. + 当前beanName`
+                     * 然后返回的是 处理后的BeanDefinition，其实就是修改 beanClass 为 ScopedProxyFactoryBean 这个类型
+                     *
+                     * {@link ScopedProxyUtils#createScopedProxy(BeanDefinitionHolder, BeanDefinitionRegistry, boolean)}
+                     * */
                     definitionHolder = AnnotationConfigUtils.applyScopedProxyMode(scopeMetadata, definitionHolder, this.registry);
                     beanDefinitions.add(definitionHolder);
 

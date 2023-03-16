@@ -172,6 +172,7 @@ class ConfigurationClassBeanDefinitionReader {
         AnnotationMetadata metadata = configClass.getMetadata();
         AnnotatedGenericBeanDefinition configBeanDef = new AnnotatedGenericBeanDefinition(metadata);
 
+        // 拿到 @Scope 信息
         ScopeMetadata scopeMetadata = scopeMetadataResolver.resolveScopeMetadata(configBeanDef);
         configBeanDef.setScope(scopeMetadata.getScopeName());
         String configBeanName = this.importBeanNameGenerator.generateBeanName(configBeanDef, this.registry);
@@ -179,6 +180,10 @@ class ConfigurationClassBeanDefinitionReader {
         AnnotationConfigUtils.processCommonDefinitionAnnotations(configBeanDef, metadata);
 
         BeanDefinitionHolder definitionHolder = new BeanDefinitionHolder(configBeanDef, configBeanName);
+        /**
+         * 看看是否需要做 额外处理，和这里是一样的逻辑
+         * {@link ClassPathBeanDefinitionScanner#doScan(String...)}
+         * */
         definitionHolder = AnnotationConfigUtils.applyScopedProxyMode(scopeMetadata, definitionHolder, this.registry);
         // 注册
         this.registry.registerBeanDefinition(definitionHolder.getBeanName(), definitionHolder.getBeanDefinition());
