@@ -18,7 +18,6 @@ import org.springframework.stereotype.Component;
 @EnableAsync
 public class Test {
 
-
     @Autowired
     private Test test;
 

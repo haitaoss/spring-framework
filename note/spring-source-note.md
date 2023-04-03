@@ -1051,6 +1051,7 @@ public @interface EarlyCreate {
    typeConverter.setConversionService(getConversionService()); 
    // ResourceEditorRegistrar 对 typeConverter 进行加工，其实就是给 typeConverter 注册PropertyEditor
    registrar.registerCustomEditors(typeConverter);
+   ```
 
 ### 循环依赖知识
 
@@ -6933,6 +6934,80 @@ public class Test {
     }
 }
 ```
+## @Qualifier
+
+### 示例代码
+
+```java
+@Component
+@Data
+public class Main {
+    @Autowired
+    @Qualifier
+    private String msg;
+    @Autowired
+    @Qualifier("1")
+    private List<String> list1;
+    @Autowired
+    @Qualifier
+    private List<String> list2;
+
+    @Bean
+    @Qualifier("1")
+    public String o1() {
+        return new String("o1");
+    }
+
+    @Bean
+    @Qualifier("1")
+    public String o11() {
+        return new String("o11");
+    }
+
+    @Bean
+    @Qualifier
+    public String o2() {
+        return new String("o2");
+    }
+
+    public static void main(String[] args) throws Exception {
+        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(Main.class);
+        Main bean = context.getBean(Main.class);
+        System.out.println(bean);
+    }
+}
+```
+
+### 原理
+
+```java
+/**
+ * @Qualifier 并不只是限定beanName，可以理解成给 依赖进行分组
+ * 
+ * 依赖解析的大致流程
+ * {@link DefaultListableBeanFactory#doResolveDependency(DependencyDescriptor, String, Set, TypeConverter)}
+ * {@link DefaultListableBeanFactory#findAutowireCandidates(String, Class, DependencyDescriptor)}
+ *  遍历候选的bean过滤是候选者 
+ *  {@link DefaultListableBeanFactory#isAutowireCandidate(String, DependencyDescriptor)}
+ *  {@link QualifierAnnotationAutowireCandidateResolver#isAutowireCandidate(BeanDefinitionHolder, DependencyDescriptor)}
+ *      其实就是校验：
+ *          - 字段依赖@Qualifier校验
+ *          - 方法参数依赖@Qualifier校验
+ *      
+ *      依赖没有 @Qualifier 那就不判断，直接就是匹配。
+ *      拿到依赖上的注解,过滤出是 @Qualifier 就进行匹配，匹配不满足还会 拿到注解上的注解,过滤出是 @Qualifier 再进行匹配
+ *      
+ *      进行匹配的逻辑：
+ *           BeanDefinition 没有设置 Qualifier 那就从声明bean的地方找：
+ *               1. @Bean 标注的方法上找 @Qualifier
+ *               2. beanClass 上找 @Qualifier
+ *           若找到了 @Qualifier 那就直接和 声明依赖的 @Qualifier 进行 equals 比较，为true就直接return 匹配
+ *           否则就拿 依赖注入的 @Qualifier 的注解值 和 beanName 进行匹配
+ * 
+ * Tips：我们可以利用@Qualifier的匹配逻辑，来实现给要注入的依赖进行分组
+ * */
+```
+
 # Spring好用的工具类
 
 ## ProxyFactoryBean

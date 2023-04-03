@@ -140,16 +140,23 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
     @Override
     public boolean isAutowireCandidate(BeanDefinitionHolder bdHolder, DependencyDescriptor descriptor) {
         /**
-         * 这个就是检查BeanDefinition的属性值
+         * 这个就是检查BeanDefinition的属性值 和 校验 bdHolder 是否是 descriptor 的类型(就是校验要注入的bean是需要的类型才是true)
          * {@link AbstractBeanDefinition#isAutowireCandidate()}
          * */
         boolean match = super.isAutowireCandidate(bdHolder, descriptor);
         if (match) {
             /**
+             * 依赖没有 @Qualifier 那就不判断，直接就是匹配。
+             * 拿到依赖上的注解,过滤出是 @Qualifier 就进行匹配，匹配不满足还会 拿到注解上的注解,过滤出是 @Qualifier 再进行匹配
+             *
              * 字段依赖@Qualifier校验,和方法参数依赖@Qualifier校验
              *
-             * 对依赖的所有注解进行匹配，是@Qualifier就匹配注解的值和BeanDefinition中的值是否一致，如果不一致 或者 没有@Qualifier，会有补偿策略，
-             * 拿到注解上的注解,遍历 是@Qualifier就进行匹配
+             * 进行匹配的逻辑：
+             *      BeanDefinition 没有设置 Qualifier 那就从声明bean的地方找：
+             *          1. @Bean 标注的方法上找 @Qualifier
+             *          2. beanClass 上找 @Qualifier
+             *      若找到了 @Qualifier 那就直接和 声明依赖的 @Qualifier 进行 equals 比较，为true就直接return 匹配
+             *      否则就拿 依赖注入的 @Qualifier 的注解值 和 beanName 进行匹配
              * */
             match = checkQualifiers(bdHolder, descriptor.getAnnotations());
             if (match) {
@@ -213,6 +220,12 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
             if (isQualifier(type)) {
                 /**
                  * 就是看 BeanDefinition 记录的信息 是否和 @Qualifier 的值一致返回true
+                 *
+                 * BeanDefinition 没有设置 Qualifier 那就从声明bean的地方找：
+                 *  1. @Bean 标注的方法上找 @Qualifier
+                 *  2. beanClass 上找 @Qualifier
+                 * 若找到了 @Qualifier 那就直接和 依赖注入的 @Qualifier 进行 equals 比较，为true就直接return 匹配
+                 * 否则就拿 依赖注入的 @Qualifier 的注解值 和 beanName 进行匹配
                  * */
                 if (!checkQualifier(bdHolder, annotation, typeConverter)) {
                     // 需要应急检查
@@ -294,11 +307,32 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
         if (qualifier == null) {
             qualifier = bd.getQualifier(ClassUtils.getShortName(type));
         }
+        /**
+         * BeanDefinition 没有设置 Qualifier 那就从声明bean的地方找：
+         *  1. @Bean 标注的方法上找 @Qualifier
+         *  2. beanClass 上找 @Qualifier
+         * 若找到了 @Qualifier 那就直接和 依赖注入的 @Qualifier 进行 equals 比较，为true就直接return 匹配
+         * 否则就拿 依赖注入的 @Qualifier 的注解值 和 beanName 进行匹配
+         *
+         * 注：这只是简单的总结，其实匹配还挺复杂的，但是重点就是根据 beanName 进行匹配
+         * */
         if (qualifier == null) {
             // First, check annotation on qualified element, if any
             Annotation targetAnnotation = getQualifiedElementAnnotation(bd, type);
             // Then, check annotation on factory method, if applicable
             if (targetAnnotation == null) {
+                /**
+                 * 从工厂方法上获取注解
+                 *
+                 * 就是这种情况
+                 *  @Component
+                 *  class Config{
+                 *     @Bean @Qualifier("1")
+                 *     public String o() {
+                 *         return new String("o");
+                 *     }
+                 *  }
+                 * */
                 targetAnnotation = getFactoryMethodAnnotation(bd, type);
             }
             if (targetAnnotation == null) {
@@ -326,6 +360,7 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
                     targetAnnotation = AnnotationUtils.getAnnotation(ClassUtils.getUserClass(bd.getBeanClass()), type);
                 }
             }
+            // 注解是一样的，直接返回true
             if (targetAnnotation != null && targetAnnotation.equals(annotation)) {
                 return true;
             }
@@ -336,9 +371,11 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
             // If no attributes, the qualifier must be present
             return false;
         }
+        // 遍历注解的属性值
         for (Map.Entry<String, Object> entry : attributes.entrySet()) {
             String attributeName = entry.getKey();
             Object expectedValue = entry.getValue();
+            // 实际值，指的是声明bean的地方标注的值
             Object actualValue = null;
             // Check qualifier first
             if (qualifier != null) {
@@ -349,7 +386,7 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
                 actualValue = bd.getAttribute(attributeName);
             }
             /**
-             *  bdHolder.matchesName((String) expectedValue) 就是匹配 beanName 和 @Qualifier("x")
+             *  bdHolder.matchesName((String) expectedValue) 就是拿 beanName 和 @Qualifier("x") 进行匹配
              * */
             if (actualValue == null && attributeName.equals(AutowireCandidateQualifier.VALUE_KEY) &&
                 expectedValue instanceof String &&
@@ -368,6 +405,7 @@ public class QualifierAnnotationAutowireCandidateResolver extends GenericTypeAwa
                 return false;
             }
         }
+        // 返回true
         return true;
     }
 
