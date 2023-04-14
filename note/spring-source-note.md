@@ -6370,6 +6370,8 @@ public class ValidatedTest {
 
 ### 示例代码
 
+[动态代理实现AOP和Ajc实现AOP的demo](../source-note-spring/src/main/java/cn/haitaoss/javaconfig/EnableLoadTimeWeaving/Main.java)
+
 #### @EnableLoadTimeWeaving 和`<context:load-time-weaver/>`
 
 `META-INF/aop.xml`

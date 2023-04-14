@@ -1,12 +1,14 @@
 <?xml version="1.0"?>
 <aspectj>
-    <weaver options="-verbose -debug -showWeaveInfo">
-        <include within="cn..*"/>
+<!--    <weaver options="-verbose -debug -showWeaveInfo">-->
+    <weaver>
+<!--        <include within="cn..*"/>-->
+        <include within="cn.haitaoss.javaconfig.EnableLoadTimeWeaving.ajc.*"/>
     </weaver>
 
     <aspects>
         <!-- weave in just this aspect -->
-        <aspect name="cn.haitaoss.javaconfig.EnableLoadTimeWeaving.Test.ProfilingAspect"/>
+        <aspect name="cn.haitaoss.javaconfig.EnableLoadTimeWeaving.ajc.AjcAspect"/>
     </aspects>
 
 </aspectj>
