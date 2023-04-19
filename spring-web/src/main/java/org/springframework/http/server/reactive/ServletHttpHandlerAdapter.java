@@ -16,35 +16,26 @@
 
 package org.springframework.http.server.reactive;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.util.Collection;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import javax.servlet.AsyncContext;
-import javax.servlet.AsyncEvent;
-import javax.servlet.AsyncListener;
-import javax.servlet.DispatcherType;
-import javax.servlet.Servlet;
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRegistration;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import org.apache.commons.logging.Log;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-
 import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpLogging;
 import org.springframework.http.HttpMethod;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
+import org.springframework.web.server.adapter.AbstractReactiveWebInitializer;
+import org.springframework.web.server.adapter.HttpWebHandlerAdapter;
+
+import javax.servlet.*;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.util.Collection;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Adapt {@link HttpHandler} to an {@link HttpServlet} using Servlet Async support
@@ -170,6 +161,7 @@ public class ServletHttpHandlerAdapter implements Servlet {
 		AsyncListener requestListener;
 		String logPrefix;
 		try {
+			// 构造出 httpRequest
 			httpRequest = createRequest(((HttpServletRequest) request), asyncContext);
 			requestListener = httpRequest.getAsyncListener();
 			logPrefix = httpRequest.getLogPrefix();
@@ -183,6 +175,7 @@ public class ServletHttpHandlerAdapter implements Servlet {
 			return;
 		}
 
+		// 构造出 ServerHttpResponse
 		ServerHttpResponse httpResponse = createResponse(((HttpServletResponse) response), asyncContext, httpRequest);
 		AsyncListener responseListener = ((ServletServerHttpResponse) httpResponse).getAsyncListener();
 		if (httpRequest.getMethod() == HttpMethod.HEAD) {
@@ -190,11 +183,19 @@ public class ServletHttpHandlerAdapter implements Servlet {
 		}
 
 		AtomicBoolean completionFlag = new AtomicBoolean();
+		// 结果订阅，响应式的API 也不知道是啥
 		HandlerResultSubscriber subscriber = new HandlerResultSubscriber(asyncContext, completionFlag, logPrefix);
 
 		asyncContext.addListener(new HttpHandlerAsyncListener(
 				requestListener, responseListener, subscriber, completionFlag, logPrefix));
 
+		/**
+		 * 默认是这个
+		 * {@link HttpWebHandlerAdapter#handle(ServerHttpRequest, ServerHttpResponse)}
+		 *
+		 * 设置的源码在这里
+		 * 		{@link AbstractReactiveWebInitializer#onStartup(ServletContext)}
+		 * */
 		this.httpHandler.handle(httpRequest, httpResponse).subscribe(subscriber);
 	}
 

@@ -16,18 +16,17 @@
 
 package org.springframework.web.server.handler;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
-import reactor.core.publisher.Mono;
-
 import org.springframework.http.HttpMethod;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebExceptionHandler;
 import org.springframework.web.server.WebHandler;
+import reactor.core.publisher.Mono;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * WebHandler decorator that invokes one or more {@link WebExceptionHandler WebExceptionHandlers}
@@ -49,6 +48,7 @@ public class ExceptionHandlingWebHandler extends WebHandlerDecorator {
 	public ExceptionHandlingWebHandler(WebHandler delegate, List<WebExceptionHandler> handlers) {
 		super(delegate);
 		List<WebExceptionHandler> handlersToUse = new ArrayList<>();
+		// 默认的异常处理
 		handlersToUse.add(new CheckpointInsertingHandler());
 		handlersToUse.addAll(handlers);
 		this.exceptionHandlers = Collections.unmodifiableList(handlersToUse);
@@ -67,12 +67,16 @@ public class ExceptionHandlingWebHandler extends WebHandlerDecorator {
 	public Mono<Void> handle(ServerWebExchange exchange) {
 		Mono<Void> completion;
 		try {
+			/**
+			 * {@link FilteringWebHandler#handle(ServerWebExchange)}
+			 * */
 			completion = super.handle(exchange);
 		}
 		catch (Throwable ex) {
 			completion = Mono.error(ex);
 		}
 
+		// 遍历 exceptionHandlers 处理异常
 		for (WebExceptionHandler handler : this.exceptionHandlers) {
 			completion = completion.onErrorResume(ex -> handler.handle(exchange, ex));
 		}

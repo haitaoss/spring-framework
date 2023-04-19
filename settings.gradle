@@ -59,4 +59,5 @@ settings.gradle.projectsLoaded {
 }
 include 'source-note-spring'
 include 'source-note-springmvc'
+include 'source-note-spring-webflux'
 

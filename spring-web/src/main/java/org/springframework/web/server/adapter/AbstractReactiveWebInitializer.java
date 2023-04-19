@@ -16,12 +16,6 @@
 
 package org.springframework.web.server.adapter;
 
-import javax.servlet.ServletContext;
-import javax.servlet.ServletContextEvent;
-import javax.servlet.ServletContextListener;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRegistration;
-
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -29,6 +23,8 @@ import org.springframework.http.server.reactive.HttpHandler;
 import org.springframework.http.server.reactive.ServletHttpHandlerAdapter;
 import org.springframework.util.Assert;
 import org.springframework.web.WebApplicationInitializer;
+
+import javax.servlet.*;
 
 /**
  * Base class for a {@link org.springframework.web.WebApplicationInitializer}
@@ -62,7 +58,11 @@ public abstract class AbstractReactiveWebInitializer implements WebApplicationIn
 		refreshApplicationContext(applicationContext);
 		registerCloseListener(servletContext, applicationContext);
 
+		/**
+		 * 最终返回的是 HttpWebHandlerAdapter 类型的
+		 * */
 		HttpHandler httpHandler = WebHttpHandlerBuilder.applicationContext(applicationContext).build();
+		// 构造成 Servlet
 		ServletHttpHandlerAdapter servlet = new ServletHttpHandlerAdapter(httpHandler);
 
 		ServletRegistration.Dynamic registration = servletContext.addServlet(servletName, servlet);

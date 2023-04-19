@@ -16,13 +16,12 @@
 
 package org.springframework.web.server.handler;
 
-import java.util.List;
-
-import reactor.core.publisher.Mono;
-
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebHandler;
+import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 /**
  * {@link WebHandlerDecorator} that invokes a chain of {@link WebFilter WebFilters}
@@ -56,6 +55,9 @@ public class FilteringWebHandler extends WebHandlerDecorator {
 
 	@Override
 	public Mono<Void> handle(ServerWebExchange exchange) {
+		/**
+		 * {@link org.springframework.web.reactive.DispatcherHandler#handle(ServerWebExchange)}
+		 * */
 		return this.chain.filter(exchange);
 	}
 

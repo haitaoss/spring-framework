@@ -16,16 +16,6 @@
 
 package org.springframework.web.server.adapter;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import reactor.blockhound.BlockHound;
-import reactor.blockhound.integration.BlockHoundIntegration;
-
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
@@ -44,6 +34,15 @@ import org.springframework.web.server.handler.FilteringWebHandler;
 import org.springframework.web.server.i18n.LocaleContextResolver;
 import org.springframework.web.server.session.DefaultWebSessionManager;
 import org.springframework.web.server.session.WebSessionManager;
+import reactor.blockhound.BlockHound;
+import reactor.blockhound.integration.BlockHoundIntegration;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * This builder has two purposes:
@@ -164,26 +163,31 @@ public final class WebHttpHandlerBuilder {
 	 */
 	public static WebHttpHandlerBuilder applicationContext(ApplicationContext context) {
 
+		// 获取 WebHandler 构造出 WebHttpHandlerBuilder
 		WebHttpHandlerBuilder builder = new WebHttpHandlerBuilder(
 				context.getBean(WEB_HANDLER_BEAN_NAME, WebHandler.class), context);
 
+		// 设置上 WebFilter
 		List<WebFilter> webFilters = context
 				.getBeanProvider(WebFilter.class)
 				.orderedStream()
 				.collect(Collectors.toList());
 		builder.filters(filters -> filters.addAll(webFilters));
 
+		// 设置上 WebExceptionHandler
 		List<WebExceptionHandler> exceptionHandlers = context
 				.getBeanProvider(WebExceptionHandler.class)
 				.orderedStream()
 				.collect(Collectors.toList());
 		builder.exceptionHandlers(handlers -> handlers.addAll(exceptionHandlers));
 
+		// 设置上 HttpHandlerDecoratorFactory
 		context.getBeanProvider(HttpHandlerDecoratorFactory.class)
 				.orderedStream()
 				.forEach(builder::httpHandlerDecorator);
 
 		try {
+			// 设置 WebSessionManager
 			builder.sessionManager(
 					context.getBean(WEB_SESSION_MANAGER_BEAN_NAME, WebSessionManager.class));
 		}
@@ -192,6 +196,7 @@ public final class WebHttpHandlerBuilder {
 		}
 
 		try {
+			// 设置 ServerCodecConfigurer
 			builder.codecConfigurer(
 					context.getBean(SERVER_CODEC_CONFIGURER_BEAN_NAME, ServerCodecConfigurer.class));
 		}
@@ -388,6 +393,7 @@ public final class WebHttpHandlerBuilder {
 	 * Build the {@link HttpHandler}.
 	 */
 	public HttpHandler build() {
+		// 一层层装饰
 		WebHandler decorated = new FilteringWebHandler(this.webHandler, this.filters);
 		decorated = new ExceptionHandlingWebHandler(decorated,  this.exceptionHandlers);
 
