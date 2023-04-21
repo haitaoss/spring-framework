@@ -22,6 +22,8 @@ import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.http.codec.ServerCodecConfigurer;
 import org.springframework.http.server.reactive.HttpHandler;
 import org.springframework.http.server.reactive.HttpHandlerDecoratorFactory;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
@@ -393,7 +395,34 @@ public final class WebHttpHandlerBuilder {
 	 * Build the {@link HttpHandler}.
 	 */
 	public HttpHandler build() {
-		// 一层层装饰
+		/**
+		 * 一层层装饰
+		 *
+		 * FilteringWebHandler 代理 WebHandler (默认配置的是 DispatcherHandler), 增加了使用  WebFilter 的逻辑
+		 * ExceptionHandlingWebHandler 代理 FilteringWebHandler, 增加了使用 WebExceptionHandler 的逻辑
+		 * HttpWebHandlerAdapter 代理 ExceptionHandlingWebHandler, 增加了 自定义 request、装饰request和response 的逻辑
+		 *
+		 * 最终暴露出去的是 HttpWebHandlerAdapter，大致的执行逻辑如下：
+		 * {@link HttpWebHandlerAdapter#handle(ServerHttpRequest, ServerHttpResponse)}
+		 *		1. 使用 ForwardedHeaderTransformer 用来对 request 进行自定义
+		 *			request = this.forwardedHeaderTransformer.apply(request);
+		 *
+		 *		2. 构造出 ServerWebExchange
+		 *			ServerWebExchange exchange = createExchange(request, response);
+		 *
+		 *		3. 委托给 ExceptionHandlingWebHandler 执行
+		 *			{@link ExceptionHandlingWebHandler#handle(ServerWebExchange)}
+		 *
+		 *			3.1 委托给 FilteringWebHandler 执行拿到返回值
+		 *				{@link FilteringWebHandler#handle(ServerWebExchange)}
+		 *				 其实就是迭代执行 WebFilter，然后再委托给 WebHandler 执行
+		 *
+		 *			3.2	处理异常信息
+		 *				// 遍历 exceptionHandlers 处理异常
+		 * 				for (WebExceptionHandler handler : this.exceptionHandlers) {
+		 * 					completion = completion.onErrorResume(ex -> handler.handle(exchange, ex));
+		 * 				}
+		 * */
 		WebHandler decorated = new FilteringWebHandler(this.webHandler, this.filters);
 		decorated = new ExceptionHandlingWebHandler(decorated,  this.exceptionHandlers);
 

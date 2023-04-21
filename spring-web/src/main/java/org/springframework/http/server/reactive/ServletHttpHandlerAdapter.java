@@ -153,6 +153,11 @@ public class ServletHttpHandlerAdapter implements Servlet {
 			throw new ServletException("Failed to create response content", ex);
 		}
 
+		/**
+		 * 开启异步
+		 *
+		 * 这是 Servlet 3.1 开始支持的。
+		 * */
 		// Start async before Read/WriteListener registration
 		AsyncContext asyncContext = request.startAsync();
 		asyncContext.setTimeout(-1);
@@ -163,6 +168,8 @@ public class ServletHttpHandlerAdapter implements Servlet {
 		try {
 			// 构造出 httpRequest
 			httpRequest = createRequest(((HttpServletRequest) request), asyncContext);
+
+			// 请求监听器
 			requestListener = httpRequest.getAsyncListener();
 			logPrefix = httpRequest.getLogPrefix();
 		}
@@ -177,6 +184,8 @@ public class ServletHttpHandlerAdapter implements Servlet {
 
 		// 构造出 ServerHttpResponse
 		ServerHttpResponse httpResponse = createResponse(((HttpServletResponse) response), asyncContext, httpRequest);
+
+		// 响应监听器
 		AsyncListener responseListener = ((ServletServerHttpResponse) httpResponse).getAsyncListener();
 		if (httpRequest.getMethod() == HttpMethod.HEAD) {
 			httpResponse = new HttpHeadResponseDecorator(httpResponse);
@@ -186,6 +195,7 @@ public class ServletHttpHandlerAdapter implements Servlet {
 		// 结果订阅，响应式的API 也不知道是啥
 		HandlerResultSubscriber subscriber = new HandlerResultSubscriber(asyncContext, completionFlag, logPrefix);
 
+		// 注册 监听器。完成请求时会回调监听器的生命周期方法
 		asyncContext.addListener(new HttpHandlerAsyncListener(
 				requestListener, responseListener, subscriber, completionFlag, logPrefix));
 

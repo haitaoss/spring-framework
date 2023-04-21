@@ -16,19 +16,18 @@
 
 package org.springframework.web.server.handler;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.ListIterator;
-
-import reactor.core.publisher.Mono;
-
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import org.springframework.web.server.WebHandler;
+import reactor.core.publisher.Mono;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.ListIterator;
 
 /**
  * Default implementation of {@link WebFilterChain}.
@@ -74,7 +73,9 @@ public class DefaultWebFilterChain implements WebFilterChain {
 	private static DefaultWebFilterChain initChain(List<WebFilter> filters, WebHandler handler) {
 		DefaultWebFilterChain chain = new DefaultWebFilterChain(filters, handler, null, null);
 		ListIterator<? extends WebFilter> iterator = filters.listIterator(filters.size());
+		// 存在 WebFilter
 		while (iterator.hasPrevious()) {
+			// 层层包装，一个 WebFilter 对应 一个 chain
 			chain = new DefaultWebFilterChain(filters, handler, iterator.previous(), chain);
 		}
 		return chain;
@@ -118,6 +119,10 @@ public class DefaultWebFilterChain implements WebFilterChain {
 	public Mono<Void> filter(ServerWebExchange exchange) {
 		return Mono.defer(() ->
 				this.currentFilter != null && this.chain != null ?
+						/**
+						 * 注意这里传的是 this.chain 而不是 this。
+						 * 因为在构造器的时候是 将 WebFilter 层层包装，一个 WebFilter 就是一个 chain
+						 * */
 						invokeFilter(this.currentFilter, this.chain, exchange) :
 						this.handler.handle(exchange));
 	}

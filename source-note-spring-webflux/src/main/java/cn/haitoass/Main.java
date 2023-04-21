@@ -22,7 +22,6 @@ import java.io.File;
 @EnableWebFlux
 @ComponentScan
 public class Main extends AbstractReactiveWebInitializer {
-
     @Override
     protected Class<?>[] getConfigClasses() {
         return new Class[]{Main.class};
@@ -68,4 +67,5 @@ public class Main extends AbstractReactiveWebInitializer {
         thread.setDaemon(false);
         thread.start();
     }
+
 }

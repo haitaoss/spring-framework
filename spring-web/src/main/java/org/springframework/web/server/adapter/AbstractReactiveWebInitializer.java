@@ -52,9 +52,11 @@ public abstract class AbstractReactiveWebInitializer implements WebApplicationIn
 		String servletName = getServletName();
 		Assert.hasLength(servletName, "getServletName() must not return null or empty");
 
+		// 创建出IOC容器
 		ApplicationContext applicationContext = createApplicationContext();
 		Assert.notNull(applicationContext, "createApplicationContext() must not return null");
 
+		// 刷新IOC容器
 		refreshApplicationContext(applicationContext);
 		registerCloseListener(servletContext, applicationContext);
 

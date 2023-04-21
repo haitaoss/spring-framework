@@ -1,13 +1,9 @@
 # [Spring源码笔记](./note/spring-source-note.md)
 # [SpringMVC源码笔记](./note/springmvc-source-note.md)
+# [Spring WebFlux 源码笔记](./note/springwebflux-source-note.md)
 # 打赏名单
 **特别感谢陆总监，帮忙分享项目给其他小伙伴，让我这无人问津的项目被更多优秀的人才关注到。陆总监真的是一位在用心分享技术的Up主，说话非常接地气!!!**
 ![img_1.png](.README_imgs/img_1.png)
-
----
-> 近来不少机油加我邮箱要私发打赏，我想还是直接挂出来吧！热心老板要给我加个鸡腿/请我喝杯咖啡，请随意！
-
-<img src=".README_imgs/image-20230417202356060.png" alt="image-20230417202356060" style="zoom: 67%;" />
 
 ## 以下是开源项目的赞助名单（按时间先后排序）：
 > 因为有些昵称是特殊字符显示不出来，需要改信息的可以邮箱私聊我。

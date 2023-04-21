@@ -229,6 +229,7 @@ public class HttpWebHandlerAdapter extends WebHandlerDecorator implements HttpHa
 	public Mono<Void> handle(ServerHttpRequest request, ServerHttpResponse response) {
 		if (this.forwardedHeaderTransformer != null) {
 			try {
+				// 可以配置 ForwardedHeaderTransformer 用来对 request 进行自定义
 				request = this.forwardedHeaderTransformer.apply(request);
 			}
 			catch (Throwable ex) {
@@ -239,6 +240,7 @@ public class HttpWebHandlerAdapter extends WebHandlerDecorator implements HttpHa
 				return response.setComplete();
 			}
 		}
+		// 构造出 ServerWebExchange
 		ServerWebExchange exchange = createExchange(request, response);
 
 		LogFormatUtils.traceDebug(logger, traceOn ->

@@ -16,14 +16,6 @@
 
 package org.springframework.web.reactive;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-
 import org.springframework.beans.factory.BeanFactoryUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
@@ -37,6 +29,13 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebHandler;
 import org.springframework.web.server.adapter.WebHttpHandlerBuilder;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Central dispatcher for HTTP request handlers/controllers. Dispatches to
@@ -143,10 +142,27 @@ public class DispatcherHandler implements WebHandler, PreFlightRequestHandler, A
 		if (this.handlerMappings == null) {
 			return createNotFoundError();
 		}
+
+		// 针对 预检 请求的处理
 		if (CorsUtils.isPreFlightRequest(exchange.getRequest())) {
 			return handlePreFlight(exchange);
 		}
+
+		/**
+		 * 和 SpringMVC 是类似的。
+		 *
+		 * 1. 使用 {@link HandlerMapping#getHandler(ServerWebExchange)} 得到 handler
+		 * 2. 遍历 {@link HandlerAdapter#supports(Object)} 找到适配的，就用来执行 handler
+		 * 3. 遍历 {@link HandlerResultHandler#supports(HandlerResult)} 找到适配的，就用来处理 返回结果
+		 *
+		 * Tips：
+		 * 	- 使用 @EnableWebFlux 会注册 RequestMappingHandlerMapping、RequestMappingHandlerAdapter 是用来处理
+		 * 		@Controller、@RequestMapping、@InitBinder、@SessionAttribute、@ModelAttribute 的功能和SpringMVC是一致的
+		 *
+		 * 	- 会注册 ViewResolutionResultHandler 是用来支持 视图的
+		 * */
 		return Flux.fromIterable(this.handlerMappings)
+				// concatMap 会收集不是 Mono.Empty() 的内容 组成 Flux
 				.concatMap(mapping -> mapping.getHandler(exchange))
 				.next()
 				.switchIfEmpty(createNotFoundError())
