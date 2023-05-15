@@ -1357,8 +1357,12 @@ protected void initStrategies(ApplicationContext context) {
  * {@link HandlerMethodArgumentResolver#resolveArgument(MethodParameter, ModelAndViewContainer, NativeWebRequest, WebDataBinderFactory)}
  *
  * 比较有代表意义的就这两个抽象类：
- * - AbstractMessageConverterMethodArgumentResolver：定义了读取请求体，并将请求体转换成具体参数类型的逻辑
- * - AbstractNamedValueMethodArgumentResolver ：定义了根据参数名 从 request中获取参数值的逻辑，比如从 Request域、Session域、Header、Cookie等 
+ *  - AbstractMessageConverterMethodArgumentResolver：定义了读取请求体，并将请求体转换成具体参数类型的逻辑
+ *  - AbstractNamedValueMethodArgumentResolver ：定义了根据参数名 从 request中获取参数值的逻辑，比如从 Request域、Session域、Header、Cookie等
+ *
+ * 会进行JSR303校验的：
+ *  - ModelAttributeMethodProcessor：这是兜底的参数解析器。自定义的JavaBean就是通过这个解析的
+ *  - RequestResponseBodyMethodProcessor：解析请求体的内容
  **/
 ```
 

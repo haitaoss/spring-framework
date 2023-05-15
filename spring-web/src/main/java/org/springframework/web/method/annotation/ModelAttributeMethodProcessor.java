@@ -16,24 +16,8 @@
 
 package org.springframework.web.method.annotation;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Array;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.Part;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.beans.BeanInstantiationException;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.TypeMismatchException;
@@ -45,11 +29,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.validation.BindException;
-import org.springframework.validation.BindingResult;
-import org.springframework.validation.Errors;
-import org.springframework.validation.SmartValidator;
-import org.springframework.validation.Validator;
+import org.springframework.validation.*;
 import org.springframework.validation.annotation.ValidationAnnotationUtils;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -62,6 +42,14 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartRequest;
 import org.springframework.web.multipart.support.StandardServletPartUtils;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.Part;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.util.*;
 
 /**
  * Resolve {@code @ModelAttribute} annotated method arguments and handle
@@ -108,6 +96,9 @@ public class ModelAttributeMethodProcessor implements HandlerMethodArgumentResol
 	 */
 	@Override
 	public boolean supportsParameter(MethodParameter parameter) {
+		/**
+		 * 有 @ModelAttribute 或者 不是简单类型(说白了就是自定义的类) 就适配
+		 * */
 		return (parameter.hasParameterAnnotation(ModelAttribute.class) ||
 				(this.annotationNotRequired && !BeanUtils.isSimpleProperty(parameter.getParameterType())));
 	}
@@ -129,21 +120,26 @@ public class ModelAttributeMethodProcessor implements HandlerMethodArgumentResol
 		Assert.state(mavContainer != null, "ModelAttributeMethodProcessor requires ModelAndViewContainer");
 		Assert.state(binderFactory != null, "ModelAttributeMethodProcessor requires WebDataBinderFactory");
 
+		// 获取 @ModelAttribute 的注解值 或者是 参数的类型解析得到name
 		String name = ModelFactory.getNameForParameter(parameter);
 		ModelAttribute ann = parameter.getParameterAnnotation(ModelAttribute.class);
 		if (ann != null) {
+			// 根据注解值巨鼎是否对 name 进行属性绑定
 			mavContainer.setBinding(name, ann.binding());
 		}
 
 		Object attribute = null;
 		BindingResult bindingResult = null;
 
+		// mavContainer 中存在
 		if (mavContainer.containsAttribute(name)) {
+			// 拿到
 			attribute = mavContainer.getModel().get(name);
 		}
 		else {
 			// Create attribute instance
 			try {
+				// 其实就是反射实例化出来
 				attribute = createAttribute(name, parameter, binderFactory, webRequest);
 			}
 			catch (BindException ex) {
@@ -163,13 +159,17 @@ public class ModelAttributeMethodProcessor implements HandlerMethodArgumentResol
 		}
 
 		if (bindingResult == null) {
+			// 使用 WebDataBinder 装饰 attribute
 			// Bean property binding and validation;
 			// skipped in case of binding failure on construction.
 			WebDataBinder binder = binderFactory.createBinder(webRequest, attribute, name);
 			if (binder.getTarget() != null) {
+				// 不是 禁用绑定的
 				if (!mavContainer.isBindingDisabled(name)) {
+					// 进行属性绑定
 					bindRequestParameters(binder, webRequest);
 				}
+				// 进行 JSR303 校验
 				validateIfApplicable(binder, parameter);
 				if (binder.getBindingResult().hasErrors() && isBindExceptionRequired(binder, parameter)) {
 					throw new BindException(binder.getBindingResult());
@@ -216,7 +216,9 @@ public class ModelAttributeMethodProcessor implements HandlerMethodArgumentResol
 		MethodParameter nestedParameter = parameter.nestedIfOptional();
 		Class<?> clazz = nestedParameter.getNestedParameterType();
 
+		// 拿到构造器
 		Constructor<?> ctor = BeanUtils.getResolvableConstructor(clazz);
+		// 通过构造器实例化
 		Object attribute = constructAttribute(ctor, attributeName, parameter, binderFactory, webRequest);
 		if (parameter != nestedParameter) {
 			attribute = Optional.of(attribute);
