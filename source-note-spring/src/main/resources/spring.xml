@@ -29,7 +29,7 @@
     <alias name="testInit" alias="testInit2"/>
     <import resource="spring2.xml"/>
     <beans>
-        <bean class="cn.haitaoss.Test"/>
+        <bean class="cn.haitaoss.Main"/>
     </beans>
 
 </beans>

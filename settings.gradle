@@ -1,16 +1,40 @@
 pluginManagement {
 	repositories {
-		maven { name "Alibaba" ; url 'https://maven.aliyun.com/repository/public' } 
-		maven { name "Bstek" ; url 'https://nexus.bsdn.org/content/groups/public/' } 
-		maven { name "M2" ; url 'https://plugins.gradle.org/m2/' }
-		gradlePluginPortal()
-		maven { url "https://repo.spring.io/plugins-release" }
+		mavenLocal()
+		// 从 https://developer.aliyun.com/mvn/guide 找的
+		maven { "central"; url "https://maven.aliyun.com/repository/central"}
+		maven { "jcenter"; url "https://maven.aliyun.com/repository/public"}
+		maven { "public"; url "https://maven.aliyun.com/repository/public"}
+		maven { "google"; url "https://maven.aliyun.com/repository/google"}
+		maven { "gradle-plugin"; url "https://maven.aliyun.com/repository/gradle-plugin"}
+		maven { "spring"; url "https://maven.aliyun.com/repository/spring"}
+		maven { "spring-plugin"; url "https://maven.aliyun.com/repository/spring-plugin"}
+		maven { "grails-core"; url "https://maven.aliyun.com/repository/grails-core"}
+		maven { "apache snapshots"; url "https://maven.aliyun.com/repository/apache-snapshots"}
+		mavenCentral()
 	}
 }
 
 plugins {
 	id "com.gradle.enterprise" version "3.6.1"
 	// id "io.spring.ge.conventions" version "0.0.7"
+}
+
+dependencyResolutionManagement {
+	repositories {
+		mavenLocal()
+		// 从 https://developer.aliyun.com/mvn/guide 找的
+		maven { "central"; url "https://maven.aliyun.com/repository/central"}
+		maven { "jcenter"; url "https://maven.aliyun.com/repository/public"}
+		maven { "public"; url "https://maven.aliyun.com/repository/public"}
+		maven { "google"; url "https://maven.aliyun.com/repository/google"}
+		maven { "gradle-plugin"; url "https://maven.aliyun.com/repository/gradle-plugin"}
+		maven { "spring"; url "https://maven.aliyun.com/repository/spring"}
+		maven { "spring-plugin"; url "https://maven.aliyun.com/repository/spring-plugin"}
+		maven { "grails-core"; url "https://maven.aliyun.com/repository/grails-core"}
+		maven { "apache snapshots"; url "https://maven.aliyun.com/repository/apache-snapshots"}
+		mavenCentral()
+	}
 }
 
 include "spring-aop"

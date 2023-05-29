@@ -11,6 +11,6 @@
      </bean>-->
     <import resource="classpath:spring5.xml"/>
     <beans>
-        <bean id="1" class="cn.haitaoss.Test"></bean>
+        <bean id="1" class="cn.haitaoss.Main"></bean>
     </beans>
 </beans>

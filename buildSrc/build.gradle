@@ -2,11 +2,6 @@ plugins {
 	id 'java-gradle-plugin'
 }
 
-repositories {
-	mavenCentral()
-	gradlePluginPortal()
-}
-
 dependencies {
 	implementation "me.champeau.gradle:japicmp-gradle-plugin:0.2.8"
 	implementation "com.google.guava:guava:28.2-jre" // required by japicmp-gradle-plugin

@@ -288,13 +288,6 @@ configure(allprojects) { project ->
 		resolutionStrategy {
 			cacheChangingModulesFor 0, "seconds"
 		}
-		repositories {
-			mavenLocal()
-      		maven { name "Alibaba" ; url "https://maven.aliyun.com/repository/public" }
-      		maven { name "Bstek" ; url "https://nexus.bsdn.org/content/groups/public/" }
-			mavenCentral()
-			maven { url "https://repo.spring.io/libs-spring-framework-build" }
-		}
 	}
 	configurations.all {
 		resolutionStrategy {
