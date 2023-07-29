@@ -18,69 +18,85 @@ import java.util.Arrays;
 @EnableAspectJAutoProxy(exposeProxy = true, proxyTargetClass = true)
 @Component
 public class AopTest {
-    public AopTest() {
-        System.out.println("AopTest 构造器");
-    }
+	public AopTest() {
+		System.out.println("AopTest 构造器");
+	}
 
-    public static void main(String[] args) {
-        AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AopTest.class);
-        System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
-    }
+	public static void main(String[] args) {
+		AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AopTest.class);
+		System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
 
-    @Aspect
-    @Component
-    public class AspectDemo {
-        /**
-         * 只有@Around支持 ProceedingJoinPoint、JoinPoint、JoinPoint.StaticPart
-         * 其他的支持 JoinPoint、JoinPoint.StaticPart
-         * try{
-         *
-         * @Around、@Before、@AfterReturning }catch(){
-         * @AfterThrowing }finally{
-         * @After }
-         */
-        @Pointcut("execution(* test*(..))")
-        private void pointcut() {
-        }
+		context.getBean(AopDemo.class).test2("haitao");
+	}
 
-        @Around("pointcut()")
-        public void around(ProceedingJoinPoint proceedingJoinPoint) {
-            try {
-                System.out.println("around...");
-                proceedingJoinPoint.proceed();
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
-            }
-        }
+	@Aspect
+	@Component
+	public class AspectDemo {
+		/**
+		 * 只有@Around支持 ProceedingJoinPoint、JoinPoint、JoinPoint.StaticPart
+		 * 其他的支持 JoinPoint、JoinPoint.StaticPart
+		 * try{
+		 *
+		 * @Around、@Before、@AfterReturning }catch(){
+		 * @AfterThrowing }finally{
+		 * @After }
+		 */
+		@Pointcut("execution(* test*(..))")
+		private void pointcut() {
+		}
 
-        @Before("pointcut()")
-        public void before(/*JoinPoint joinPoint,*/JoinPoint.StaticPart staticPart) {
-            System.out.println("before...");
-        }
+		@Around("pointcut()")
+		public void around(ProceedingJoinPoint proceedingJoinPoint) {
+			try {
+				System.out.println("around...");
+				proceedingJoinPoint.proceed();
+			} catch (Throwable e) {
+				throw new RuntimeException(e);
+			}
+		}
 
-        @After("pointcut()")
-        public void after(JoinPoint joinPoint) {
-            System.out.println("after...");
-        }
+		@Around("pointcut() && args(msg) ")
+		public void around(ProceedingJoinPoint proceedingJoinPoint, String msg) {
+			try {
+				System.out.println("around..." + msg);
+				proceedingJoinPoint.proceed();
+			} catch (Throwable e) {
+				throw new RuntimeException(e);
+			}
+		}
+
+		@Before("pointcut()")
+		public void before(/*JoinPoint joinPoint,*/JoinPoint.StaticPart staticPart) {
+			System.out.println("before...");
+		}
+
+		@After("pointcut()")
+		public void after(JoinPoint joinPoint) {
+			System.out.println("after...");
+		}
 
 
-        @AfterThrowing("pointcut()")
-        public void afterThrowing(JoinPoint joinPoint) {
-            System.out.println("afterThrowing...");
-        }
+		@AfterThrowing("pointcut()")
+		public void afterThrowing(JoinPoint joinPoint) {
+			System.out.println("afterThrowing...");
+		}
 
-        @AfterReturning("pointcut()")
-        public void afterReturning(JoinPoint joinPoint) {
-            System.out.println("afterReturning...");
-        }
-    }
+		@AfterReturning("pointcut()")
+		public void afterReturning(JoinPoint joinPoint) {
+			System.out.println("afterReturning...");
+		}
+	}
 
 
-    @Component
-    public class AopDemo {
-        public void test() {
-            System.out.println("AopDemo.test");
-        }
-    }
+	@Component
+	public class AopDemo {
+		public void test() {
+			System.out.println("AopDemo.test");
+		}
+
+		public void test2(String msg) {
+			System.out.println("AopDemo.test....." + msg);
+		}
+	}
 
 }
