@@ -15,7 +15,15 @@ Spring源码视频(看了P8)：https://www.bilibili.com/video/BV1sd4y1m7e1
 
 ![image-20221112084615402](.spring-source-note_imgs/image-20221112084615402.png)
 
+> 设置成 gradle 的方式运行会方便一些，后面的 ajc aop 等等都不需要配置。
+>
+> 因为我发现慢的原因是电脑的问题，所以后面都改成以 gradle 运行、然后 gradle 也改成使用 wrapper 指定的gradle
+
 ![image-20221105161913239](.spring-source-note_imgs/image-20221105161913239.png)
+
+> 改成这样子了
+
+![image-20230822102636628](.spring-source-note_imgs/image-20230822102636628.png) 
 
 ![image-20221105161946762](.spring-source-note_imgs/image-20221105161946762.png)
 

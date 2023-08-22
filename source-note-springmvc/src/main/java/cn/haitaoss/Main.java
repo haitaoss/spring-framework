@@ -66,7 +66,7 @@ public class Main {
         WebResourceRoot resources = new StandardRoot(ctx);
 
         // 指定编译后的 class 文件位置
-        File additionalWebInfClasses = new File("source-note-springmvc/out/produ?ction/classes");
+        File additionalWebInfClasses = new File("source-note-springmvc/out/production/classes");
 
         // 添加web资源
         resources.addPreResources(new DirResourceSet(resources, "/", additionalWebInfClasses.getAbsolutePath(), "/"));

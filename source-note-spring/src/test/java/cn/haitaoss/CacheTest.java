@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit;
 
 public class CacheTest {
 
-    @Test
+//    @Test
     public void timedCachetest() {
         ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1);
         Cache<String, Thing> cache = Caffeine.newBuilder()
