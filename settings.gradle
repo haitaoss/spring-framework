@@ -81,7 +81,7 @@ settings.gradle.projectsLoaded {
 		}
 	}
 }
-include 'source-note-spring'
-include 'source-note-springmvc'
-include 'source-note-spring-webflux'
+include 'source-note:source-note-spring'
+include 'source-note:source-note-springmvc'
+include 'source-note:source-note-spring-webflux'
 

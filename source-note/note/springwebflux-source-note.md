@@ -26,7 +26,7 @@
 
 ## AbstractReactiveWebInitializer
 
-[建议先看 SpringMVC 一下独立web应用的启动流程](./springmvc-source-note.md#嵌入式Tomcat启动流程) 
+[建议先看 SpringMVC 一下独立web应用的启动流程](springmvc-source-note.md#嵌入式Tomcat启动流程) 
 
 ```java
 /**
