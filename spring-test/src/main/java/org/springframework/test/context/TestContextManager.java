@@ -134,7 +134,14 @@ public class TestContextManager {
 	 * @see #registerTestExecutionListeners
 	 */
 	public TestContextManager(TestContextBootstrapper testContextBootstrapper) {
+		// new TestContext（会处理标注在 TestClass 上的 @ContextConfiguration、@ContextHierarchy、@ActiveProfiles、@TestPropertySource）
 		this.testContext = testContextBootstrapper.buildTestContext();
+		/**
+		 * 注册 TestExecutionListener（会处理标注在 TestClass 上的 @TestExecutionListeners）
+		 * 设置到 {@link TestContextManager#testExecutionListeners} 中
+		 *
+		 * Tips：说白了就是将配置的内容映射到 TestContextBootstrapper 中
+		 */
 		registerTestExecutionListeners(testContextBootstrapper.getTestExecutionListeners());
 	}
 

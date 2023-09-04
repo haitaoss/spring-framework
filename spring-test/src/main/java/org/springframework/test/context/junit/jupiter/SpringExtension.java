@@ -135,6 +135,17 @@ public class SpringExtension implements BeforeAllCallback, AfterAllCallback, Tes
 	@Override
 	public void postProcessTestInstance(Object testInstance, ExtensionContext context) throws Exception {
 		validateAutowiredConfig(context);
+		/**
+		 * 实例化 TestContextManager
+		 * 		{@link TestContextManager#TestContextManager(Class)}
+		 *		1. new TestContext（会处理标注在 TestClass 上的 @ContextConfiguration、@ContextHierarchy、@ActiveProfiles、@TestPropertySource）
+		 *		2. 处理标注在 TestClass 上的 @TestExecutionListeners 设置给 TestContext
+		 *
+		 * 执行 prepareTestInstance
+		 * 		{@link TestContextManager#prepareTestInstance(Object)}
+		 * 		1. 根据 	TestContext 的内容 配置 IOC容器？
+		 * 		// TODOHAITAO: 2023/9/4
+		 */
 		getTestContextManager(context).prepareTestInstance(testInstance);
 	}
 

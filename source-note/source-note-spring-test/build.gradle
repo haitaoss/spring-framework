@@ -1,0 +1,37 @@
+plugins {
+    id 'java'
+}
+
+group = 'cn.haitaoss'
+version = '5.3.10'
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    testRuntimeOnly.exclude group: 'org.apache.logging.log4j', module: 'log4j-slf4j-impl'
+}
+
+dependencies {
+    // spring
+    implementation(project(":spring-beans"))
+    implementation(project(":spring-context"))
+
+    // logback
+    implementation("ch.qos.logback:logback-classic:1.2.11")
+
+    testImplementation platform('org.junit:junit-bom:5.9.1')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+
+    // lombok
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.2'
+    testCompileOnly 'org.projectlombok:lombok:1.18.2'
+
+    // spring test
+    testImplementation(project(":spring-test"))
+}
+
+test {
+    useJUnitPlatform()
+}

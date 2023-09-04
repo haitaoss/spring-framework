@@ -125,6 +125,7 @@ public abstract class AbstractTestContextBootstrapper implements TestContextBoot
 						clazz.getName()));
 			}
 			usingDefaults = true;
+			// 读取 META-INF/spring.factories 文件 key是 `TestExecutionListener.class.getName()`
 			classesList.addAll(getDefaultTestExecutionListenerClasses());
 		}
 		else {
@@ -152,6 +153,7 @@ public abstract class AbstractTestContextBootstrapper implements TestContextBoot
 					classesList.addAll(getDefaultTestExecutionListenerClasses());
 				}
 
+				// @TestExecutionListeners 注解的值
 				classesList.addAll(0, Arrays.asList(testExecutionListeners.listeners()));
 
 				descriptor = (inheritListeners ? parentDescriptor : null);
@@ -164,9 +166,11 @@ public abstract class AbstractTestContextBootstrapper implements TestContextBoot
 			classesToUse = new LinkedHashSet<>(classesList);
 		}
 
+		// 实例化
 		List<TestExecutionListener> listeners = instantiateListeners(classesToUse);
 		// Sort by Ordered/@Order if we loaded default listeners.
 		if (usingDefaults) {
+			// 排序
 			AnnotationAwareOrderComparator.sort(listeners);
 		}
 
@@ -213,6 +217,7 @@ public abstract class AbstractTestContextBootstrapper implements TestContextBoot
 	protected Set<Class<? extends TestExecutionListener>> getDefaultTestExecutionListenerClasses() {
 		Set<Class<? extends TestExecutionListener>> defaultListenerClasses = new LinkedHashSet<>();
 		ClassLoader cl = getClass().getClassLoader();
+		// 读取 META-INF/spring.factories 文件 key是 `TestExecutionListener.class.getName()`
 		for (String className : getDefaultTestExecutionListenerClassNames()) {
 			try {
 				defaultListenerClasses.add((Class<? extends TestExecutionListener>) ClassUtils.forName(className, cl));
@@ -257,11 +262,13 @@ public abstract class AbstractTestContextBootstrapper implements TestContextBoot
 		Class<?> testClass = getBootstrapContext().getTestClass();
 		CacheAwareContextLoaderDelegate cacheAwareContextLoaderDelegate = getCacheAwareContextLoaderDelegate();
 
+		// testClass 没有标注 @ContextConfiguration、@ContextHierarchy
 		if (TestContextAnnotationUtils.findAnnotationDescriptorForTypes(
 				testClass, ContextConfiguration.class, ContextHierarchy.class) == null) {
 			return buildDefaultMergedContextConfiguration(testClass, cacheAwareContextLoaderDelegate);
 		}
 
+		// 标注了 @ContextHierarchy
 		if (TestContextAnnotationUtils.findAnnotationDescriptor(testClass, ContextHierarchy.class) != null) {
 			Map<String, List<ContextConfigurationAttributes>> hierarchyMap =
 					ContextLoaderUtils.buildContextHierarchyMap(testClass);
@@ -288,6 +295,7 @@ public abstract class AbstractTestContextBootstrapper implements TestContextBoot
 			return mergedConfig;
 		}
 		else {
+			// else 就是处理标注了 @ContextConfiguration
 			return buildMergedContextConfiguration(testClass,
 					ContextLoaderUtils.resolveContextConfigurationAttributes(testClass),
 					null, cacheAwareContextLoaderDelegate, true);
@@ -347,14 +355,18 @@ public abstract class AbstractTestContextBootstrapper implements TestContextBoot
 		List<Class<?>> classes = new ArrayList<>();
 		List<Class<?>> initializers = new ArrayList<>();
 
+		// 迭代
 		for (ContextConfigurationAttributes configAttributes : configAttributesList) {
 			if (logger.isTraceEnabled()) {
 				logger.trace(String.format("Processing locations and classes for context configuration attributes %s",
 						configAttributes));
 			}
+			// 默认是 DelegatingSmartContextLoader
 			if (contextLoader instanceof SmartContextLoader) {
 				SmartContextLoader smartContextLoader = (SmartContextLoader) contextLoader;
+				// 主要是拿到 location 和 classes 的值
 				smartContextLoader.processContextConfiguration(configAttributes);
+				// 记录解析结果
 				locations.addAll(0, Arrays.asList(configAttributes.getLocations()));
 				classes.addAll(0, Arrays.asList(configAttributes.getClasses()));
 			}
@@ -370,6 +382,7 @@ public abstract class AbstractTestContextBootstrapper implements TestContextBoot
 			}
 		}
 
+		// 读取 META-INF/spring.factories 文件 key是 `ContextCustomizerFactory.class.getName()`
 		Set<ContextCustomizer> contextCustomizers = getContextCustomizers(testClass,
 				Collections.unmodifiableList(configAttributesList));
 
@@ -379,15 +392,21 @@ public abstract class AbstractTestContextBootstrapper implements TestContextBoot
 				"or ContextCustomizers were declared for context configuration attributes %s",
 				contextLoader.getClass().getSimpleName(), configAttributesList));
 
+		// 处理 @TestPropertySource
 		MergedTestPropertySources mergedTestPropertySources =
 				TestPropertySourceUtils.buildMergedTestPropertySources(testClass);
+
+		// 构造出 MergedContextConfiguration
 		MergedContextConfiguration mergedConfig = new MergedContextConfiguration(testClass,
 				StringUtils.toStringArray(locations), ClassUtils.toClassArray(classes),
+				// 处理 @ContextConfiguration(inheritInitializers={})
 				ApplicationContextInitializerUtils.resolveInitializerClasses(configAttributesList),
+				// 处理 @ActiveProfiles
 				ActiveProfilesUtils.resolveActiveProfiles(testClass),
 				mergedTestPropertySources.getLocations(),
 				mergedTestPropertySources.getProperties(),
 				contextCustomizers, contextLoader, cacheAwareContextLoaderDelegate, parentConfig);
+
 
 		return processMergedContextConfiguration(mergedConfig);
 	}
@@ -395,14 +414,18 @@ public abstract class AbstractTestContextBootstrapper implements TestContextBoot
 	private Set<ContextCustomizer> getContextCustomizers(Class<?> testClass,
 			List<ContextConfigurationAttributes> configAttributes) {
 
+		// 读取 META-INF/spring.factories 文件 key是 `ContextCustomizerFactory.class.getName()`
 		List<ContextCustomizerFactory> factories = getContextCustomizerFactories();
 		Set<ContextCustomizer> customizers = new LinkedHashSet<>(factories.size());
 		for (ContextCustomizerFactory factory : factories) {
+			// 实例化
 			ContextCustomizer customizer = factory.createContextCustomizer(testClass, configAttributes);
 			if (customizer != null) {
+				// 收集
 				customizers.add(customizer);
 			}
 		}
+		// 返回
 		return customizers;
 	}
 
@@ -445,6 +468,10 @@ public abstract class AbstractTestContextBootstrapper implements TestContextBoot
 
 		Class<? extends ContextLoader> contextLoaderClass = resolveExplicitContextLoaderClass(configAttributesList);
 		if (contextLoaderClass == null) {
+			/**
+			 * 默认
+			 *  {@link DefaultTestContextBootstrapper#getDefaultContextLoaderClass(Class)} --> DelegatingSmartContextLoader
+			 */
 			contextLoaderClass = getDefaultContextLoaderClass(testClass);
 		}
 		if (logger.isTraceEnabled()) {

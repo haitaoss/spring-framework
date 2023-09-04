@@ -127,8 +127,10 @@ abstract class BootstrapUtils {
 
 		Class<?> clazz = null;
 		try {
+			// 从 testClass 找 @BootstrapWith 注解，返回注解的 value 值
 			clazz = resolveExplicitTestContextBootstrapper(testClass);
 			if (clazz == null) {
+				// 有 @WebAppConfiguration 注解就使用 WebTestContextBootstrapper 否则就用 DefaultTestContextBootstrapper
 				clazz = resolveDefaultTestContextBootstrapper(testClass);
 			}
 			if (logger.isDebugEnabled()) {
@@ -137,6 +139,7 @@ abstract class BootstrapUtils {
 			}
 			TestContextBootstrapper testContextBootstrapper =
 					BeanUtils.instantiateClass(clazz, TestContextBootstrapper.class);
+			// 关联 bootstrapContext
 			testContextBootstrapper.setBootstrapContext(bootstrapContext);
 			return testContextBootstrapper;
 		}
@@ -179,7 +182,9 @@ abstract class BootstrapUtils {
 	}
 
 	private static Class<?> resolveDefaultTestContextBootstrapper(Class<?> testClass) throws Exception {
+		// 有 @WebAppConfiguration 注解
 		boolean webApp = TestContextAnnotationUtils.hasAnnotation(testClass, webAppConfigurationClass);
+		// WebTestContextBootstrapper : DefaultTestContextBootstrapper
 		String bootstrapperClassName = (webApp ? DEFAULT_WEB_TEST_CONTEXT_BOOTSTRAPPER_CLASS_NAME :
 				DEFAULT_TEST_CONTEXT_BOOTSTRAPPER_CLASS_NAME);
 		return ClassUtils.forName(bootstrapperClassName, BootstrapUtils.class.getClassLoader());
