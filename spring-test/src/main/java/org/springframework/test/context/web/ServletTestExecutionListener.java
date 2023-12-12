@@ -183,10 +183,12 @@ public class ServletTestExecutionListener extends AbstractTestExecutionListener 
 	}
 
 	private void setUpRequestContextIfNecessary(TestContext testContext) {
+		// @WebAppConfiguration	|| 有标记了
 		if (!isActivated(testContext) || alreadyPopulatedRequestContextHolder(testContext)) {
 			return;
 		}
 
+		// 会从缓存中获取IOC容器，没有就创建并refresh
 		ApplicationContext context = testContext.getApplicationContext();
 
 		if (context instanceof WebApplicationContext) {
@@ -209,6 +211,7 @@ public class ServletTestExecutionListener extends AbstractTestExecutionListener 
 			ServletWebRequest servletWebRequest = new ServletWebRequest(request, response);
 
 			RequestContextHolder.setRequestAttributes(servletWebRequest);
+			// 设置标记
 			testContext.setAttribute(POPULATED_REQUEST_CONTEXT_HOLDER_ATTRIBUTE, Boolean.TRUE);
 			testContext.setAttribute(RESET_REQUEST_CONTEXT_HOLDER_ATTRIBUTE, Boolean.TRUE);
 

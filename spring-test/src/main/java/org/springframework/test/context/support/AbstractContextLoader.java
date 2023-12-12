@@ -132,9 +132,11 @@ public abstract class AbstractContextLoader implements SmartContextLoader {
 	 * @see ConfigurableApplicationContext#setId
 	 */
 	protected void prepareContext(ConfigurableApplicationContext context, MergedContextConfiguration mergedConfig) {
+		// 配置 environment
 		context.getEnvironment().setActiveProfiles(mergedConfig.getActiveProfiles());
 		TestPropertySourceUtils.addPropertiesFilesToEnvironment(context, mergedConfig.getPropertySourceLocations());
 		TestPropertySourceUtils.addInlinedPropertiesToEnvironment(context, mergedConfig.getPropertySourceProperties());
+		// 回调 ApplicationContextInitializer
 		invokeApplicationContextInitializers(context, mergedConfig);
 	}
 
@@ -165,8 +167,10 @@ public abstract class AbstractContextLoader implements SmartContextLoader {
 			initializerInstances.add((ApplicationContextInitializer<ConfigurableApplicationContext>) BeanUtils.instantiateClass(initializerClass));
 		}
 
+		// 排序
 		AnnotationAwareOrderComparator.sort(initializerInstances);
 		for (ApplicationContextInitializer<ConfigurableApplicationContext> initializer : initializerInstances) {
+			// 回调
 			initializer.initialize(context);
 		}
 	}

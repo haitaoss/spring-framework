@@ -121,6 +121,7 @@ public class DefaultTestContext implements TestContext {
 	 */
 	@Override
 	public ApplicationContext getApplicationContext() {
+		// 会从缓存中获取IOC容器，没有就创建并refresh
 		ApplicationContext context = this.cacheAwareContextLoaderDelegate.loadContext(this.mergedContextConfiguration);
 		if (context instanceof ConfigurableApplicationContext) {
 			@SuppressWarnings("resource")

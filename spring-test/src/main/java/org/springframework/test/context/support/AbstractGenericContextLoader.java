@@ -109,22 +109,36 @@ public abstract class AbstractGenericContextLoader extends AbstractContextLoader
 		}
 
 		validateMergedContextConfiguration(mergedConfig);
-
+		// new 一个
 		GenericApplicationContext context = createContext();
 		ApplicationContext parent = mergedConfig.getParentApplicationContext();
 		if (parent != null) {
 			context.setParent(parent);
 		}
 
+		// 预留的模板方法
 		prepareContext(context);
+		/**
+		 * 1. 根据 @ActiveProfiles、@TestPropertySource 来设置 environment
+		 * 2. 配置了 ApplicationContextInitializer 就回调
+		 */
 		prepareContext(context, mergedConfig);
+		// 预留的方法用于自定义 beanFactory
 		customizeBeanFactory(context.getDefaultListableBeanFactory());
+		// 加载 beanDefinition，就是将 mergedConfig 记录的 location 或者 配置类 注册到 context 中
 		loadBeanDefinitions(context, mergedConfig);
+		// 注册各种Processor
 		AnnotationConfigUtils.registerAnnotationConfigProcessors(context);
+		// 预留的方法用于自定义 context
 		customizeContext(context);
+		/**
+		 * 回调 ContextCustomizer 用来加工 context
+		 */
 		customizeContext(context, mergedConfig);
 
+		// refresh IOC 容器
 		context.refresh();
+		// 通过 Runtime.getRuntime().addShutdownHook 用户关闭 context
 		context.registerShutdownHook();
 
 		return context;
@@ -182,15 +196,22 @@ public abstract class AbstractGenericContextLoader extends AbstractContextLoader
 					StringUtils.arrayToCommaDelimitedString(locations)));
 		}
 
+		// new 一个
 		GenericApplicationContext context = createContext();
-
+		// 预留的模板方法
 		prepareContext(context);
+		// 预留的方法用于自定义 beanFactory
 		customizeBeanFactory(context.getDefaultListableBeanFactory());
+		// 加载 beanDefinition
 		createBeanDefinitionReader(context).loadBeanDefinitions(locations);
+		// 注册各种Processor
 		AnnotationConfigUtils.registerAnnotationConfigProcessors(context);
+		// 预留的方法用于自定义 context
 		customizeContext(context);
 
+		// refresh IOC 容器
 		context.refresh();
+		// 通过 Runtime.getRuntime().addShutdownHook 用户关闭 context
 		context.registerShutdownHook();
 
 		return context;

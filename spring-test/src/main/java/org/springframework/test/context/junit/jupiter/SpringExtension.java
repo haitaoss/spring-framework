@@ -138,7 +138,7 @@ public class SpringExtension implements BeforeAllCallback, AfterAllCallback, Tes
 		/**
 		 * 实例化 TestContextManager
 		 * 		{@link TestContextManager#TestContextManager(Class)}
-		 *		1. new TestContext（会处理标注在 TestClass 上的 @ContextConfiguration、@ContextHierarchy、@ActiveProfiles、@TestPropertySource）
+		 *		1. 处理标注在 TestClass 上的 @ContextConfiguration、@ContextHierarchy、@ActiveProfiles、@TestPropertySource 构造出 TestContext
 		 *		2. 处理标注在 TestClass 上的 @TestExecutionListeners 设置给 TestContext
 		 *
 		 * 执行 prepareTestInstance

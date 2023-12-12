@@ -27,6 +27,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import org.springframework.lang.Nullable;
+import org.springframework.test.context.support.DependencyInjectionTestExecutionListener;
+import org.springframework.test.context.web.ServletTestExecutionListener;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
 
@@ -134,7 +136,10 @@ public class TestContextManager {
 	 * @see #registerTestExecutionListeners
 	 */
 	public TestContextManager(TestContextBootstrapper testContextBootstrapper) {
-		// new TestContext（会处理标注在 TestClass 上的 @ContextConfiguration、@ContextHierarchy、@ActiveProfiles、@TestPropertySource）
+		/**
+		 * 会处理标注在 TestClass 上的 @ContextConfiguration、@ContextHierarchy、@ActiveProfiles、@TestPropertySource
+		 * 将处理的信息构造出 testContext
+		 */
 		this.testContext = testContextBootstrapper.buildTestContext();
 		/**
 		 * 注册 TestExecutionListener（会处理标注在 TestClass 上的 @TestExecutionListeners）
@@ -250,8 +255,14 @@ public class TestContextManager {
 		}
 		getTestContext().updateState(testInstance, null, null);
 
+		// 迭代
 		for (TestExecutionListener testExecutionListener : getTestExecutionListeners()) {
 			try {
+				/**
+				 * 回调 testExecutionListener。
+				 * 	{@link ServletTestExecutionListener#prepareTestInstance(TestContext)}
+				 * 	{@link DependencyInjectionTestExecutionListener#prepareTestInstance(TestContext)}
+				 */
 				testExecutionListener.prepareTestInstance(getTestContext());
 			}
 			catch (Throwable ex) {

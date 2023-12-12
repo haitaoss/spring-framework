@@ -80,6 +80,7 @@ public class DependencyInjectionTestExecutionListener extends AbstractTestExecut
 		if (logger.isDebugEnabled()) {
 			logger.debug("Performing dependency injection for test context [" + testContext + "].");
 		}
+		// 对 测试类 完成属性填充和初始化
 		injectDependencies(testContext);
 	}
 
@@ -92,6 +93,7 @@ public class DependencyInjectionTestExecutionListener extends AbstractTestExecut
 	 */
 	@Override
 	public void beforeTestMethod(TestContext testContext) throws Exception {
+		// 存在属性，就注入
 		if (Boolean.TRUE.equals(testContext.getAttribute(REINJECT_DEPENDENCIES_ATTRIBUTE))) {
 			if (logger.isDebugEnabled()) {
 				logger.debug("Reinjecting dependencies for test context [" + testContext + "].");
@@ -113,11 +115,19 @@ public class DependencyInjectionTestExecutionListener extends AbstractTestExecut
 	 * @see #beforeTestMethod(TestContext)
 	 */
 	protected void injectDependencies(TestContext testContext) throws Exception {
+		// 拿到测试类
 		Object bean = testContext.getTestInstance();
 		Class<?> clazz = testContext.getTestClass();
+		// 会从缓存中获取IOC容器，没有就创建并refresh
 		AutowireCapableBeanFactory beanFactory = testContext.getApplicationContext().getAutowireCapableBeanFactory();
+		// 使用 beanFactory 对 测试类 完成属性填充
 		beanFactory.autowireBeanProperties(bean, AutowireCapableBeanFactory.AUTOWIRE_NO, false);
+		// 使用 beanFactory 对 测试类 完成初始化
 		beanFactory.initializeBean(bean, clazz.getName() + AutowireCapableBeanFactory.ORIGINAL_INSTANCE_SUFFIX);
+		/**
+		 * 移除属性，表示已经注入完了
+		 * 比如 {@link #beforeTestMethod(TestContext)} 会根据这个属性，判断是否需要注入依赖
+		 */
 		testContext.removeAttribute(REINJECT_DEPENDENCIES_ATTRIBUTE);
 	}
 

@@ -350,6 +350,7 @@ public abstract class AbstractTestContextBootstrapper implements TestContextBoot
 
 		Assert.notEmpty(configAttributesList, "ContextConfigurationAttributes list must not be null or empty");
 
+		// 默认是 DelegatingSmartContextLoader		// TODOHAITAO: 2023/9/6
 		ContextLoader contextLoader = resolveContextLoader(testClass, configAttributesList);
 		List<String> locations = new ArrayList<>();
 		List<Class<?>> classes = new ArrayList<>();

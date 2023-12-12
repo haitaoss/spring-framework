@@ -26,6 +26,7 @@ import org.springframework.test.context.CacheAwareContextLoaderDelegate;
 import org.springframework.test.context.ContextLoader;
 import org.springframework.test.context.MergedContextConfiguration;
 import org.springframework.test.context.SmartContextLoader;
+import org.springframework.test.context.support.AbstractGenericContextLoader;
 import org.springframework.util.Assert;
 
 /**
@@ -96,6 +97,10 @@ public class DefaultCacheAwareContextLoaderDelegate implements CacheAwareContext
 
 		if (contextLoader instanceof SmartContextLoader) {
 			SmartContextLoader smartContextLoader = (SmartContextLoader) contextLoader;
+			/**
+			 * 创建IOC容器、然后执行 refresh
+			 * 	{@link AbstractGenericContextLoader#loadContext(MergedContextConfiguration)}
+			 */
 			applicationContext = smartContextLoader.loadContext(mergedContextConfiguration);
 		}
 		else {
@@ -121,11 +126,13 @@ public class DefaultCacheAwareContextLoaderDelegate implements CacheAwareContext
 			ApplicationContext context = this.contextCache.get(mergedContextConfiguration);
 			if (context == null) {
 				try {
+					// 创建IOC容器、然后执行 refresh
 					context = loadContextInternal(mergedContextConfiguration);
 					if (logger.isDebugEnabled()) {
 						logger.debug(String.format("Storing ApplicationContext [%s] in cache under key [%s]",
 								System.identityHashCode(context), mergedContextConfiguration));
 					}
+					// 入缓存
 					this.contextCache.put(mergedContextConfiguration, context);
 				}
 				catch (Exception ex) {
